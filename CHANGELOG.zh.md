@@ -10,6 +10,27 @@ MINOR 版本升级视为破坏性。
 本 changelog 跟踪**包发布**,不涉及 Ktav 格式本身的变更 —— 后者见
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md)。
 
+## 0.1.1 —— 新增 aarch64-linux-musl 原生二进制
+
+补齐 0.1.0 延后的唯一平台。
+
+### 新增
+
+- **`@ktav-lang/js-linux-arm64-musl`** —— 面向 Alpine Linux ARM64
+  的原生 N-API 二进制。已加入 `optionalDependencies`；
+  `npm install @ktav-lang/ktav` 在该平台上会自动选用原生 `.node`，
+  不再报 missing-binary。
+
+### 构建管线
+
+- `release.yml` 通过 `cargo-zigbuild` + `zig` 交叉编译
+  `aarch64-unknown-linux-musl`；zig 的安装步骤按 target 条件启用，
+  其他 7 个 target 不为此下载 150 MB 的 zig。
+- `.cargo/config.toml` 针对 musl 目标关闭 `crt-static`—— 否则
+  Rust 拒绝生成 `cdylib`。
+
+其他内容—— 公开 API、类型映射、运行时支持 —— 相对 0.1.0 没有变化。
+
 ## 0.1.0 —— 首次公开发布
 
 首次发布。面向 **Ktav 格式 0.1**。

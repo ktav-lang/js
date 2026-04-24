@@ -63,12 +63,14 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
             build: npx napi build --release -p ktav-napi --target x86_64-unknown-linux-musl --platform --js false --output-dir . --use-napi-cross
-          # aarch64-unknown-linux-musl intentionally skipped for 0.1.0 —
-          # @napi-rs/cross-toolchain has no x64→aarch64-musl pair, and
-          # cargo-zigbuild / cross-rs for this combo needs a separate
-          # toolchain-install step. Track in a follow-up for 0.1.1;
-          # Alpine ARM64 consumers can fall back to building from
-          # source or use the WASM build in the meantime.
+          # aarch64-unknown-linux-musl uses cargo-zigbuild via
+          # `--cross-compile` — @napi-rs/cross-toolchain doesn't ship
+          # an x64→aarch64-musl linker pair, but zig's bundled musl
+          # sysroot handles it cleanly. The `setup-zig` step below is
+          # gated on the target name so it only runs here.
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            build: npx napi build --release -p ktav-napi --target aarch64-unknown-linux-musl --platform --js false --output-dir . --cross-compile
 
     steps:
       - uses: actions/checkout@v6
@@ -84,6 +86,21 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.settings.target }}
+
+      # Zig is only required by the `--cross-compile` build path — we
+      # use it for aarch64-unknown-linux-musl (see matrix comment).
+      # Skipping on every other target avoids a 150MB download × 7.
+      - name: Install zig (for --cross-compile targets only)
+        if: matrix.settings.target == 'aarch64-unknown-linux-musl'
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.14.0
+      - name: Install cargo-zigbuild (for --cross-compile targets only)
+        if: matrix.settings.target == 'aarch64-unknown-linux-musl'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild
+
       - run: npm ci
       - name: Build
         run: ${{ matrix.settings.build }}

@@ -1,12 +1,12 @@
 {
-  "name": "@ktav-lang/js-darwin-arm64",
+  "name": "@ktav-lang/js-linux-arm64-musl",
   "version": "0.1.1",
   "cpu": [
     "arm64"
   ],
-  "main": "ktav.darwin-arm64.node",
+  "main": "ktav.linux-arm64-musl.node",
   "files": [
-    "ktav.darwin-arm64.node"
+    "ktav.linux-arm64-musl.node"
   ],
   "description": "Universal JS/TS bindings for Ktav — a plain configuration format with three rules, zero indentation, and zero quoting. WASM-backed, ships for Node, Deno, Bun, and browsers from a single package.",
   "keywords": [
@@ -32,6 +32,9 @@
     "url": "https://github.com/ktav-lang/js/issues"
   },
   "os": [
-    "darwin"
+    "linux"
+  ],
+  "libc": [
+    "musl"
   ]
 }

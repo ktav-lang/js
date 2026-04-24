@@ -11,6 +11,28 @@ This changelog tracks **package releases**, not changes to the Ktav
 format itself — for the latter see
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
+## 0.1.1 — adds aarch64-linux-musl native
+
+Backfills the one platform deferred from 0.1.0.
+
+### Added
+
+- **`@ktav-lang/js-linux-arm64-musl`** — native N-API binary for
+  Alpine Linux on ARM64. Now listed in `optionalDependencies`;
+  `npm install @ktav-lang/ktav` on this platform gets the native
+  `.node` automatically instead of a missing-binary error.
+
+### Build plumbing
+
+- `release.yml` cross-compiles `aarch64-unknown-linux-musl` via
+  `cargo-zigbuild` + `zig`, gated behind a per-target setup step so
+  the other 7 entries don't pay the 150 MB zig download.
+- `.cargo/config.toml` disables `crt-static` on musl targets — Rust's
+  default refuses `cdylib` otherwise.
+
+Everything else — the public API, type mapping, runtime support — is
+unchanged from 0.1.0.
+
 ## 0.1.0 — first public release
 
 The initial release. Targets **Ktav format 0.1**.

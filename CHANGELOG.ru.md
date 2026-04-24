@@ -12,6 +12,28 @@ MINOR bump — ломающий.
 формата Ktav — для последнего см.
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
+## 0.1.1 — нативный aarch64-linux-musl
+
+Докрывает единственную платформу, отложенную из 0.1.0.
+
+### Добавлено
+
+- **`@ktav-lang/js-linux-arm64-musl`** — нативный N-API бинарь для
+  Alpine Linux на ARM64. Теперь в `optionalDependencies`;
+  `npm install @ktav-lang/ktav` на этой платформе автоматически
+  подхватит нативный `.node` вместо ошибки missing-binary.
+
+### Внутренности сборки
+
+- `release.yml` кросс-компилирует `aarch64-unknown-linux-musl`
+  через `cargo-zigbuild` + `zig`, шаг установки zig условно — только
+  для этого target'а, остальные 7 не тянут лишние 150 МБ.
+- `.cargo/config.toml` отключает `crt-static` на musl-targets — без
+  этого Rust не соглашается собирать `cdylib`.
+
+Остальное — публичный API, type mapping, поддержка рантаймов — без
+изменений с 0.1.0.
+
 ## 0.1.0 — первый публичный релиз
 
 Первый релиз. Цель — **формат Ktav 0.1**.
