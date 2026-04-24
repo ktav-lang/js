@@ -2,7 +2,7 @@
 // the consumer to call the default export (`init()`) once before using
 // `loads` / `dumps`, so we expose it here alongside the typed API.
 
-// @ts-expect-error — resolved at build time by wasm-pack (`--target web`).
+// Resolved via package.json `imports`; emitted by wasm-pack `--target web`.
 import init, * as wasm from "#wasm/web";
 
 import type { KtavInput, KtavValue } from "./api.js";

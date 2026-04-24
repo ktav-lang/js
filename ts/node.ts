@@ -1,8 +1,8 @@
 // Node.js entrypoint. Re-exports the wasm-bindgen `nodejs`-target build
 // with the canonical generic-typed public API from `./api`.
 
-// @ts-expect-error — resolved at runtime via package.json `imports`; the
-// wasm-bindgen `.d.ts` is emitted by `wasm-pack` at build time.
+// Resolved via package.json `imports`; the wasm-bindgen `.d.ts` is
+// emitted by `wasm-pack` at build time under `dist/wasm/node/`.
 import * as wasm from "#wasm/node";
 
 import type { KtavInput, KtavValue } from "./api.js";

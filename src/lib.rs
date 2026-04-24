@@ -26,6 +26,7 @@ use ktav::render;
 use ktav::value::{ObjectMap, Scalar, Value};
 use rustc_hash::FxBuildHasher;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
 
 /// Parse a Ktav document and return the equivalent JavaScript value.
 #[wasm_bindgen(js_name = loads)]
@@ -104,10 +105,16 @@ fn js_to_value(obj: &JsValue) -> Result<Value, JsError> {
         return Ok(Value::Bool(b));
     }
     if obj.is_bigint() {
-        // `BigInt.prototype.toString()` gives a canonical decimal form
+        // `BigInt.prototype.toString(10)` gives a canonical decimal form
         // with no separators — safe to parse back on the Rust side.
-        let s = js_sys::JsString::from(obj.clone()).as_string().ok_or_else(|| {
-            JsError::new("BigInt could not be converted to string")
+        // `JsValue::as_string()` returns `None` for a BigInt (distinct
+        // from a String), so route through `BigInt::to_string(10)`.
+        let bi: &BigInt = obj.unchecked_ref();
+        let s_js = bi.to_string(10).map_err(|e| {
+            JsError::new(&format!("BigInt.toString(10) failed: {e:?}"))
+        })?;
+        let s = s_js.as_string().ok_or_else(|| {
+            JsError::new("BigInt.toString(10) did not return a string")
         })?;
         return Ok(Value::Integer(Scalar::from(s.as_str())));
     }

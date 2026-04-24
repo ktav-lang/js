@@ -20,7 +20,11 @@ port:i 8080
 host: localhost
 ratio:f 0.5
 tls: true
-tags: [ alpha beta gamma ]
+tags: [
+    alpha
+    beta
+    gamma
+]
 db.name: primary
 db.timeout:i 30
 `;

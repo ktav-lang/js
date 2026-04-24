@@ -2,7 +2,7 @@
 // `bundler`-target wasm-bindgen build uses ESM import of `.wasm` and
 // relies on the bundler to resolve it — no runtime `init` call.
 
-// @ts-expect-error — resolved at build time by wasm-pack (`--target bundler`).
+// Resolved via package.json `imports`; emitted by wasm-pack `--target bundler`.
 import * as wasm from "#wasm/bundler";
 
 import type { KtavInput, KtavValue } from "./api.js";

@@ -10,7 +10,7 @@
 // `--no-pack` suppresses wasm-pack's own package.json — we ship our own.
 
 import { execSync } from "node:child_process";
-import { rmSync, existsSync } from "node:fs";
+import { rmSync, existsSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -40,6 +40,15 @@ for (const [target, subdir] of targets) {
     console.log(`[build] ${cmd}`);
     execSync(cmd, { cwd: root, stdio: "inherit" });
 }
+
+// wasm-pack's `nodejs` target emits CJS glue (`exports.foo = ...`). The
+// root package.json has `"type": "module"`, so Node refuses to load it
+// as ESM. Drop a local marker in the nodejs output dir that overrides
+// the type for just that subtree. `web` / `bundler` emit ESM already.
+writeFileSync(
+    resolve(outRoot, "node", "package.json"),
+    JSON.stringify({ type: "commonjs" }, null, 2) + "\n",
+);
 
 // Sanity check — every target should have emitted a .wasm + .js + .d.ts.
 for (const [, subdir] of targets) {
