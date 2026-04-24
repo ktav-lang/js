@@ -1,0 +1,30 @@
+# Local agent/dev scratch — per AGENTS.md §9, never commit or publish.
+docs_local/
+
+# Rust build artifacts
+target/
+Cargo.lock
+
+# Node / JS
+node_modules/
+dist/
+*.tsbuildinfo
+
+# wasm-pack scratch
+pkg/
+
+# IDE / editor metadata
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log

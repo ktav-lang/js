@@ -1,0 +1,200 @@
+//! WebAssembly bindings for the Ktav configuration format.
+//!
+//! Compiled by `wasm-pack` into three targets (node / web / bundler); a
+//! thin TypeScript facade under `ts/` wraps the generated glue with
+//! generic-typed `loads<T>` / `dumps<T>` signatures.
+//!
+//! ## Type mapping
+//!
+//! | Ktav               | JavaScript           |
+//! |--------------------|----------------------|
+//! | `null`             | `null`               |
+//! | `true` / `false`   | `boolean`            |
+//! | `:i <digits>`      | `number` (safe) / `bigint` (out of range) |
+//! | `:f <number>`      | `number`             |
+//! | bare scalar        | `string`             |
+//! | `[ ... ]`          | `Array`              |
+//! | `{ ... }`          | plain object         |
+//!
+//! JavaScript has a single `number` type, so the encoder uses a simple
+//! rule: `Number.isInteger(x)` → `:i`, otherwise `:f`. `bigint` always
+//! becomes `:i` (arbitrary precision round-trips through decimal string).
+
+use indexmap::IndexMap;
+use js_sys::{Array, BigInt, Object, Reflect};
+use ktav::render;
+use ktav::value::{ObjectMap, Scalar, Value};
+use rustc_hash::FxBuildHasher;
+use wasm_bindgen::prelude::*;
+
+/// Parse a Ktav document and return the equivalent JavaScript value.
+#[wasm_bindgen(js_name = loads)]
+pub fn loads(s: &str) -> Result<JsValue, JsError> {
+    let value = ktav::parse(s).map_err(|e| JsError::new(&e.to_string()))?;
+    value_to_js(&value)
+}
+
+/// Serialize a JavaScript value as a Ktav document. The top-level value
+/// must be a plain object — Ktav documents are objects.
+#[wasm_bindgen(js_name = dumps)]
+pub fn dumps(obj: JsValue) -> Result<String, JsError> {
+    let value = js_to_value(&obj)?;
+    if !matches!(value, Value::Object(_)) {
+        return Err(JsError::new("Top-level Ktav value must be an object"));
+    }
+    render::render(&value).map_err(|e| JsError::new(&e.to_string()))
+}
+
+/// Map a `ktav::Value` to a native JavaScript value.
+fn value_to_js(value: &Value) -> Result<JsValue, JsError> {
+    Ok(match value {
+        Value::Null => JsValue::NULL,
+        Value::Bool(b) => JsValue::from_bool(*b),
+        Value::Integer(s) => {
+            // Fast path: most config integers fit in i53 (JS safe-integer
+            // range). Parse + range-check; fall back to `BigInt` only when
+            // the literal exceeds what JS Number can represent exactly.
+            if let Ok(v) = s.as_str().parse::<i64>() {
+                if (-(1i64 << 53)..=(1i64 << 53)).contains(&v) {
+                    JsValue::from_f64(v as f64)
+                } else {
+                    bigint_from_str(s.as_str())?
+                }
+            } else {
+                bigint_from_str(s.as_str())?
+            }
+        }
+        Value::Float(s) => {
+            let v: f64 = s.as_str().parse().map_err(|_| {
+                JsError::new(&format!("Invalid Float literal: {}", s.as_str()))
+            })?;
+            JsValue::from_f64(v)
+        }
+        Value::String(s) => JsValue::from_str(s.as_str()),
+        Value::Array(items) => {
+            let arr = Array::new_with_length(items.len() as u32);
+            for (i, item) in items.iter().enumerate() {
+                arr.set(i as u32, value_to_js(item)?);
+            }
+            arr.into()
+        }
+        Value::Object(obj) => {
+            let out = Object::new();
+            for (k, v) in obj.iter() {
+                Reflect::set(&out, &JsValue::from_str(k.as_str()), &value_to_js(v)?)
+                    .map_err(|e| JsError::new(&format!("{e:?}")))?;
+            }
+            out.into()
+        }
+    })
+}
+
+/// Map a native JavaScript value to a `ktav::Value`.
+///
+/// Order matters: `bigint` must be checked before generic object
+/// branches. `Number.isInteger(x)` decides `:i` vs `:f` for Number —
+/// `1` encodes as `:i 1`, `1.5` as `:f 1.5`. (JS itself does not
+/// distinguish `1` from `1.0`; users who want `:f` for a whole number
+/// should use `BigInt`-free explicit decimals like `1.0` in a string.)
+fn js_to_value(obj: &JsValue) -> Result<Value, JsError> {
+    if obj.is_null() || obj.is_undefined() {
+        return Ok(Value::Null);
+    }
+    if let Some(b) = obj.as_bool() {
+        return Ok(Value::Bool(b));
+    }
+    if obj.is_bigint() {
+        // `BigInt.prototype.toString()` gives a canonical decimal form
+        // with no separators — safe to parse back on the Rust side.
+        let s = js_sys::JsString::from(obj.clone()).as_string().ok_or_else(|| {
+            JsError::new("BigInt could not be converted to string")
+        })?;
+        return Ok(Value::Integer(Scalar::from(s.as_str())));
+    }
+    if let Some(n) = obj.as_f64() {
+        if !n.is_finite() {
+            return Err(JsError::new(
+                "NaN / Infinity is not representable in Ktav 0.1.0",
+            ));
+        }
+        // Integer detection mirrors `Number.isInteger(x)` — integral and
+        // within the i64 range (the broader i53-safe range is a subset).
+        if n.fract() == 0.0 && (i64::MIN as f64..=i64::MAX as f64).contains(&n) {
+            let mut buf = itoa::Buffer::new();
+            return Ok(Value::Integer(Scalar::from(buf.format(n as i64))));
+        }
+        return Ok(Value::Float(Scalar::from(format_float(n))));
+    }
+    if let Some(s) = obj.as_string() {
+        return Ok(Value::String(Scalar::from(s.as_str())));
+    }
+    if Array::is_array(obj) {
+        let arr = Array::from(obj);
+        let len = arr.length() as usize;
+        let mut out = Vec::with_capacity(len);
+        for i in 0..arr.length() {
+            out.push(js_to_value(&arr.get(i))?);
+        }
+        return Ok(Value::Array(out));
+    }
+    if obj.is_object() {
+        let entries = Object::entries(&Object::from(obj.clone()));
+        let mut map: ObjectMap = IndexMap::with_capacity_and_hasher(
+            entries.length() as usize,
+            FxBuildHasher,
+        );
+        for i in 0..entries.length() {
+            let pair = Array::from(&entries.get(i));
+            let key = pair.get(0);
+            let val = pair.get(1);
+            let key_str = key.as_string().ok_or_else(|| {
+                JsError::new("Object keys must be strings")
+            })?;
+            map.insert(Scalar::from(key_str.as_str()), js_to_value(&val)?);
+        }
+        return Ok(Value::Object(map));
+    }
+    Err(JsError::new("Unsupported JavaScript value type for Ktav"))
+}
+
+/// Build a JS `BigInt` from a decimal string literal.
+fn bigint_from_str(s: &str) -> Result<JsValue, JsError> {
+    BigInt::new(&JsValue::from_str(s))
+        .map(Into::into)
+        .map_err(|e| JsError::new(&format!("BigInt parse failed: {e:?}")))
+}
+
+/// Format `f64` with a mandatory decimal point in the mantissa — Ktav's
+/// Float grammar requires `N.N` at a minimum, but `ryu` emits `1e100`
+/// without one for large values. Inserts `.0` right before the exponent.
+fn format_float(v: f64) -> String {
+    let mut buf = ryu::Buffer::new();
+    let s = buf.format(v);
+    let bytes = s.as_bytes();
+    let mut e_pos: Option<usize> = None;
+    let mut has_dot = false;
+    for (i, &b) in bytes.iter().enumerate() {
+        if b == b'.' {
+            has_dot = true;
+        } else if b == b'e' || b == b'E' {
+            e_pos = Some(i);
+            break;
+        }
+    }
+    match (e_pos, has_dot) {
+        (_, true) => s.to_string(),
+        (Some(pos), false) => {
+            let mut out = String::with_capacity(s.len() + 2);
+            out.push_str(&s[..pos]);
+            out.push_str(".0");
+            out.push_str(&s[pos..]);
+            out
+        }
+        (None, false) => {
+            let mut out = String::with_capacity(s.len() + 2);
+            out.push_str(s);
+            out.push_str(".0");
+            out
+        }
+    }
+}

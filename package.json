@@ -1,0 +1,74 @@
+{
+  "name": "ktav",
+  "version": "0.1.0",
+  "description": "Universal JS/TS bindings for Ktav — a plain configuration format with three rules, zero indentation, and zero quoting. WASM-backed, ships for Node, Deno, Bun, and browsers from a single package.",
+  "license": "MIT",
+  "author": "Marat K <phpcraftdream@gmail.com>",
+  "homepage": "https://github.com/ktav-lang/js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ktav-lang/js.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ktav-lang/js/issues"
+  },
+  "keywords": [
+    "ktav",
+    "config",
+    "configuration",
+    "parser",
+    "serializer",
+    "wasm",
+    "webassembly"
+  ],
+  "type": "module",
+  "main": "./dist/ts/node.js",
+  "types": "./dist/ts/node.d.ts",
+  "browser": "./dist/ts/web.js",
+  "exports": {
+    ".": {
+      "types": "./dist/ts/node.d.ts",
+      "node": {
+        "types": "./dist/ts/node.d.ts",
+        "default": "./dist/ts/node.js"
+      },
+      "deno": {
+        "types": "./dist/ts/web.d.ts",
+        "default": "./dist/ts/web.js"
+      },
+      "bun": {
+        "types": "./dist/ts/node.d.ts",
+        "default": "./dist/ts/node.js"
+      },
+      "browser": {
+        "types": "./dist/ts/web.d.ts",
+        "default": "./dist/ts/web.js"
+      },
+      "default": {
+        "types": "./dist/ts/bundler.d.ts",
+        "default": "./dist/ts/bundler.js"
+      }
+    }
+  },
+  "imports": {
+    "#wasm/node": "./dist/wasm/node/ktav.js",
+    "#wasm/web": "./dist/wasm/web/ktav.js",
+    "#wasm/bundler": "./dist/wasm/bundler/ktav.js"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build:wasm": "node scripts/build.mjs",
+    "build:ts": "tsc -p tsconfig.json",
+    "build": "npm run build:wasm && npm run build:ts",
+    "clean": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\"",
+    "test": "node --test tests/"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
