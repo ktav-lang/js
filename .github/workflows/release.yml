@@ -59,9 +59,12 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
             build: npx napi build --release -p ktav-napi --target x86_64-unknown-linux-musl --platform --js false --output-dir . --use-napi-cross
-          - os: ubuntu-latest
-            target: aarch64-unknown-linux-musl
-            build: npx napi build --release -p ktav-napi --target aarch64-unknown-linux-musl --platform --js false --output-dir . --use-napi-cross
+          # aarch64-unknown-linux-musl intentionally skipped for 0.1.0 —
+          # @napi-rs/cross-toolchain has no x64→aarch64-musl pair, and
+          # cargo-zigbuild / cross-rs for this combo needs a separate
+          # toolchain-install step. Track in a follow-up for 0.1.1;
+          # Alpine ARM64 consumers can fall back to building from
+          # source or use the WASM build in the meantime.
 
     steps:
       - uses: actions/checkout@v6
