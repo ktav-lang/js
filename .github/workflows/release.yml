@@ -38,8 +38,12 @@ jobs:
             target: aarch64-pc-windows-msvc
             build: npx napi build --release -p ktav-napi --target aarch64-pc-windows-msvc --platform --js false --output-dir .
 
-          # macOS — native x64 and arm64 runners both available.
-          - os: macos-13
+          # macOS — both targets built on the `macos-latest` (Apple
+          # Silicon) runner. Rust + Apple's clang cross-compile x86_64
+          # from arm64 hosts natively, and the arm64 runner pool is
+          # far less constrained than `macos-13` — avoids queue times
+          # that routinely hit 20+ minutes on Intel-Mac runners.
+          - os: macos-latest
             target: x86_64-apple-darwin
             build: npx napi build --release -p ktav-napi --target x86_64-apple-darwin --platform --js false --output-dir .
           - os: macos-latest
