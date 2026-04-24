@@ -4,14 +4,16 @@
 <body>
 <pre id="log"></pre>
 <script type="module">
-    // Import through the compiled TS facade to mirror what a real
-    // consumer gets via `<script type="module">import "ktav"</script>`.
-    // That path uses the inline wasm build — `ready()` decodes the
-    // base64-embedded bytes once, no extra HTTP round trip.
-    import { loads, dumps, ready } from "/dist/ts/web.js";
-    import { runAll } from "/tests/shared/assertions.mjs";
+    console.log("[runner] module start");
+    // Dynamic imports so we can log between each and narrow failures.
+    console.log("[runner] fetching assertions.mjs");
+    const { runAll } = await import("/tests/shared/assertions.mjs");
+    console.log("[runner] fetching dist/ts/web.js");
+    const { loads, dumps, ready } = await import("/dist/ts/web.js");
+    console.log("[runner] imports resolved");
 
     await ready();
+    console.log("[runner] ready() done");
 
     const manifest = await fetch("/__manifest").then(r => r.json());
 

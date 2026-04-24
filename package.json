@@ -50,11 +50,6 @@
       }
     }
   },
-  "imports": {
-    "#wasm/web": "./dist/wasm/web/ktav.js",
-    "#wasm/web-inline": "./dist/wasm/web/ktav.inline.js",
-    "#wasm/bundler": "./dist/wasm/bundler/ktav.js"
-  },
   "files": [
     "dist/ts/",
     "dist/wasm/",

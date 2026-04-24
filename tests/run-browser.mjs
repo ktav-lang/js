@@ -90,19 +90,47 @@ const url = `http://127.0.0.1:${port}/tests/browser-runner.html`;
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage();
 page.on("console", (msg) => console.log(`[browser:${msg.type()}] ${msg.text()}`));
-page.on("pageerror", (err) => console.error(`[browser:pageerror] ${err}`));
+
+let pageError = null;
+page.on("pageerror", (err) => {
+    pageError = err;
+    console.error(`[browser:pageerror] ${err}`);
+});
+page.on("requestfailed", (req) => {
+    console.error(`[browser:requestfailed] ${req.url()} — ${req.failure()?.errorText}`);
+});
+page.on("response", (res) => {
+    if (res.status() >= 400) {
+        console.error(`[browser:response ${res.status()}] ${res.url()}`);
+    }
+});
 
 await page.goto(url);
-const result = await page.evaluate(
-    () =>
-        new Promise((resolve) => {
-            const done = () => {
-                if (globalThis.__ktavResult) resolve(globalThis.__ktavResult);
-                else setTimeout(done, 50);
-            };
-            done();
-        }),
-);
+
+const TIMEOUT_MS = 60_000;
+const deadline = Date.now() + TIMEOUT_MS;
+let result = null;
+while (Date.now() < deadline) {
+    if (pageError) break;
+    result = await page.evaluate(() => globalThis.__ktavResult ?? null);
+    if (result) break;
+    await new Promise((r) => setTimeout(r, 100));
+}
+
+if (!result) {
+    await browser.close();
+    server.close();
+    if (pageError) {
+        console.error(`[browser] page errored before __ktavResult was set`);
+    } else {
+        console.error(
+            `[browser] timed out after ${TIMEOUT_MS}ms — runner page never set __ktavResult. ` +
+            `Likely an import / load failure inside browser-runner.html; re-run with ` +
+            `headless: false to inspect.`,
+        );
+    }
+    process.exit(1);
+}
 
 await browser.close();
 server.close();
