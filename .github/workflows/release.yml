@@ -33,35 +33,35 @@ jobs:
           # Windows
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            build: npx napi build --release -p ktav-napi --target x86_64-pc-windows-msvc --platform --js false
+            build: npx napi build --release -p ktav-napi --target x86_64-pc-windows-msvc --platform --js false --output-dir .
           - os: windows-latest
             target: aarch64-pc-windows-msvc
-            build: npx napi build --release -p ktav-napi --target aarch64-pc-windows-msvc --platform --js false
+            build: npx napi build --release -p ktav-napi --target aarch64-pc-windows-msvc --platform --js false --output-dir .
 
           # macOS — native x64 and arm64 runners both available.
           - os: macos-13
             target: x86_64-apple-darwin
-            build: npx napi build --release -p ktav-napi --target x86_64-apple-darwin --platform --js false
+            build: npx napi build --release -p ktav-napi --target x86_64-apple-darwin --platform --js false --output-dir .
           - os: macos-latest
             target: aarch64-apple-darwin
-            build: npx napi build --release -p ktav-napi --target aarch64-apple-darwin --platform --js false
+            build: npx napi build --release -p ktav-napi --target aarch64-apple-darwin --platform --js false --output-dir .
 
           # Linux gnu — native x64, cross-compile arm64 via @napi-rs/cli.
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            build: npx napi build --release -p ktav-napi --target x86_64-unknown-linux-gnu --platform --js false --use-napi-cross
+            build: npx napi build --release -p ktav-napi --target x86_64-unknown-linux-gnu --platform --js false --output-dir . --use-napi-cross
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            build: npx napi build --release -p ktav-napi --target aarch64-unknown-linux-gnu --platform --js false --use-napi-cross
+            build: npx napi build --release -p ktav-napi --target aarch64-unknown-linux-gnu --platform --js false --output-dir . --use-napi-cross
 
           # Linux musl — Zig is the only reliable static-MUSL linker
           # on hosted runners; cargo-zigbuild is what napi-rs ships for.
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
-            build: npx napi build --release -p ktav-napi --target x86_64-unknown-linux-musl --platform --js false --use-napi-cross
+            build: npx napi build --release -p ktav-napi --target x86_64-unknown-linux-musl --platform --js false --output-dir . --use-napi-cross
           - os: ubuntu-latest
             target: aarch64-unknown-linux-musl
-            build: npx napi build --release -p ktav-napi --target aarch64-unknown-linux-musl --platform --js false --use-napi-cross
+            build: npx napi build --release -p ktav-napi --target aarch64-unknown-linux-musl --platform --js false --output-dir . --use-napi-cross
 
     steps:
       - uses: actions/checkout@v6
