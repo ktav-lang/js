@@ -1,0 +1,26 @@
+[package]
+name = "ktav-wasm"
+description = "wasm-bindgen bindings for the Ktav configuration format (browser / Deno / bundler targets)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+# Which version of the Ktav format specification these bindings implement.
+[package.metadata.ktav]
+spec-version = "0.1.0"
+
+[lib]
+name = "ktav"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+ktav = { workspace = true }
+indexmap = { workspace = true }
+rustc-hash = { workspace = true }
+itoa = { workspace = true }
+ryu = { workspace = true }
+wasm-bindgen = "0.2"
+js-sys = "0.3"

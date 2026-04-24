@@ -1,0 +1,35 @@
+[package]
+name = "ktav-napi"
+description = "N-API (Node / Bun) bindings for the Ktav configuration format"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+# napi-build v2.3.1 emits `cargo::rerun-if-env-changed` directives, a
+# syntax stabilised in Rust 1.77. We can't inherit the workspace MSRV
+# (1.70) here, so bump this crate specifically. The wasm crate and the
+# shared `ktav` core still hold to 1.70.
+rust-version = "1.77"
+publish = false
+
+[package.metadata.ktav]
+spec-version = "0.1.0"
+
+[lib]
+name = "ktav_napi"
+crate-type = ["cdylib"]
+
+[dependencies]
+ktav = { workspace = true }
+indexmap = { workspace = true }
+rustc-hash = { workspace = true }
+itoa = { workspace = true }
+ryu = { workspace = true }
+# napi-rs v3 is the current stable line; N-API v8 features let us use
+# native `BigInt` conversions without manual i64 packing. `napi4` is
+# the minimum ABI that ships on all supported Node LTS / Bun / Electron.
+napi = { version = "3", default-features = false, features = ["napi8", "compat-mode"] }
+napi-derive = "3"
+
+[build-dependencies]
+napi-build = "2"

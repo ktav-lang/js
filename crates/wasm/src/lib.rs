@@ -1,8 +1,12 @@
 //! WebAssembly bindings for the Ktav configuration format.
 //!
-//! Compiled by `wasm-pack` into three targets (node / web / bundler); a
-//! thin TypeScript facade under `ts/` wraps the generated glue with
-//! generic-typed `loads<T>` / `dumps<T>` signatures.
+//! Compiled by `wasm-pack` into two targets (web / bundler) that serve
+//! browser, Deno, and bundled consumers. Node / Bun go through the
+//! sibling `ktav-napi` crate instead — see `crates/napi/` — because
+//! N-API avoids the UTF-16 ↔ UTF-8 string copy that dominates the
+//! wasm-bindgen FFI boundary. A thin TypeScript facade under `ts/`
+//! wraps both backends with generic-typed `loads<T>` / `dumps<T>`
+//! signatures so consumers see one API.
 //!
 //! ## Type mapping
 //!

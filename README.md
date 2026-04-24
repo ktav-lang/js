@@ -85,13 +85,34 @@ encodes as `:i`. `NaN` and `Infinity` are rejected.
 
 ## Build from source
 
-Prerequisites: Rust ≥ 1.70, `wasm-pack`, Node ≥ 18.
+Common prerequisites:
+- Rust ≥ 1.70 (stable) + target `wasm32-unknown-unknown`.
+- Node ≥ 18.
+- `wasm-pack` (`cargo install wasm-pack`) — for the web / Deno / bundler
+  builds.
+- `@napi-rs/cli` (installed by `npm install` as a dev dep) — for the
+  native `.node` binary that Node and Bun consume.
+
+Windows-specific: the N-API crate links against the MSVC toolchain, so
+you need **either**
+
+1. Visual Studio Build Tools with the **Windows SDK** component
+   installed (canonical path), **or**
+2. `cargo-xwin` + **Windows Developer Mode enabled**
+   (Settings → Privacy & security → For developers → Developer Mode).
+   Developer Mode grants your user the symlink privilege that `xwin`
+   needs to unpack the MSVC/SDK cache. After enabling, also run
+   `rustup override set stable-x86_64-pc-windows-msvc` in this repo —
+   the GNU toolchain hits a separate `libnode.dll` wall that Node on
+   Windows doesn't provide.
+
+Linux / macOS: nothing extra — system compiler + Rust is enough.
 
 ```bash
 git clone --recurse-submodules https://github.com/ktav-lang/js.git
 cd js
 npm install
-npm run build     # wasm-pack × 3 targets, then tsc
+npm run build     # napi + wasm-pack × 2 targets, then tsc
 npm test
 ```
 
