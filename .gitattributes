@@ -1,0 +1,12 @@
+# Normalize text line endings to LF in the repository, regardless of
+# contributor's platform or `core.autocrlf` setting. Working-tree files
+# on all platforms check out with LF — no more CRLF/LF noise in
+# `git status` from Windows clients.
+* text=auto eol=lf
+
+# Windows-only scripts must stay CRLF — cmd.exe refuses to parse .bat
+# files with LF-only endings. Only applies to the three local build
+# helpers under `scripts/`; everything else (Rust, JS, TS, Python,
+# shell, markdown) stays LF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
