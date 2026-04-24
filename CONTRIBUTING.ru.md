@@ -104,6 +104,33 @@ npm run build:wasm      # web + bundler wasm + web/inline
 npm run build:ts        # только TypeScript-фасад
 ```
 
+## Локальный прогон clippy (нюанс Windows)
+
+`cargo clippy --target wasm32-unknown-unknown` всё равно компилирует
+host-сторонние proc-macro'ы и `build.rs`-скрипты — они всегда
+собираются под HOST-triple. На Windows-машине, где активный toolchain
+— MSVC (наш дефолт после `rustup override set stable-x86_64-pc-windows-msvc`
+для N-API-сборки), clippy тянет MSVC-овский `link.exe` и падает,
+если в шелле не загружен `vcvars64.bat`.
+
+Чтобы обойти всю эту возню, гоняй clippy для wasm-крейта через
+GNU-toolchain — линкер MinGW уже в PATH, никакой настройки не нужно:
+
+```bash
+cargo +stable-x86_64-pc-windows-gnu clippy-wasm -- -D warnings
+```
+
+Алиасы `clippy-wasm` / `clippy-napi` живут в `.cargo/config.toml` и
+подставляют нужные `--target`-флаги. Для N-API-крейта MSVC-toolchain
+обязателен (линковка против импортов node.dll) — оборачивай через
+`scripts/lint-rust-napi-windows.bat` или просто запускай
+`npm run lint:rust`, который по платформе сам выберет правильную
+обёртку.
+
+На Linux / macOS ничего из этого не нужно — дефолтный toolchain это
+GNU / Darwin, `cargo clippy-wasm` и `cargo clippy-napi` работают
+как есть.
+
 ## Стиль кода
 
 - **TypeScript**: strict, NodeNext module resolution. Избегайте `any`

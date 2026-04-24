@@ -4,10 +4,14 @@
 <body>
 <pre id="log"></pre>
 <script type="module">
-    import init, { loads, dumps } from "/dist/wasm/web/ktav.js";
+    // Import through the compiled TS facade to mirror what a real
+    // consumer gets via `<script type="module">import "ktav"</script>`.
+    // That path uses the inline wasm build — `ready()` decodes the
+    // base64-embedded bytes once, no extra HTTP round trip.
+    import { loads, dumps, ready } from "/dist/ts/web.js";
     import { runAll } from "/tests/shared/assertions.mjs";
 
-    await init({ module_or_path: "/dist/wasm/web/ktav_bg.wasm" });
+    await ready();
 
     const manifest = await fetch("/__manifest").then(r => r.json());
 

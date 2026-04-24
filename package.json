@@ -52,6 +52,7 @@
   },
   "imports": {
     "#wasm/web": "./dist/wasm/web/ktav.js",
+    "#wasm/web-inline": "./dist/wasm/web/ktav.inline.js",
     "#wasm/bundler": "./dist/wasm/bundler/ktav.js"
   },
   "files": [
@@ -64,6 +65,7 @@
     "CHANGELOG.md"
   ],
   "scripts": {
+    "lint:rust": "node scripts/lint-rust.mjs",
     "build:napi": "node scripts/build-napi.mjs",
     "build:wasm": "node -e \"import('child_process').then(c=>{const w=process.platform==='win32';c.execSync(w?'scripts\\\\build-wasm-windows.bat':'node scripts/build-wasm.mjs',{stdio:'inherit'})})\"",
     "build:ts": "tsc -p tsconfig.json",

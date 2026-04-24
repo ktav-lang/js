@@ -3,12 +3,15 @@
 // `Deno.readFile` so `init()` doesn't have to `fetch()`.
 // Run: deno run --allow-read --allow-env tests/run-deno.ts
 
-import init, { loads, dumps } from "../dist/wasm/web/ktav.js";
+// Go through the compiled TS facade (`dist/ts/web.js`) so we
+// exercise the same import path real Deno consumers would see via
+// package.json `exports`. That bundle uses the inline wasm build,
+// so there's no `.wasm` fetch — just `await ready()` once.
+import { loads, dumps, ready } from "../dist/ts/web.js";
 // @ts-expect-error — plain .mjs, no type-decls; run-time is fine.
 import { runAll } from "./shared/assertions.mjs";
 
-const wasmUrl = new URL("../dist/wasm/web/ktav_bg.wasm", import.meta.url);
-await init({ module_or_path: await Deno.readFile(wasmUrl) });
+await ready();
 
 const repo = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 

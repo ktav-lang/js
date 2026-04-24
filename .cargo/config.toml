@@ -1,0 +1,19 @@
+# Cargo aliases for the common lint / check flows.
+#
+# Use with the GNU toolchain on Windows to dodge the MSVC linker
+# dance for `ktav-wasm`:
+#
+#     cargo +stable-x86_64-pc-windows-gnu clippy-wasm -- -D warnings
+#
+# On Linux / macOS (or a Windows box whose default toolchain is
+# already GNU) the `+` prefix is unnecessary:
+#
+#     cargo clippy-wasm -- -D warnings
+#
+# `clippy-napi` always needs the MSVC toolchain on Windows — the
+# final cdylib links against node.dll imports. Either launch it from
+# a shell with vcvars64 sourced, or run `npm run lint:rust` which
+# dispatches to `scripts/lint-rust-napi-windows.bat` for you.
+[alias]
+clippy-wasm = ["clippy", "-p", "ktav-wasm", "--target", "wasm32-unknown-unknown", "--all-targets"]
+clippy-napi = ["clippy", "-p", "ktav-napi", "--all-targets"]

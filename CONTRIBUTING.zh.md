@@ -99,6 +99,30 @@ npm run build:wasm      # web + bundler wasm + web/inline
 npm run build:ts        # 仅 TypeScript 外观层
 ```
 
+## 在 Windows 本地运行 clippy（注意点）
+
+`cargo clippy --target wasm32-unknown-unknown` 仍然会把宿主侧的 proc-macro
+和 `build.rs` 脚本按宿主三元组编译 —— 这两类东西永远是按 host 编译的。
+在 Windows 上，如果默认 toolchain 是 MSVC（我们为 N-API 构建执行过
+`rustup override set stable-x86_64-pc-windows-msvc` 之后就是这个状态），
+clippy 会拉起 MSVC 的 `link.exe`，除非当前 shell 已经 source 过
+`vcvars64.bat`，否则就会报错。
+
+绕过这套流程的办法：给 wasm crate 的 clippy 指定 GNU toolchain —— MinGW
+的链接器已经在 PATH 里，不用任何配置：
+
+```bash
+cargo +stable-x86_64-pc-windows-gnu clippy-wasm -- -D warnings
+```
+
+`clippy-wasm` / `clippy-napi` 这两个 alias 写在 `.cargo/config.toml`
+里，封装了正确的 target 参数。N-API crate 绕不开 MSVC（需要链接
+node.dll 的导入符号）—— 用 `scripts/lint-rust-napi-windows.bat`
+包一层，或者直接 `npm run lint:rust`，脚本会按平台选合适的包装器。
+
+Linux / macOS 完全不需要这些 —— 默认 toolchain 就是 GNU / Darwin，
+直接 `cargo clippy-wasm` 和 `cargo clippy-napi` 即可。
+
 ## 代码风格
 
 - **TypeScript**:strict,NodeNext 模块解析。公开 API 避免 `any`

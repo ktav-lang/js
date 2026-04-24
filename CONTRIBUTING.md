@@ -102,6 +102,32 @@ npm run build:wasm      # web + bundler wasm + web/inline
 npm run build:ts        # TypeScript facade only
 ```
 
+## Running clippy locally (Windows quirk)
+
+`cargo clippy --target wasm32-unknown-unknown` still compiles host-side
+proc-macros and `build.rs` scripts — those always build for the host
+triple. On a Windows box whose default toolchain is MSVC (our default
+after `rustup override set stable-x86_64-pc-windows-msvc` for the N-API
+build), clippy pulls in MSVC's `link.exe` and fails unless the shell
+already has `vcvars64.bat` sourced.
+
+Dodge the whole dance by running the wasm-crate clippy through the
+GNU toolchain — MinGW's linker is already in PATH, no setup needed:
+
+```bash
+cargo +stable-x86_64-pc-windows-gnu clippy-wasm -- -D warnings
+```
+
+The `clippy-wasm` / `clippy-napi` aliases live in `.cargo/config.toml`
+and lock in the right target flags. For the N-API crate, the MSVC
+toolchain is unavoidable (it links against node.dll imports) — wrap
+it with `scripts/lint-rust-napi-windows.bat` or just run
+`npm run lint:rust`, which dispatches to the right wrapper per
+platform.
+
+Linux / macOS need none of this — default toolchain is GNU / Darwin,
+`cargo clippy-wasm` and `cargo clippy-napi` work as-is.
+
 ## Code style
 
 - **TypeScript**: strict, NodeNext module resolution. Avoid `any` in

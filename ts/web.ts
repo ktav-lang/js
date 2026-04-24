@@ -1,21 +1,41 @@
-// Browser / Deno entrypoint. The `web`-target wasm-bindgen build expects
-// the consumer to call the default export (`init()`) once before using
-// `loads` / `dumps`, so we expose it here alongside the typed API.
+// Browser / Deno entrypoint.
+//
+// Defaults to the **inline** wasm build — `crates/wasm`'s compiled
+// binary is base64-embedded in the JS bundle. One HTTP round trip,
+// no sibling `.wasm` fetch, works over `file://`. The `.wasm` bytes
+// are lazily decoded and cached on the first call to `ready()`, so
+// repeated `ready()` calls after warm-up are free.
+//
+// Power users who want the fetch-based build (smaller JS, separate
+// cacheable `.wasm`) can import `ktav/dist/wasm/web/ktav.js`
+// directly and drive its `init(URL)` themselves.
 
-// Resolved via package.json `imports`; emitted by wasm-pack `--target web`.
-import init, * as wasm from "#wasm/web";
+// Resolved via package.json `imports`; emitted by
+// `scripts/build-wasm.mjs` after wasm-pack's `--target web`.
+import init, * as wasm from "#wasm/web-inline";
 
 import type { KtavInput, KtavValue } from "./api.js";
 export type { KtavArray, KtavError, KtavInput, KtavObject, KtavValue, Ktav } from "./api.js";
 
+let warmPromise: Promise<void> | null = null;
+
 /**
- * Initialize the WASM module. Must be awaited once before any call to
- * `loads` / `dumps` in browser / Deno contexts. Accepts the same inputs
- * as the wasm-bindgen default export (URL, BufferSource, Response, …);
- * `undefined` falls back to a sibling `.wasm` file next to the JS glue.
+ * Prewarm the WASM module.
+ *
+ * Must be awaited **once** before the first call to `loads` / `dumps`
+ * on the web / Deno / browser path. The first call decodes the
+ * embedded wasm bytes from base64 and instantiates the module;
+ * subsequent calls return the same resolved promise without doing
+ * any work (idempotent).
+ *
+ * On Node / Bun this is not imported — the native entry loads the
+ * `.node` binary synchronously at import time.
  */
-export async function ready(input?: Parameters<typeof init>[0]): Promise<void> {
-    await init(input);
+export function ready(): Promise<void> {
+    if (warmPromise === null) {
+        warmPromise = init().then(() => undefined);
+    }
+    return warmPromise;
 }
 
 export function loads<T = KtavValue>(s: string): T {
