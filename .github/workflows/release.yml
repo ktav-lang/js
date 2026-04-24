@@ -171,10 +171,29 @@ jobs:
         run: |
           for dir in npm/*/; do
             echo "publishing $dir"
-            npm publish --access public --provenance --tag latest "$dir" || exit 1
+            # EPUBLISHCONFLICT (409 `already published`) is not fatal —
+            # happens when a previous run got partway through the
+            # matrix then hit a separate error. Every other non-zero
+            # exit propagates.
+            if ! out=$(npm publish --access public --provenance --tag latest "$dir" 2>&1); then
+              echo "$out"
+              if echo "$out" | grep -qE "EPUBLISHCONFLICT|previously published|cannot publish over"; then
+                echo "[publish] $dir already on registry — skipping"
+                continue
+              fi
+              exit 1
+            fi
           done
 
       - name: Publish main ktav
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public --provenance --tag latest
+        run: |
+          if ! out=$(npm publish --access public --provenance --tag latest 2>&1); then
+            echo "$out"
+            if echo "$out" | grep -qE "EPUBLISHCONFLICT|previously published|cannot publish over"; then
+              echo "[publish] main package already on registry — skipping"
+              exit 0
+            fi
+            exit 1
+          fi
