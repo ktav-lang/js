@@ -66,7 +66,12 @@
     "build:ts": "tsc -p tsconfig.json",
     "build": "npm run build:napi && npm run build:wasm && npm run build:ts",
     "clean": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\"",
-    "test": "node --test tests/basic.test.mjs tests/conformance.test.mjs"
+    "test:node-napi": "node tests/run-node-napi.mjs",
+    "test:node-wasm": "node tests/run-node-wasm.mjs",
+    "test:bun": "bun run tests/run-bun.mjs",
+    "test:deno": "deno run --allow-read --allow-env tests/run-deno.ts",
+    "test:browser": "node tests/run-browser.mjs",
+    "test": "npm run test:node-napi && npm run test:node-wasm && npm run test:bun && npm run test:deno && npm run test:browser"
   },
   "engines": {
     "node": ">=18"
@@ -75,6 +80,7 @@
     "@napi-rs/cli": "^3.6.2",
     "@types/node": "^25.6.0",
     "json-bigint": "^1.0.0",
+    "playwright": "^1.59.1",
     "typescript": "^6.0.3"
   }
 }

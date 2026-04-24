@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>ktav browser test runner</title></head>
+<body>
+<pre id="log"></pre>
+<script type="module">
+    import init, { loads, dumps } from "/dist/wasm/web/ktav.js";
+    import { runAll } from "/tests/shared/assertions.mjs";
+
+    await init({ module_or_path: "/dist/wasm/web/ktav_bg.wasm" });
+
+    const manifest = await fetch("/__manifest").then(r => r.json());
+
+    // Browser fetch adapter — synchronous adapter over a pre-warmed
+    // Map. `runAll` calls `readTextFile` synchronously, so we must
+    // fetch every fixture before kicking the suite off.
+    const cache = new Map();
+    const allFiles = [...manifest.valid, ...manifest.invalid];
+    for (const f of allFiles) {
+        cache.set(f, await fetch("/" + f.replace(/^\/+/, "")).then(r => r.text()));
+        const json = f.replace(/\.ktav$/, ".json");
+        cache.set(json, await fetch("/" + json.replace(/^\/+/, "")).then(r => r.text()));
+    }
+
+    function walkKtavFiles(dir) {
+        // Manifest already carries per-subdir lists; just pick by prefix.
+        if (dir.endsWith("/valid")) return manifest.valid;
+        if (dir.endsWith("/invalid")) return manifest.invalid;
+        return [];
+    }
+
+    const log = document.getElementById("log");
+    const result = runAll({
+        loads,
+        dumps,
+        readTextFile: (p) => {
+            const v = cache.get(p);
+            if (v === undefined) throw new Error("fixture not preloaded: " + p);
+            return v;
+        },
+        walkKtavFiles,
+        specDir: manifest.specDir,
+        label: "browser",
+        log: (m) => { log.textContent += m + "\n"; },
+    });
+    log.textContent += `\n[browser] ${result.passed}/${result.total} passed, ${result.failed} failed\n`;
+    globalThis.__ktavResult = result;
+</script>
+</body>
+</html>
