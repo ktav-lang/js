@@ -15,6 +15,14 @@ format itself — for the latter see
 
 The initial release. Targets **Ktav format 0.1**.
 
+### Package name
+
+Published as **`@ktav-lang/ktav`** on npm. The unscoped name `ktav`
+(matching the Rust crate and the PyPI package) is blocked by npm's
+similarity filter against popular names like `koa` / `keyv` / `klaw`.
+If the unscoped name opens up later, a future release may alias to it;
+for now the scoped form is canonical.
+
 ### Public API
 
 - `loads<T = KtavValue>(s: string): T` — parse a Ktav document.

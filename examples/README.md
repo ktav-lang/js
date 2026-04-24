@@ -7,7 +7,7 @@ not to demonstrate advanced features.
 
 | Runtime   | Folder          | How it loads ktav                          |
 |-----------|-----------------|--------------------------------------------|
-| Node      | `node/`         | N-API native `.node` (via `import "ktav"`) |
+| Node      | `node/`         | N-API native `.node` (via `import "@ktav-lang/ktav"`) |
 | Bun       | `bun/`          | N-API native `.node`                        |
 | Deno      | `deno/`         | wasm `web` target (`await ready()`)         |
 | Browser   | `browser/`      | wasm `web` target, served by any static HTTP server |
@@ -15,8 +15,8 @@ not to demonstrate advanced features.
 
 From a git checkout, each example resolves ktav through a relative
 path to `../../dist/` so you can hack the binding and see the change
-without publishing. Published consumers just `npm install ktav` and
-import from the package name.
+without publishing. Published consumers just `npm install @ktav-lang/ktav`
+and import from the package name.
 
 Run `npm run build` at the repo root first — every example depends on
 the compiled artifacts under `dist/`.

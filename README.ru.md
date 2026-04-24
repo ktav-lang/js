@@ -17,8 +17,13 @@
 ## Установка
 
 ```bash
-npm install ktav
+npm install @ktav-lang/ktav
 ```
+
+> **Про имя:** короткое `ktav` заблокировано фильтром похожих имён на npm
+> (слишком близко к `koa`, `keyv`, `klaw`, …), поэтому пакет публикуется
+> под скоупом `@ktav-lang`. В Rust (`ktav` на crates.io) и Python
+> (`ktav` на PyPI) короткая форма сохранена.
 
 Один пакет обслуживает все целевые рантаймы:
 
@@ -36,7 +41,7 @@ macOS (x64/arm64) и Windows (x64/arm64); npm через `optionalDependencies`
 ## Быстрый старт
 
 ```ts
-import { loads, dumps } from "ktav";
+import { loads, dumps } from "@ktav-lang/ktav";
 
 interface Config {
     port: number;
@@ -67,7 +72,7 @@ const back = dumps(cfg);
 отложенно:
 
 ```ts
-import { ready, loads } from "ktav";
+import { ready, loads } from "@ktav-lang/ktav";
 await ready();
 loads("port:i 8080\n");
 ```

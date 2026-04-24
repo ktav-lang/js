@@ -15,8 +15,12 @@
 ## 安装
 
 ```bash
-npm install ktav
+npm install @ktav-lang/ktav
 ```
+
+> **命名说明：** 短名 `ktav` 被 npm 的相似名过滤器拦下（与 `koa`、`keyv`、
+> `klaw`… 过于相似），因此该包发布在 `@ktav-lang` scope 下。Rust
+> （crates.io 上的 `ktav`）与 Python（PyPI 上的 `ktav`）保留短名。
 
 一个包服务所有目标运行时:
 
@@ -33,7 +37,7 @@ Windows (x64/arm64) 预编译;npm 通过 `optionalDependencies` 安装与当前
 ## 快速开始
 
 ```ts
-import { loads, dumps } from "ktav";
+import { loads, dumps } from "@ktav-lang/ktav";
 
 interface Config {
     port: number;
@@ -63,7 +67,7 @@ Deno 与浏览器的使用方必须在首次调用 `loads` / `dumps` 之前调�
 `ready()`,因为 wasm 目标采用延迟实例化:
 
 ```ts
-import { ready, loads } from "ktav";
+import { ready, loads } from "@ktav-lang/ktav";
 await ready();
 loads("port:i 8080\n");
 ```

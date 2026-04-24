@@ -3,7 +3,7 @@
 // inlines/serves it according to its own policy. No runtime `init()`
 // call is needed.
 
-import { loads, dumps } from "ktav";
+import { loads, dumps } from "@ktav-lang/ktav";
 
 const src = `
 service: ktav-vite-demo

@@ -17,8 +17,13 @@ document.
 ## Install
 
 ```bash
-npm install ktav
+npm install @ktav-lang/ktav
 ```
+
+> **Naming note:** the bare `ktav` name is blocked on npm's similarity
+> filter (too close to `koa`, `keyv`, `klaw`, …), so the package ships
+> under the `@ktav-lang` scope. Rust (`ktav` on crates.io) and Python
+> (`ktav` on PyPI) keep the short form.
 
 One package serves every target runtime:
 
@@ -36,7 +41,7 @@ matches, the loader throws early with a clear diagnostic.
 ## Quick start
 
 ```ts
-import { loads, dumps } from "ktav";
+import { loads, dumps } from "@ktav-lang/ktav";
 
 interface Config {
     port: number;
@@ -66,7 +71,7 @@ Deno and browser consumers must call `ready()` once before the first
 `loads` / `dumps`, because the wasm target defers instantiation:
 
 ```ts
-import { ready, loads } from "ktav";
+import { ready, loads } from "@ktav-lang/ktav";
 await ready();
 loads("port:i 8080\n");
 ```

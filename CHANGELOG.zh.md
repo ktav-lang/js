@@ -14,6 +14,13 @@ MINOR 版本升级视为破坏性。
 
 首次发布。面向 **Ktav 格式 0.1**。
 
+### 包名
+
+在 npm 上以 **`@ktav-lang/ktav`** 发布。短名 `ktav`（Rust crate 与 PyPI
+包都用它）被 npm 的相似名过滤器拦下 —— 与 `koa` / `keyv` / `klaw`
+等流行包太相似。若未来短名开放，后续版本可能加入别名；目前 scoped
+形式为正式名。
+
 ### 公开 API
 
 - `loads<T = KtavValue>(s: string): T` —— 解析 Ktav 文档。

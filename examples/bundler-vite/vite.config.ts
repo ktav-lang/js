@@ -5,10 +5,10 @@ import { defineConfig } from "vite";
 export default defineConfig({
     resolve: {
         alias: {
-            ktav: new URL("../../dist/ts/bundler.js", import.meta.url).pathname,
+            "@ktav-lang/ktav": new URL("../../dist/ts/bundler.js", import.meta.url).pathname,
         },
     },
     optimizeDeps: {
-        exclude: ["ktav"],
+        exclude: ["@ktav-lang/ktav"],
     },
 });
