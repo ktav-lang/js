@@ -57,6 +57,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: npm ci
       - run: rustup target add wasm32-unknown-unknown
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
       - name: Build wasm (for #wasm/* type resolution)
         run: npm run build:wasm
       - name: Build napi (so dist/native/ is populated)
@@ -91,7 +95,9 @@ jobs:
       - run: rustup target add wasm32-unknown-unknown
       - run: npm ci
       - name: Install wasm-pack
-        run: cargo install wasm-pack --locked
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
       - run: npm run build
       - run: npm run test:node-napi
       - run: npm run test:node-wasm
@@ -116,7 +122,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: rustup target add wasm32-unknown-unknown
       - run: npm ci
-      - run: cargo install wasm-pack --locked
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
       - run: npm run build
       - run: npm run test:bun
 
@@ -142,7 +150,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: rustup target add wasm32-unknown-unknown
       - run: npm ci
-      - run: cargo install wasm-pack --locked
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
       - run: npm run build:wasm
       - run: npm run build:ts
       - run: npm run test:deno
@@ -166,7 +176,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: rustup target add wasm32-unknown-unknown
       - run: npm ci
-      - run: cargo install wasm-pack --locked
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
       - run: npm run build:wasm
       - run: npm run build:ts
       - run: npx playwright install --with-deps chromium

@@ -70,9 +70,10 @@ fn value_to_js(value: &Value) -> Result<JsValue, JsError> {
             }
         }
         Value::Float(s) => {
-            let v: f64 = s.as_str().parse().map_err(|_| {
-                JsError::new(&format!("Invalid Float literal: {}", s.as_str()))
-            })?;
+            let v: f64 = s
+                .as_str()
+                .parse()
+                .map_err(|_| JsError::new(&format!("Invalid Float literal: {}", s.as_str())))?;
             JsValue::from_f64(v)
         }
         Value::String(s) => JsValue::from_str(s.as_str()),
@@ -114,12 +115,12 @@ fn js_to_value(obj: &JsValue) -> Result<Value, JsError> {
         // `JsValue::as_string()` returns `None` for a BigInt (distinct
         // from a String), so route through `BigInt::to_string(10)`.
         let bi: &BigInt = obj.unchecked_ref();
-        let s_js = bi.to_string(10).map_err(|e| {
-            JsError::new(&format!("BigInt.toString(10) failed: {e:?}"))
-        })?;
-        let s = s_js.as_string().ok_or_else(|| {
-            JsError::new("BigInt.toString(10) did not return a string")
-        })?;
+        let s_js = bi
+            .to_string(10)
+            .map_err(|e| JsError::new(&format!("BigInt.toString(10) failed: {e:?}")))?;
+        let s = s_js
+            .as_string()
+            .ok_or_else(|| JsError::new("BigInt.toString(10) did not return a string"))?;
         return Ok(Value::Integer(Scalar::from(s.as_str())));
     }
     if let Some(n) = obj.as_f64() {
@@ -150,17 +151,15 @@ fn js_to_value(obj: &JsValue) -> Result<Value, JsError> {
     }
     if obj.is_object() {
         let entries = Object::entries(&Object::from(obj.clone()));
-        let mut map: ObjectMap = IndexMap::with_capacity_and_hasher(
-            entries.length() as usize,
-            FxBuildHasher,
-        );
+        let mut map: ObjectMap =
+            IndexMap::with_capacity_and_hasher(entries.length() as usize, FxBuildHasher);
         for i in 0..entries.length() {
             let pair = Array::from(&entries.get(i));
             let key = pair.get(0);
             let val = pair.get(1);
-            let key_str = key.as_string().ok_or_else(|| {
-                JsError::new("Object keys must be strings")
-            })?;
+            let key_str = key
+                .as_string()
+                .ok_or_else(|| JsError::new("Object keys must be strings"))?;
             map.insert(Scalar::from(key_str.as_str()), js_to_value(&val)?);
         }
         return Ok(Value::Object(map));

@@ -152,12 +152,9 @@ fn js_to_value(env: &Env, obj: &Unknown) -> Result<Value> {
             // also a `typeof === "object"`, so we must branch here.
             let is_array = {
                 let mut ia: bool = false;
-                let status =
-                    unsafe { sys::napi_is_array(env.raw(), obj.raw(), &mut ia) };
+                let status = unsafe { sys::napi_is_array(env.raw(), obj.raw(), &mut ia) };
                 if status != sys::Status::napi_ok {
-                    return Err(Error::from_reason(
-                        "napi_is_array failed".to_string(),
-                    ));
+                    return Err(Error::from_reason("napi_is_array failed".to_string()));
                 }
                 ia
             };
@@ -175,9 +172,7 @@ fn js_to_value(env: &Env, obj: &Unknown) -> Result<Value> {
             }
             let js_obj: Object = unsafe { obj.cast()? };
             let names = js_obj.get_property_names()?;
-            let name_arr: Array = unsafe {
-                Array::from_napi_value(env.raw(), names.raw())?
-            };
+            let name_arr: Array = unsafe { Array::from_napi_value(env.raw(), names.raw())? };
             let len = name_arr.len();
             let mut map: ObjectMap =
                 IndexMap::with_capacity_and_hasher(len as usize, FxBuildHasher);
