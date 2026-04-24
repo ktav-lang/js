@@ -79,10 +79,11 @@ fn value_to_js<'env>(env: &'env Env, value: &Value) -> Result<Unknown<'env>> {
 
 /// Encode a Ktav `Integer` scalar (stored as decimal string) as the
 /// smallest JS numeric type that losslessly represents it:
-///   - fits in i53 → `Number`
-///   - fits in i128 → JS `BigInt` via `i128`'s ToNapiValue impl
-///   - otherwise     → parse via JS `BigInt(str)` so arbitrary-precision
-///                     literals still survive the round-trip.
+///
+/// - fits in i53 → `Number`
+/// - fits in i128 → JS `BigInt` via `i128`'s `ToNapiValue` impl
+/// - otherwise → parse via JS `BigInt(str)` so arbitrary-precision
+///   literals still survive the round-trip.
 fn integer_to_js<'env>(env: &'env Env, s: &str) -> Result<Unknown<'env>> {
     if let Ok(n) = s.parse::<i64>() {
         if (-(1i64 << 53)..=(1i64 << 53)).contains(&n) {
