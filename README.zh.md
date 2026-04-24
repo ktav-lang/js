@@ -1,0 +1,163 @@
+# ktav (JavaScript / TypeScript)
+
+> [Ktav](https://github.com/ktav-lang/spec) 的通用 JS/TS 绑定 —— 一种朴素的
+> 配置格式。JSON 形状,无引号,无逗号,以点号串联的嵌套键。底层由 Rust
+> 驱动;面向 Node 与 Bun 以原生 N-API 发布,面向 Deno、浏览器与打包器以
+> WebAssembly 发布。
+
+**语言:** [English](README.md) · [Русский](README.ru.md) · **简体中文**
+
+**规范:** 本包实现 **Ktav 0.1**。格式独立于本包版本化维护,参见
+[`ktav-lang/spec`](https://github.com/ktav-lang/spec) 的正式文档。
+
+---
+
+## 安装
+
+```bash
+npm install ktav
+```
+
+一个包服务所有目标运行时:
+
+| 运行时                              | 后端   | 加载方式                                          |
+|-------------------------------------|--------|---------------------------------------------------|
+| Node ≥ 18, Bun                      | N-API  | 通过 optional dep 加载平台专属 `.node`            |
+| Deno, 浏览器                        | WASM   | `web` 目标,使用方 `await ready()`                |
+| Webpack / Vite / Rollup / esbuild   | WASM   | `bundler` 目标,由打包器解析 `.wasm`              |
+
+原生二进制已为 Linux (x64/arm64, glibc + musl)、macOS (x64/arm64) 与
+Windows (x64/arm64) 预编译;npm 通过 `optionalDependencies` 安装与当前
+主机匹配的那一个。若无匹配项,加载器会及早抛出并给出清晰的诊断信息。
+
+## 快速开始
+
+```ts
+import { loads, dumps } from "ktav";
+
+interface Config {
+    port: number;
+    host: string;
+    tls: boolean;
+    tags: string[];
+}
+
+const cfg = loads<Config>(`
+port:i 8080
+host: localhost
+tls: true
+tags: [
+    alpha
+    beta
+    gamma
+]
+`);
+
+cfg.port;  // 8080 —— 类型为 number
+cfg.host;  // "localhost"
+
+const back = dumps(cfg);
+```
+
+Deno 与浏览器的使用方必须在首次调用 `loads` / `dumps` 之前调用一次
+`ready()`,因为 wasm 目标采用延迟实例化:
+
+```ts
+import { ready, loads } from "ktav";
+await ready();
+loads("port:i 8080\n");
+```
+
+Node / Bun 的使用方无需此步 —— 原生二进制会在导入时加载。
+
+## 公开 API
+
+```ts
+function loads<T = KtavValue>(s: string): T;
+function dumps<T extends KtavInput = KtavInput>(obj: T): string;
+
+// 仅 web / Deno / 浏览器;Node + Bun 忽略此函数
+function ready(input?: URL | Response | ArrayBuffer): Promise<void>;
+```
+
+`loads` 上的泛型参数是**未经检查的类型断言** —— 当你已知数据形状、
+希望获得 IDE 自动补全时使用。不传则得到结构化类型 `KtavValue`。
+
+## 类型映射
+
+| Ktav             | JavaScript                                         |
+|------------------|----------------------------------------------------|
+| `null`           | `null`                                             |
+| `true` / `false` | `boolean`                                          |
+| `:i <digits>`    | `number` (安全范围) / `bigint` (更大)              |
+| `:f <number>`    | `number`                                           |
+| 裸标量           | `string`                                           |
+| `[ ... ]`        | `Array`                                            |
+| `{ ... }`        | 普通对象 (保留插入顺序)                            |
+
+Ktav 坚持**"不耍小聪明"** —— 裸 `port: 8080` 在解析层面仍然是字符串。
+需要数字时请使用类型标记 `:i` / `:f`,或在应用层自行转换。
+
+编码时,`Number.isInteger(x)` 决定使用 `:i` 还是 `:f`;`bigint` 始终
+编码为 `:i`。`NaN` 与 `±Infinity` 会被拒绝 —— Ktav 0.1.0 不表示它们。
+
+## 单文件浏览器构建
+
+`dist/wasm/web/ktav.inline.js` 是将 WASM 二进制以 base64 内嵌的变体
+—— 无需同级 `.wasm` 文件,也无需 HTTP 服务器,直接放进任何
+`<script type="module">`。在 `file://` 下也能工作。
+
+```html
+<script type="module">
+    import init, { loads, dumps } from "https://unpkg.com/ktav/dist/wasm/web/ktav.inline.js";
+    await init();
+    console.log(loads("hello: world\n"));
+</script>
+```
+
+代价:未压缩时体积增大约 35 %,gzip 后约 5 % —— base64 对 wasm 那种
+接近随机的字节序列压缩效果很好。
+
+## 理念
+
+Ktav 有意保持小巧。五条设计原则
+(来自 [`spec/CONTRIBUTING.md`](https://github.com/ktav-lang/spec/blob/main/CONTRIBUTING.md)):
+
+1. **局部性** —— 一行的含义不依赖另一行。
+2. **一句话** —— 任何新规则都能用规范中的一句话写完。
+3. **不对空白敏感** (换行除外)。
+4. **不耍小聪明** —— 格式永不替你判断 `"8080"` 是数字。
+5. **显式优于机灵** —— `::` 的冗长是刻意的。
+
+本绑定遵循同样的原则:没有 schema 推断、没有自动类型转换、没有默认值。
+想要类型,请在边界层用你自己的工具 (Zod、io-ts、手写校验器) 作用在
+本库返回的原生结构上。
+
+## 相关项目
+
+- [`ktav-lang/spec`](https://github.com/ktav-lang/spec) —— 规范的
+  标准文档与跨语言一致性测试套件。
+- [`ktav-lang/rust`](https://github.com/ktav-lang/rust) —— 参考 Rust
+  实现。N-API crate 与 WASM crate 都对其做了封装。
+- [`ktav-lang/python`](https://github.com/ktav-lang/python) —— 基于同
+  一 crate 的 Python 绑定 (PyO3)。
+
+## 版本策略
+
+遵循 [Semantic Versioning](https://semver.org/),采用 pre-1.0 约定:
+MINOR 版本升级视为破坏性。包版本与 `ktav` crate 版本同步推进。
+
+## 开发
+
+开发环境、跨运行时测试矩阵与贡献流程见
+[CONTRIBUTING.md](CONTRIBUTING.md)。
+
+## 支持本项目
+
+作者有许多构想,可能对全球 IT 广泛有益 —— 不局限于 Ktav。实现这些
+构想需要资金支持。如果您愿意提供帮助,请联系
+**phpcraftdream@gmail.com**。
+
+## 许可证
+
+MIT。详见 [LICENSE](LICENSE)。

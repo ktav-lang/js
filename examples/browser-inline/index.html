@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ktav — browser inline example (single file)</title>
+    <style>
+        body { font: 14px/1.4 system-ui, sans-serif; max-width: 720px; margin: 2em auto; padding: 0 1em; }
+        pre { background: #f4f4f4; padding: 1em; border-radius: 6px; overflow-x: auto; }
+        .note { color: #666; font-size: .9em; }
+    </style>
+</head>
+<body>
+    <h1>ktav — inline example</h1>
+    <p class="note">This page loads <code>ktav.inline.js</code>, which has
+       the WASM binary base64-embedded. No sibling <code>.wasm</code> file
+       is fetched — the page works even when opened via <code>file://</code>.</p>
+    <pre id="out">loading...</pre>
+    <script type="module">
+        import init, { loads, dumps } from "../../dist/wasm/web/ktav.inline.js";
+
+        await init();
+
+        const cfg = loads(`
+service: ktav-inline-demo
+port:i 8080
+tls: true
+`);
+        document.getElementById("out").textContent =
+            "parsed:\n" + JSON.stringify(cfg, null, 2) +
+            "\n\nrendered:\n" + dumps(cfg);
+    </script>
+</body>
+</html>

@@ -55,8 +55,11 @@
     "#wasm/bundler": "./dist/wasm/bundler/ktav.js"
   },
   "files": [
-    "dist/",
+    "dist/ts/",
+    "dist/wasm/",
     "README.md",
+    "README.ru.md",
+    "README.zh.md",
     "LICENSE",
     "CHANGELOG.md"
   ],
@@ -76,10 +79,33 @@
   "engines": {
     "node": ">=18"
   },
+  "napi": {
+    "binaryName": "ktav",
+    "packageName": "@ktav-lang/js",
+    "targets": [
+      "x86_64-pc-windows-msvc",
+      "aarch64-pc-windows-msvc",
+      "x86_64-apple-darwin",
+      "aarch64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-gnu",
+      "x86_64-unknown-linux-musl",
+      "aarch64-unknown-linux-musl"
+    ]
+  },
+  "optionalDependencies": {
+    "@ktav-lang/js-win32-x64-msvc": "0.1.0",
+    "@ktav-lang/js-win32-arm64-msvc": "0.1.0",
+    "@ktav-lang/js-darwin-x64": "0.1.0",
+    "@ktav-lang/js-darwin-arm64": "0.1.0",
+    "@ktav-lang/js-linux-x64-gnu": "0.1.0",
+    "@ktav-lang/js-linux-arm64-gnu": "0.1.0",
+    "@ktav-lang/js-linux-x64-musl": "0.1.0",
+    "@ktav-lang/js-linux-arm64-musl": "0.1.0"
+  },
   "devDependencies": {
     "@napi-rs/cli": "^3.6.2",
     "@types/node": "^25.6.0",
-    "json-bigint": "^1.0.0",
     "playwright": "^1.59.1",
     "typescript": "^6.0.3"
   }

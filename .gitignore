@@ -13,6 +13,12 @@ dist/
 # wasm-pack scratch
 pkg/
 
+# napi-rs CLI staging for release — `.node` binaries live in
+# per-platform optionalDependencies that are published separately.
+# Their package.json lives in git; the native binary is dropped in
+# by CI via `napi artifacts` right before `npm publish`.
+npm/*/*.node
+
 # IDE / editor metadata
 .idea/
 .vscode/

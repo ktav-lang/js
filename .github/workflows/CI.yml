@@ -1,0 +1,185 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  # ------------------------------------------------------------------
+  # Rust lint — one crate at a time against the workspace.
+  # ------------------------------------------------------------------
+  rust-lint:
+    name: Rust fmt + clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --check
+      - run: rustup target add wasm32-unknown-unknown
+      - run: cargo clippy -p ktav-napi --all-targets -- -D warnings
+      - run: cargo clippy -p ktav-wasm --target wasm32-unknown-unknown -- -D warnings
+
+  # ------------------------------------------------------------------
+  # TypeScript typecheck — reuses the same tsc the publish path runs.
+  # ------------------------------------------------------------------
+  ts-typecheck:
+    name: TypeScript typecheck
+    runs-on: ubuntu-latest
+    needs: []
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: npm ci
+      - run: rustup target add wasm32-unknown-unknown
+      - name: Build wasm (for #wasm/* type resolution)
+        run: npm run build:wasm
+      - name: Build napi (so dist/native/ is populated)
+        run: npm run build:napi
+      - name: tsc
+        run: npx tsc -p tsconfig.json
+
+  # ------------------------------------------------------------------
+  # Cross-runtime test matrix. Each job builds the right bits locally
+  # and runs the corresponding test:* script. Keeping them in separate
+  # jobs means a Bun regression doesn't block Deno results and vice
+  # versa.
+  # ------------------------------------------------------------------
+  test-node:
+    name: Tests — Node ${{ matrix.node }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: ["18", "20", "22"]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: rustup target add wasm32-unknown-unknown
+      - run: npm ci
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
+      - run: npm run build
+      - run: npm run test:node-napi
+      - run: npm run test:node-wasm
+
+  test-bun:
+    name: Tests — Bun / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: rustup target add wasm32-unknown-unknown
+      - run: npm ci
+      - run: cargo install wasm-pack --locked
+      - run: npm run build
+      - run: npm run test:bun
+
+  test-deno:
+    name: Tests — Deno / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: rustup target add wasm32-unknown-unknown
+      - run: npm ci
+      - run: cargo install wasm-pack --locked
+      - run: npm run build:wasm
+      - run: npm run build:ts
+      - run: npm run test:deno
+
+  test-browser:
+    name: Tests — Browser (chromium) / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: rustup target add wasm32-unknown-unknown
+      - run: npm ci
+      - run: cargo install wasm-pack --locked
+      - run: npm run build:wasm
+      - run: npm run build:ts
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+
+  # Summary job for branch protection — lights up only when every
+  # matrix cell passes. Add this as the required check in rulesets.
+  test-summary:
+    name: Test summary
+    runs-on: ubuntu-latest
+    needs: [rust-lint, ts-typecheck, test-node, test-bun, test-deno, test-browser]
+    if: always()
+    steps:
+      - name: Fail if any upstream job failed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1

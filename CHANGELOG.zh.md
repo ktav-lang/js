@@ -1,0 +1,65 @@
+# Changelog
+
+**语言:** [English](CHANGELOG.md) · [Русский](CHANGELOG.ru.md) · **简体中文**
+
+本文档记录 JavaScript / TypeScript 绑定的所有重要变更。格式基于
+[Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/);版本采用
+[Semantic Versioning](https://semver.org/),遵循 pre-1.0 约定:
+MINOR 版本升级视为破坏性。
+
+本 changelog 跟踪**包发布**,不涉及 Ktav 格式本身的变更 —— 后者见
+[`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md)。
+
+## 0.1.0 —— 首次公开发布
+
+首次发布。面向 **Ktav 格式 0.1**。
+
+### 公开 API
+
+- `loads<T = KtavValue>(s: string): T` —— 解析 Ktav 文档。
+- `dumps<T extends KtavInput = KtavInput>(obj: T): string` —— 序列化
+  JavaScript 值 (顶层必须是对象)。
+- `ready(input?): Promise<void>` —— 初始化 WASM 模块。在 Node / Bun
+  上为 no-op,在 Deno / 浏览器上必须调用一次。
+- TypeScript 类型 `KtavValue`、`KtavObject`、`KtavArray`、`KtavInput`、
+  `KtavError`。
+
+### 后端
+
+- **N-API** (`crates/napi`) —— 面向 Node ≥ 18 与 Bun ≥ 1.0 的原生
+  `.node` 二进制。为 Linux (x64/arm64, gnu + musl)、macOS
+  (x64/arm64)、Windows (x64/arm64) 预编译;八个平台子包以
+  `@ktav-lang/js-<triple>` 发布,并作为主包的
+  `optionalDependencies` 声明。
+- **WebAssembly** (`crates/wasm`) —— 一个包提供两个 wasm-pack 目标:
+  - `web` 面向 Deno 与浏览器 (使用方调用 `ready()`),还包含
+    `ktav.inline.js` —— 同一入口,将 `.wasm` 以 base64 内嵌,单个
+    文件即可放入 `<script type="module">`,无需另外发起 fetch。
+  - `bundler` 面向 webpack / rollup / esbuild / vite。
+
+### 类型映射
+
+| Ktav             | JavaScript                                        |
+|------------------|---------------------------------------------------|
+| `null`           | `null`                                            |
+| `true` / `false` | `boolean`                                         |
+| `:i <digits>`    | `number` (安全范围) / `bigint` (更大)             |
+| `:f <number>`    | `number`                                          |
+| 裸标量           | `string`                                          |
+| `[ ... ]`        | `Array`                                           |
+| `{ ... }`        | 普通对象 (保留插入顺序)                           |
+
+编码时,`Number.isInteger(x)` 选择 `:i`;`bigint` 始终编码为 `:i`。
+`NaN` 与 `±Infinity` 会被拒绝。
+
+### 测试覆盖
+
+每个运行时都跑完整的 153 个断言的一致性套件 (规范 fixture + 冒烟
+测试):Node 18 / 20 / 22 在 Linux / macOS / Windows 上,Bun 在
+三种 OS 上,Deno 2.x 在三种 OS 上,通过 Playwright 的无头 Chromium
+在三种 OS 上。
+
+### 致谢
+
+基于参考 `ktav` Rust crate 构建;PyO3 风格的绑定机制借鉴自 Python
+包。

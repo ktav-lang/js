@@ -1,28 +1,39 @@
-# ktav — JavaScript / TypeScript bindings
+# ktav (JavaScript / TypeScript)
 
-Universal JS/TS bindings for [Ktav](https://github.com/ktav-lang/spec) —
-a plain configuration format with three rules, zero indentation, and
-zero quoting. WASM-backed, ships for Node, Deno, Bun, and browsers from
-a single package.
+> Universal JS/TS bindings for [Ktav](https://github.com/ktav-lang/spec) —
+> a plain configuration format. JSON-shape, no quotes, no commas, dotted
+> keys. Powered by Rust under the hood, shipped as native N-API for Node
+> and Bun, WebAssembly for Deno, browsers, and bundlers.
+
+**Languages:** **English** · [Русский](README.ru.md) · [简体中文](README.zh.md)
+
+**Specification:** this package implements **Ktav 0.1**. The format is
+versioned and maintained independently of this package — see
+[`ktav-lang/spec`](https://github.com/ktav-lang/spec) for the formal
+document.
+
+---
 
 ## Install
 
 ```bash
-npm install ktav       # Node, Bun, bundlers
+npm install ktav
 ```
 
-Deno:
+One package serves every target runtime:
 
-```ts
-import { loads, dumps, ready } from "npm:ktav";
-await ready();
-```
+| Runtime          | Backend  | How it's loaded                          |
+|------------------|----------|------------------------------------------|
+| Node ≥ 18, Bun   | N-API    | Platform-specific `.node` via optional dep |
+| Deno, browser    | WASM     | `web` target, consumer awaits `ready()`  |
+| Webpack / Vite / Rollup / esbuild | WASM | `bundler` target, bundler resolves `.wasm` |
 
-Browser (via a bundler: Vite / Rollup / webpack / esbuild): same import
-as Node. Without a bundler, use the `web` entry directly and await
-`ready()` once.
+Native binaries are prebuilt for Linux (x64/arm64, glibc + musl),
+macOS (x64/arm64), and Windows (x64/arm64); npm installs the one that
+matches the current host through `optionalDependencies`. If nothing
+matches, the loader throws early with a clear diagnostic.
 
-## Quick example
+## Quick start
 
 ```ts
 import { loads, dumps } from "ktav";
@@ -38,7 +49,11 @@ const cfg = loads<Config>(`
 port:i 8080
 host: localhost
 tls: true
-tags: [ alpha beta gamma ]
+tags: [
+    alpha
+    beta
+    gamma
+]
 `);
 
 cfg.port;  // 8080 — typed as number
@@ -47,16 +62,31 @@ cfg.host;  // "localhost"
 const back = dumps(cfg);
 ```
 
-## API
+Deno and browser consumers must call `ready()` once before the first
+`loads` / `dumps`, because the wasm target defers instantiation:
 
-- `loads<T = KtavValue>(s: string): T` — parse a Ktav document. The
-  generic parameter is an **unchecked cast** — use it for ergonomic
-  access when you know the schema. Pass nothing to get the structural
-  `KtavValue` type.
-- `dumps<T extends KtavInput = KtavInput>(obj: T): string` — serialize
-  a plain object as Ktav. Top-level must be an object.
-- `ready(input?)` — **web / Deno / browser only**. Awaits WASM
-  initialization. No-op on Node / Bun.
+```ts
+import { ready, loads } from "ktav";
+await ready();
+loads("port:i 8080\n");
+```
+
+Node / Bun consumers skip this — the native binary is loaded at import
+time.
+
+## Public API
+
+```ts
+function loads<T = KtavValue>(s: string): T;
+function dumps<T extends KtavInput = KtavInput>(obj: T): string;
+
+// web / Deno / browser only; Node + Bun ignore it
+function ready(input?: URL | Response | ArrayBuffer): Promise<void>;
+```
+
+The generic parameter on `loads` is an **unchecked cast** — use it when
+you know the shape for IDE autocomplete. Pass nothing for the
+structural `KtavValue` type.
 
 ## Type mapping
 
@@ -64,59 +94,79 @@ const back = dumps(cfg);
 |------------------|-------------------------------------------|
 | `null`           | `null`                                    |
 | `true` / `false` | `boolean`                                 |
-| `:i <digits>`    | `number` (safe range) / `bigint` (bigger) |
+| `:i <digits>`    | `number` (safe range) / `bigint` (larger) |
 | `:f <number>`    | `number`                                  |
 | bare scalar      | `string`                                  |
 | `[ ... ]`        | `Array`                                   |
-| `{ ... }`        | plain object                              |
+| `{ ... }`        | plain object (insertion-ordered)          |
+
+Ktav keeps **"no magic types"** — a bare `port: 8080` stays a string at
+the parser level. Use the typed markers `:i` / `:f` when you want
+numbers, or coerce at the application layer.
 
 On encode, `Number.isInteger(x)` decides `:i` vs `:f`; `bigint` always
-encodes as `:i`. `NaN` and `Infinity` are rejected.
+encodes as `:i`. `NaN` and `±Infinity` are rejected — Ktav 0.1.0 does
+not represent them.
 
-## Runtime matrix
+## Single-file browser build
 
-| Runtime   | Entry resolved        | `ready()` required |
-|-----------|-----------------------|--------------------|
-| Node 18+  | `dist/ts/node.js`     | no                 |
-| Bun       | `dist/ts/node.js`     | no                 |
-| Deno      | `dist/ts/web.js`      | yes                |
-| Browser   | `dist/ts/web.js`      | yes                |
-| Bundlers  | `dist/ts/bundler.js`  | no (bundler loads) |
+`dist/wasm/web/ktav.inline.js` is a variant with the WASM binary
+base64-embedded — drop it into any `<script type="module">` without a
+sibling `.wasm` file and without any HTTP server. Works over `file://`.
 
-## Build from source
-
-Common prerequisites:
-- Rust ≥ 1.70 (stable) + target `wasm32-unknown-unknown`.
-- Node ≥ 18.
-- `wasm-pack` (`cargo install wasm-pack`) — for the web / Deno / bundler
-  builds.
-- `@napi-rs/cli` (installed by `npm install` as a dev dep) — for the
-  native `.node` binary that Node and Bun consume.
-
-Windows-specific: the N-API crate links against the MSVC toolchain, so
-you need **either**
-
-1. Visual Studio Build Tools with the **Windows SDK** component
-   installed (canonical path), **or**
-2. `cargo-xwin` + **Windows Developer Mode enabled**
-   (Settings → Privacy & security → For developers → Developer Mode).
-   Developer Mode grants your user the symlink privilege that `xwin`
-   needs to unpack the MSVC/SDK cache. After enabling, also run
-   `rustup override set stable-x86_64-pc-windows-msvc` in this repo —
-   the GNU toolchain hits a separate `libnode.dll` wall that Node on
-   Windows doesn't provide.
-
-Linux / macOS: nothing extra — system compiler + Rust is enough.
-
-```bash
-git clone --recurse-submodules https://github.com/ktav-lang/js.git
-cd js
-npm install
-npm run build     # napi + wasm-pack × 2 targets, then tsc
-npm test
+```html
+<script type="module">
+    import init, { loads, dumps } from "https://unpkg.com/ktav/dist/wasm/web/ktav.inline.js";
+    await init();
+    console.log(loads("hello: world\n"));
+</script>
 ```
+
+Trade-off: ≈ 35 % bigger uncompressed, ≈ 5 % after gzip — base64
+compresses well against the wasm's near-random bytes.
+
+## Philosophy
+
+Ktav is intentionally small. Its five design principles
+(from [`spec/CONTRIBUTING.md`](https://github.com/ktav-lang/spec/blob/main/CONTRIBUTING.md)):
+
+1. **Locality** — a line's meaning does not depend on another line.
+2. **One sentence** — any new rule fits in one sentence of the spec.
+3. **No whitespace sensitivity** (line breaks aside).
+4. **No magic types** — the format never decides `"8080"` means a number.
+5. **Explicit over clever** — `::` is verbose on purpose.
+
+These bindings honour that: no schema inference, no auto-casting, no
+defaulting. If you want typing, do it at the boundary with your own
+tool (Zod, io-ts, hand-written validators) against the native
+structures this library returns.
+
+## Related projects
+
+- [`ktav-lang/spec`](https://github.com/ktav-lang/spec) — canonical
+  format specification and language-agnostic conformance test suite.
+- [`ktav-lang/rust`](https://github.com/ktav-lang/rust) — reference Rust
+  implementation. The N-API crate and the WASM crate both wrap it.
+- [`ktav-lang/python`](https://github.com/ktav-lang/python) — Python
+  bindings (PyO3) over the same crate.
+
+## Versioning
+
+Follows [Semantic Versioning](https://semver.org/) with the pre-1.0
+convention that a MINOR bump is breaking. Package version and the
+`ktav` crate version move together.
+
+## Development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev setup, the runtime
+test matrix, and the contribution workflow.
+
+## Support the project
+
+The author has many ideas that could be broadly useful to IT worldwide —
+not limited to Ktav. Realizing them requires funding. If you'd like to
+help, please reach out at **phpcraftdream@gmail.com**.
 
 ## License
 
-MIT — see [LICENSE](./LICENSE). Spec is under `spec/` as a git submodule
-pointing at [ktav-lang/spec](https://github.com/ktav-lang/spec).
+MIT. See [LICENSE](LICENSE).
