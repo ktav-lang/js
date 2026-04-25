@@ -12,6 +12,24 @@ MINOR bump — ломающий.
 формата Ktav — для последнего см.
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
+## 0.1.2 — фиксы Bun FFI + sync package-lock
+
+Patch-релиз поверх 0.1.1.
+
+### Исправлено
+
+- Обработка out-параметров `bun:ffi`. В 0.1.1 аргументы
+  `Uint8Array` / `BigUint64Array` оборачивались в `ffi.ptr()`;
+  тот возвращает `number`, а Bun'овский `FFIType.ptr` отказывается
+  принимать сырое число ("Unable to convert N to a pointer").
+  Теперь TypedArray / Buffer передаются **напрямую** — Bun
+  автоматически пинит backing-buffer и передаёт адрес.
+  Out-pointer'ы читаются как `Number(BigUint64Array[0])`,
+  данные распаковываются через `ffi.toArrayBuffer(ptr, 0, len)`.
+- `package-lock.json` синхронизирован с забампленными версиями
+  subpackages — `npm ci` больше не падает с `EUSAGE` на свежих
+  клонах.
+
 ## 0.1.1 — `/ffi` subexport для Deno и Bun, нативный aarch64-linux-musl
 
 ### Добавлено

@@ -20,8 +20,8 @@ interface BunFFI {
     dlopen(path: string, symbols: Record<string, { args: number[]; returns: number }>): {
         symbols: Record<string, (...args: unknown[]) => unknown>;
     };
-    ptr(typedArray: ArrayBufferView): bigint;
-    CString: new (ptr: bigint, byteOffset?: number, byteLength?: number) => { toString(): string };
+    /** Convert a native pointer (number on 64-bit) into an ArrayBuffer view. */
+    toArrayBuffer(ptr: number, byteOffset?: number, byteLength?: number): ArrayBuffer;
 }
 
 interface FFILib {
@@ -92,57 +92,58 @@ async function callNative(op: "loads" | "dumps", input: Uint8Array): Promise<Uin
     const sym = (op === "loads" ? symbols.ktav_loads : symbols.ktav_dumps) as
         (...args: unknown[]) => number;
 
-    // Out-parameters as Node `Buffer`. Bun's bun:ffi `ptr()` is
-    // documented to handle ArrayBufferView, but on some host/arch
-    // combinations passing a `BigUint64Array` makes it serialise the
-    // *value* instead of taking the buffer address. `Buffer.alloc(8)`
-    // is unambiguous: it's a memory region, never mistaken for a
-    // scalar.
-    const outBuf    = Buffer.alloc(8);
-    const outLen    = Buffer.alloc(8);
-    const outErr    = Buffer.alloc(8);
-    const outErrLen = Buffer.alloc(8);
-
-    // Source bytes — explicit `ptr()` so Bun pins the underlying
-    // ArrayBuffer; pass `null` (-> 0) for empty input.
-    const srcPtr = input.length === 0 ? null : ffi.ptr(input);
+    // Bun FFI sweet-spot: pass TypedArrays / Buffers directly for
+    // `FFIType.ptr` args — Bun pins the ArrayBuffer and forwards the
+    // address. Wrapping in `ffi.ptr()` returns a plain number that
+    // Bun then refuses to convert back to a pointer ("Unable to
+    // convert N to a pointer"). The current code hits the auto-pin
+    // path on every supported platform.
+    //
+    // Out-pointers / size_t out-params: `BigUint64Array(1)` gives us
+    // an 8-byte ArrayBuffer view; we read [0] as bigint after the
+    // call, then `Number(...)` it down to a JS number for
+    // `toArrayBuffer` and `ktav_free`.
+    const outBuf    = new BigUint64Array(1);
+    const outLen    = new BigUint64Array(1);
+    const outErr    = new BigUint64Array(1);
+    const outErrLen = new BigUint64Array(1);
 
     const rc = sym(
-        srcPtr,
+        input.length === 0 ? null : input,
         BigInt(input.length),
-        ffi.ptr(outBuf),
-        ffi.ptr(outLen),
-        ffi.ptr(outErr),
-        ffi.ptr(outErrLen),
+        outBuf,
+        outLen,
+        outErr,
+        outErrLen,
     );
 
-    // Read out-pointer / size_t values back from the 8-byte buffers.
-    const readPtr = (b: Buffer): bigint => b.readBigUInt64LE(0);
+    const ktavFree = symbols.ktav_free as (ptr: number, len: bigint) => void;
 
-    const ktavFree = symbols.ktav_free as (ptr: bigint, len: bigint) => void;
+    const readPtr = (b: BigUint64Array): number => Number(b[0]);
+    const readLen = (b: BigUint64Array): number => Number(b[0]);
 
     if (rc !== 0) {
         const errPtr = readPtr(outErr);
-        const errLen = Number(readPtr(outErrLen));
+        const errLen = readLen(outErrLen);
         let msg = `native call failed with code ${rc}`;
-        if (errPtr !== 0n && errLen > 0) {
-            const cstr = new ffi.CString(errPtr, 0, errLen);
-            msg = cstr.toString();
+        if (errPtr !== 0 && errLen > 0) {
+            const buf = ffi.toArrayBuffer(errPtr, 0, errLen);
+            msg = new TextDecoder().decode(new Uint8Array(buf));
             ktavFree(errPtr, BigInt(errLen));
         }
         const okPtr = readPtr(outBuf);
-        const okLen = Number(readPtr(outLen));
-        if (okPtr !== 0n && okLen > 0) ktavFree(okPtr, BigInt(okLen));
+        const okLen = readLen(outLen);
+        if (okPtr !== 0 && okLen > 0) ktavFree(okPtr, BigInt(okLen));
         throw new Error(msg);
     }
 
     const okPtr = readPtr(outBuf);
-    const okLen = Number(readPtr(outLen));
-    if (okPtr === 0n || okLen === 0) return new Uint8Array(0);
-    const cstr = new ffi.CString(okPtr, 0, okLen);
-    const text = cstr.toString();
+    const okLen = readLen(outLen);
+    if (okPtr === 0 || okLen === 0) return new Uint8Array(0);
+    const buf = ffi.toArrayBuffer(okPtr, 0, okLen);
+    const copy = new Uint8Array(buf.slice(0));
     ktavFree(okPtr, BigInt(okLen));
-    return new TextEncoder().encode(text);
+    return copy;
 }
 
 // ── Public API ───────────────────────────────────────────────────────

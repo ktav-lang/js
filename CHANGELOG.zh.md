@@ -10,6 +10,22 @@ MINOR 版本升级视为破坏性。
 本 changelog 跟踪**包发布**,不涉及 Ktav 格式本身的变更 —— 后者见
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md)。
 
+## 0.1.2 —— Bun FFI 修复 + package-lock 同步
+
+0.1.1 的补丁版本。
+
+### 修复
+
+- `bun:ffi` 的 out 参数处理。0.1.1 把 `Uint8Array` /
+  `BigUint64Array` 包在 `ffi.ptr()` 里;后者返回 `number`,
+  而 Bun 的 `FFIType.ptr` 拒绝接受裸 number
+  ("Unable to convert N to a pointer")。现在 TypedArray /
+  Buffer 实例 **直接** 传入 —— Bun 自动 pin 其底层缓冲并转发
+  地址。out-pointer 通过 `Number(BigUint64Array[0])` 读取,
+  数据通过 `ffi.toArrayBuffer(ptr, 0, len)` 解包。
+- `package-lock.json` 已与升版后的 subpackage 版本同步 ——
+  `npm ci` 在新 clone 上不再因 `EUSAGE` 报错。
+
 ## 0.1.1 —— `/ffi` 子导出(Deno + Bun)、aarch64-linux-musl 原生二进制
 
 ### 新增

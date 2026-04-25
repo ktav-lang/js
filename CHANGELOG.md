@@ -11,19 +11,20 @@ This changelog tracks **package releases**, not changes to the Ktav
 format itself — for the latter see
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
-## 0.1.2 — Bun FFI buffer fix, package-lock sync
+## 0.1.2 — Bun FFI fixes + package-lock sync
 
-Patch release for 0.1.1.
+Patch release on top of 0.1.1.
 
 ### Fixed
 
-- `bun:ffi` out-parameter handling. The previous build passed
-  `BigUint64Array` views directly; on some host/arch combinations
-  Bun serialised the array's *value* rather than taking a pointer
-  to its buffer, throwing `"Unable to convert N to a pointer"`.
-  Switched to `Buffer.alloc(8)` with `ffi.ptr()` and
-  `readBigUInt64LE` for unambiguous pointer semantics across all
-  Bun-supported platforms.
+- `bun:ffi` out-parameter handling. The 0.1.1 implementation
+  wrapped `Uint8Array` / `BigUint64Array` arguments in
+  `ffi.ptr()`; that returns a plain number, which Bun's
+  `FFIType.ptr` argument refuses to accept ("Unable to convert N
+  to a pointer"). Pass `TypedArray` / `Buffer` instances
+  **directly** — Bun auto-pins their backing buffer and forwards
+  the address. Read out-pointers as `Number(BigUint64Array[0])`,
+  unwrap data via `ffi.toArrayBuffer(ptr, 0, len)`.
 - `package-lock.json` synced to the bumped subpackage versions —
   `npm ci` no longer fails with `EUSAGE` on fresh clones.
 
