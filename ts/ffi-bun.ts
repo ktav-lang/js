@@ -92,46 +92,53 @@ async function callNative(op: "loads" | "dumps", input: Uint8Array): Promise<Uin
     const sym = (op === "loads" ? symbols.ktav_loads : symbols.ktav_dumps) as
         (...args: unknown[]) => number;
 
-    const outBuf = new BigUint64Array(1);
-    const outLen = new BigUint64Array(1);
-    const outErr = new BigUint64Array(1);
-    const outErrLen = new BigUint64Array(1);
+    // Out-parameters as Node `Buffer`. Bun's bun:ffi `ptr()` is
+    // documented to handle ArrayBufferView, but on some host/arch
+    // combinations passing a `BigUint64Array` makes it serialise the
+    // *value* instead of taking the buffer address. `Buffer.alloc(8)`
+    // is unambiguous: it's a memory region, never mistaken for a
+    // scalar.
+    const outBuf    = Buffer.alloc(8);
+    const outLen    = Buffer.alloc(8);
+    const outErr    = Buffer.alloc(8);
+    const outErrLen = Buffer.alloc(8);
 
-    // Bun FFI: pass TypedArray directly for `ptr` args — the runtime
-    // pins the buffer and passes its address. Forwarding the bigint
-    // result of `ffi.ptr()` trips a "Unable to convert N to a pointer"
-    // guard on Windows.
-    const srcArg = input.length === 0 ? null : input;
+    // Source bytes — explicit `ptr()` so Bun pins the underlying
+    // ArrayBuffer; pass `null` (-> 0) for empty input.
+    const srcPtr = input.length === 0 ? null : ffi.ptr(input);
 
     const rc = sym(
-        srcArg,
+        srcPtr,
         BigInt(input.length),
-        outBuf,
-        outLen,
-        outErr,
-        outErrLen,
+        ffi.ptr(outBuf),
+        ffi.ptr(outLen),
+        ffi.ptr(outErr),
+        ffi.ptr(outErrLen),
     );
+
+    // Read out-pointer / size_t values back from the 8-byte buffers.
+    const readPtr = (b: Buffer): bigint => b.readBigUInt64LE(0);
 
     const ktavFree = symbols.ktav_free as (ptr: bigint, len: bigint) => void;
 
     if (rc !== 0) {
-        const errPtr = outErr[0];
-        const errLen = Number(outErrLen[0]);
+        const errPtr = readPtr(outErr);
+        const errLen = Number(readPtr(outErrLen));
         let msg = `native call failed with code ${rc}`;
-        if (errPtr && errLen > 0) {
+        if (errPtr !== 0n && errLen > 0) {
             const cstr = new ffi.CString(errPtr, 0, errLen);
             msg = cstr.toString();
             ktavFree(errPtr, BigInt(errLen));
         }
-        const okPtr = outBuf[0];
-        const okLen = Number(outLen[0]);
-        if (okPtr && okLen > 0) ktavFree(okPtr, BigInt(okLen));
+        const okPtr = readPtr(outBuf);
+        const okLen = Number(readPtr(outLen));
+        if (okPtr !== 0n && okLen > 0) ktavFree(okPtr, BigInt(okLen));
         throw new Error(msg);
     }
 
-    const okPtr = outBuf[0];
-    const okLen = Number(outLen[0]);
-    if (!okPtr || okLen === 0) return new Uint8Array(0);
+    const okPtr = readPtr(outBuf);
+    const okLen = Number(readPtr(outLen));
+    if (okPtr === 0n || okLen === 0) return new Uint8Array(0);
     const cstr = new ffi.CString(okPtr, 0, okLen);
     const text = cstr.toString();
     ktavFree(okPtr, BigInt(okLen));
