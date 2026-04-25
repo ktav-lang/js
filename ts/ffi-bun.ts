@@ -97,15 +97,19 @@ async function callNative(op: "loads" | "dumps", input: Uint8Array): Promise<Uin
     const outErr = new BigUint64Array(1);
     const outErrLen = new BigUint64Array(1);
 
-    const srcPtr = input.length === 0 ? 0n : ffi.ptr(input);
+    // Bun FFI: pass TypedArray directly for `ptr` args — the runtime
+    // pins the buffer and passes its address. Forwarding the bigint
+    // result of `ffi.ptr()` trips a "Unable to convert N to a pointer"
+    // guard on Windows.
+    const srcArg = input.length === 0 ? null : input;
 
     const rc = sym(
-        srcPtr,
+        srcArg,
         BigInt(input.length),
-        ffi.ptr(outBuf),
-        ffi.ptr(outLen),
-        ffi.ptr(outErr),
-        ffi.ptr(outErrLen),
+        outBuf,
+        outLen,
+        outErr,
+        outErrLen,
     );
 
     const ktavFree = symbols.ktav_free as (ptr: bigint, len: bigint) => void;
