@@ -36,35 +36,79 @@ Windows (x64/arm64) 预编译;npm 通过 `optionalDependencies` 安装与当前
 
 ## 快速开始
 
+### 解析 —— 按类型读取字段
+
 ```ts
 import { loads, dumps } from "@ktav-lang/ktav";
 
+interface DB { host: string; timeout: number; }
 interface Config {
-    port: number;
-    host: string;
-    tls: boolean;
-    tags: string[];
+  service: string;
+  port:    number;
+  ratio:   number;
+  tls:     boolean;
+  tags:    string[];
+  db:      DB;
 }
 
 const cfg = loads<Config>(`
+service: web
 port:i 8080
-host: localhost
+ratio:f 0.75
 tls: true
 tags: [
-    alpha
-    beta
-    gamma
+    prod
+    eu-west-1
 ]
+db.host: primary.internal
+db.timeout:i 30
 `);
 
-cfg.port;  // 8080 —— 类型为 number
-cfg.host;  // "localhost"
-
-const back = dumps(cfg);
+cfg.port;        // 8080 —— 类型为 number
+cfg.db.timeout;  // 30
 ```
 
-Deno 与浏览器的使用方必须在首次调用 `loads` / `dumps` 之前调用一次
-`ready()`,因为 wasm 目标采用延迟实例化:
+### 遍历 —— 按运行时类型分派
+
+```ts
+for (const [k, v] of Object.entries(cfg)) {
+  let kind: string;
+  if (v === null)               kind = "null";
+  else if (typeof v === "boolean") kind = `bool=${v}`;
+  else if (typeof v === "bigint")  kind = `bigint=${v}`;
+  else if (typeof v === "number")
+    kind = Number.isInteger(v) ? `int=${v}` : `float=${v}`;
+  else if (typeof v === "string")  kind = `str=${JSON.stringify(v)}`;
+  else if (Array.isArray(v))       kind = `array(${v.length})`;
+  else if (typeof v === "object")  kind = `object(${Object.keys(v).length})`;
+  else kind = typeof v;
+  console.log(`${k} -> ${kind}`);
+}
+```
+
+### 构建并渲染 —— 用代码搭建文档
+
+```ts
+const doc = {
+  name:  "frontend",
+  port:  8443,
+  tls:   true,
+  ratio: 0.95,
+  upstreams: [
+    { host: "a.example", port: 1080 },
+    { host: "b.example", port: 1080 },
+  ],
+  notes: null,
+};
+const text = dumps(doc);
+```
+
+完整可运行的 Node 示例:[`examples/node/index.mjs`](examples/node/index.mjs)。
+
+### WASM 使用方(Deno、浏览器)
+
+首次调用 `loads` / `dumps` 之前调用一次 `ready()` —— wasm 目标
+采用延迟实例化:
 
 ```ts
 import { ready, loads } from "@ktav-lang/ktav";

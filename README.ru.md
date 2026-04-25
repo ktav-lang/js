@@ -40,36 +40,79 @@ macOS (x64/arm64) и Windows (x64/arm64); npm через `optionalDependencies`
 
 ## Быстрый старт
 
+### Парсинг — типизированно читаем поля
+
 ```ts
 import { loads, dumps } from "@ktav-lang/ktav";
 
+interface DB { host: string; timeout: number; }
 interface Config {
-    port: number;
-    host: string;
-    tls: boolean;
-    tags: string[];
+  service: string;
+  port:    number;
+  ratio:   number;
+  tls:     boolean;
+  tags:    string[];
+  db:      DB;
 }
 
 const cfg = loads<Config>(`
+service: web
 port:i 8080
-host: localhost
+ratio:f 0.75
 tls: true
 tags: [
-    alpha
-    beta
-    gamma
+    prod
+    eu-west-1
 ]
+db.host: primary.internal
+db.timeout:i 30
 `);
 
-cfg.port;  // 8080 — типизирован как number
-cfg.host;  // "localhost"
-
-const back = dumps(cfg);
+cfg.port;        // 8080 — типизирован как number
+cfg.db.timeout;  // 30
 ```
 
-Потребителям Deno и браузера нужно один раз вызвать `ready()` до
-первого `loads` / `dumps`, потому что цель wasm инстанцируется
-отложенно:
+### Обход — диспатч по runtime-типу
+
+```ts
+for (const [k, v] of Object.entries(cfg)) {
+  let kind: string;
+  if (v === null)               kind = "null";
+  else if (typeof v === "boolean") kind = `bool=${v}`;
+  else if (typeof v === "bigint")  kind = `bigint=${v}`;
+  else if (typeof v === "number")
+    kind = Number.isInteger(v) ? `int=${v}` : `float=${v}`;
+  else if (typeof v === "string")  kind = `str=${JSON.stringify(v)}`;
+  else if (Array.isArray(v))       kind = `array(${v.length})`;
+  else if (typeof v === "object")  kind = `object(${Object.keys(v).length})`;
+  else kind = typeof v;
+  console.log(`${k} -> ${kind}`);
+}
+```
+
+### Билд + рендер — собираем документ в коде
+
+```ts
+const doc = {
+  name:  "frontend",
+  port:  8443,
+  tls:   true,
+  ratio: 0.95,
+  upstreams: [
+    { host: "a.example", port: 1080 },
+    { host: "b.example", port: 1080 },
+  ],
+  notes: null,
+};
+const text = dumps(doc);
+```
+
+Полный запускаемый пример (Node) — в [`examples/node/index.mjs`](examples/node/index.mjs).
+
+### Потребители WASM (Deno, браузер)
+
+Один раз вызовите `ready()` до первого `loads` / `dumps` — wasm
+инстанцируется отложенно:
 
 ```ts
 import { ready, loads } from "@ktav-lang/ktav";

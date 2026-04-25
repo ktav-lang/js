@@ -40,35 +40,88 @@ matches, the loader throws early with a clear diagnostic.
 
 ## Quick start
 
+### Parse — typed reads off the parsed object
+
 ```ts
 import { loads, dumps } from "@ktav-lang/ktav";
 
+interface DB { host: string; timeout: number; }
 interface Config {
-    port: number;
-    host: string;
-    tls: boolean;
-    tags: string[];
+  service: string;
+  port:    number;
+  ratio:   number;
+  tls:     boolean;
+  tags:    string[];
+  db:      DB;
 }
 
 const cfg = loads<Config>(`
+service: web
 port:i 8080
-host: localhost
+ratio:f 0.75
 tls: true
 tags: [
-    alpha
-    beta
-    gamma
+    prod
+    eu-west-1
 ]
+db.host: primary.internal
+db.timeout:i 30
 `);
 
-cfg.port;  // 8080 — typed as number
-cfg.host;  // "localhost"
-
-const back = dumps(cfg);
+cfg.port;        // 8080 — typed as number
+cfg.db.timeout;  // 30
 ```
 
-Deno and browser consumers must call `ready()` once before the first
-`loads` / `dumps`, because the wasm target defers instantiation:
+### Walk — dispatch on the runtime type
+
+```ts
+for (const [k, v] of Object.entries(cfg)) {
+  let kind: string;
+  if (v === null)               kind = "null";
+  else if (typeof v === "boolean") kind = `bool=${v}`;
+  else if (typeof v === "bigint")  kind = `bigint=${v}`;
+  else if (typeof v === "number")
+    kind = Number.isInteger(v) ? `int=${v}` : `float=${v}`;
+  else if (typeof v === "string")  kind = `str=${JSON.stringify(v)}`;
+  else if (Array.isArray(v))       kind = `array(${v.length})`;
+  else if (typeof v === "object")  kind = `object(${Object.keys(v).length})`;
+  else kind = typeof v;
+  console.log(`${k} -> ${kind}`);
+}
+```
+
+### Build & render — construct a document in code
+
+```ts
+const doc = {
+  name:  "frontend",
+  port:  8443,
+  tls:   true,
+  ratio: 0.95,
+  upstreams: [
+    { host: "a.example", port: 1080 },
+    { host: "b.example", port: 1080 },
+  ],
+  notes: null,
+};
+const text = dumps(doc);
+// name: frontend
+// port:i 8443
+// tls: true
+// ratio:f 0.95
+// upstreams: [
+//     { host: a.example  port:i 1080 }
+//     { host: b.example  port:i 1080 }
+// ]
+// notes: null
+```
+
+A complete runnable Node example lives in [`examples/node/index.mjs`](examples/node/index.mjs).
+
+### WASM consumers (Deno, browser)
+
+Call `ready()` once before the first `loads` / `dumps` — the wasm
+target defers instantiation:
 
 ```ts
 import { ready, loads } from "@ktav-lang/ktav";
