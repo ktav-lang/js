@@ -72,24 +72,6 @@ cfg.port;        // 8080 — typed as number
 cfg.db.timeout;  // 30
 ```
 
-### Walk — dispatch on the runtime type
-
-```ts
-for (const [k, v] of Object.entries(cfg)) {
-  let kind: string;
-  if (v === null)               kind = "null";
-  else if (typeof v === "boolean") kind = `bool=${v}`;
-  else if (typeof v === "bigint")  kind = `bigint=${v}`;
-  else if (typeof v === "number")
-    kind = Number.isInteger(v) ? `int=${v}` : `float=${v}`;
-  else if (typeof v === "string")  kind = `str=${JSON.stringify(v)}`;
-  else if (Array.isArray(v))       kind = `array(${v.length})`;
-  else if (typeof v === "object")  kind = `object(${Object.keys(v).length})`;
-  else kind = typeof v;
-  console.log(`${k} -> ${kind}`);
-}
-```
-
 ### Build & render — construct a document in code
 
 ```ts
