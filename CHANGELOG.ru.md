@@ -12,16 +12,34 @@ MINOR bump — ломающий.
 формата Ktav — для последнего см.
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
-## 0.1.1 — нативный aarch64-linux-musl
-
-Докрывает единственную платформу, отложенную из 0.1.0.
+## 0.1.1 — `/ffi` subexport для Deno и Bun, нативный aarch64-linux-musl
 
 ### Добавлено
 
+- **`@ktav-lang/ktav/ffi` subexport** — прямой доступ к C ABI через
+  `Deno.dlopen` (Deno) и `bun:ffi` (Bun). Тот же `ktav_cabi`
+  бинарник, что у биндингов Java / Go / .NET, тот же JSON wire-формат
+  с `{"$i":"…"}` / `{"$f":"…"}`. ~3–5× быстрее WASM на больших
+  документах. Default import не меняется — это opt-in для тех, кто
+  измерил потребность. Бросает на Node (используйте default —
+  уже N-API нативный) и в браузере (`@ktav-lang/ktav/wasm`).
+  - Требует `--allow-ffi=<path>` на Deno; permission-free на Bun.
+  - Бинарник `ktav_cabi` лежит в соответствующем
+    `@ktav-lang/js-<rid>` optional dep рядом с `.node`. Переопределить
+    через `$KTAV_LIB_PATH` для локальных билдов.
+- **`@ktav-lang/ktav/wasm` subexport** — явный доступ к WASM-сборке,
+  полезно для окружений, где conditional `exports` map не выбирает
+  правильную ветку (некоторые бандлеры).
 - **`@ktav-lang/js-linux-arm64-musl`** — нативный N-API бинарь для
   Alpine Linux на ARM64. Теперь в `optionalDependencies`;
   `npm install @ktav-lang/ktav` на этой платформе автоматически
   подхватит нативный `.node` вместо ошибки missing-binary.
+
+### Тесты
+
+- Новые smoke-сьюты под Bun + Deno для `/ffi`-пути
+  (`tests/run-bun-ffi.mjs`, `tests/run-deno-ffi.ts`). CI гоняет оба
+  на Linux / macOS / Windows.
 
 ### Внутренности сборки
 

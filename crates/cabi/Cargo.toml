@@ -1,0 +1,22 @@
+[package]
+name = "ktav-cabi"
+description = "C ABI bindings for the Ktav configuration format, consumed by the Deno / Bun FFI subexports of @ktav-lang/ktav"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[package.metadata.ktav]
+spec-version = "0.1.0"
+
+[lib]
+name = "ktav_cabi"
+crate-type = ["cdylib"]
+
+[dependencies]
+ktav = { workspace = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+indexmap = { workspace = true }

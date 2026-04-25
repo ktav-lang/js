@@ -48,6 +48,24 @@
         "types": "./dist/ts/bundler.d.ts",
         "default": "./dist/ts/bundler.js"
       }
+    },
+    "./ffi": {
+      "deno": {
+        "types": "./dist/ts/ffi-deno.d.ts",
+        "default": "./dist/ts/ffi-deno.js"
+      },
+      "bun": {
+        "types": "./dist/ts/ffi-bun.d.ts",
+        "default": "./dist/ts/ffi-bun.js"
+      },
+      "default": {
+        "types": "./dist/ts/ffi-error.d.ts",
+        "default": "./dist/ts/ffi-error.js"
+      }
+    },
+    "./wasm": {
+      "types": "./dist/ts/web.d.ts",
+      "default": "./dist/ts/web.js"
     }
   },
   "files": [
@@ -69,9 +87,11 @@
     "test:node-napi": "node tests/run-node-napi.mjs",
     "test:node-wasm": "node tests/run-node-wasm.mjs",
     "test:bun": "bun run tests/run-bun.mjs",
+    "test:bun-ffi": "bun run tests/run-bun-ffi.mjs",
     "test:deno": "deno run --allow-read --allow-env tests/run-deno.ts",
+    "test:deno-ffi": "deno run --allow-ffi --allow-env --allow-read tests/run-deno-ffi.ts",
     "test:browser": "node tests/run-browser.mjs",
-    "test": "npm run test:node-napi && npm run test:node-wasm && npm run test:bun && npm run test:deno && npm run test:browser"
+    "test": "npm run test:node-napi && npm run test:node-wasm && npm run test:bun && npm run test:bun-ffi && npm run test:deno && npm run test:deno-ffi && npm run test:browser"
   },
   "engines": {
     "node": ">=18"

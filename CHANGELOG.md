@@ -11,16 +11,35 @@ This changelog tracks **package releases**, not changes to the Ktav
 format itself — for the latter see
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
-## 0.1.1 — adds aarch64-linux-musl native
-
-Backfills the one platform deferred from 0.1.0.
+## 0.1.1 — `/ffi` subexport for Deno + Bun, aarch64-linux-musl native
 
 ### Added
 
+- **`@ktav-lang/ktav/ffi` subexport** — direct C ABI access via
+  `Deno.dlopen` (Deno) and `bun:ffi` (Bun). Same `ktav_cabi`
+  shared library used by the Java / Go / .NET bindings, same
+  `{"$i":"…"}` / `{"$f":"…"}` JSON wire format. ~3–5× faster than
+  the WASM path on large documents. Default import unchanged —
+  this is opt-in for users who measure a need. Throws on Node
+  (use the default — already N-API native) and the browser
+  (use `@ktav-lang/ktav/wasm`).
+  - Requires `--allow-ffi=<path>` on Deno; permission-free on Bun.
+  - The `ktav_cabi` binary is bundled in the matching
+    `@ktav-lang/js-<rid>` optional dep alongside the existing
+    `.node`. Override with `$KTAV_LIB_PATH` for local builds.
+- **`@ktav-lang/ktav/wasm` subexport** — explicit access to the
+  WASM build, useful for environments where the conditional
+  `exports` map can't pick the right entry (e.g. some bundlers).
 - **`@ktav-lang/js-linux-arm64-musl`** — native N-API binary for
   Alpine Linux on ARM64. Now listed in `optionalDependencies`;
   `npm install @ktav-lang/ktav` on this platform gets the native
   `.node` automatically instead of a missing-binary error.
+
+### Tests
+
+- New Bun + Deno smoke suites for the `/ffi` path
+  (`tests/run-bun-ffi.mjs`, `tests/run-deno-ffi.ts`). CI runs both
+  on Linux / macOS / Windows.
 
 ### Build plumbing
 

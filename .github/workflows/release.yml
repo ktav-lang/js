@@ -112,6 +112,105 @@ jobs:
           if-no-files-found: error
 
   # ------------------------------------------------------------------
+  # Build the cdylib `ktav_cabi` for each platform — same C ABI as the
+  # Java / Go / .NET bindings, consumed by the new `/ffi` subexport
+  # (Deno via Deno.dlopen, Bun via bun:ffi). Dropped into each
+  # `npm/<rid>/` subpackage at publish time.
+  # ------------------------------------------------------------------
+  build-cabi:
+    name: cabi / ${{ matrix.settings.rid }}
+    runs-on: ${{ matrix.settings.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            rid: win32-x64-msvc
+            artifact: ktav_cabi.dll
+            use-zigbuild: false
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+            rid: win32-arm64-msvc
+            artifact: ktav_cabi.dll
+            use-zigbuild: false
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            rid: darwin-x64
+            artifact: libktav_cabi.dylib
+            use-zigbuild: false
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            rid: darwin-arm64
+            artifact: libktav_cabi.dylib
+            use-zigbuild: false
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            rid: linux-x64-gnu
+            artifact: libktav_cabi.so
+            use-zigbuild: true
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            rid: linux-arm64-gnu
+            artifact: libktav_cabi.so
+            use-zigbuild: true
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            rid: linux-x64-musl
+            artifact: libktav_cabi.so
+            use-zigbuild: true
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            rid: linux-arm64-musl
+            artifact: libktav_cabi.so
+            use-zigbuild: true
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.settings.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: cabi-${{ matrix.settings.target }}
+
+      - name: Install zig
+        if: matrix.settings.use-zigbuild
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.14.0
+      - name: Install cargo-zigbuild
+        if: matrix.settings.use-zigbuild
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild
+
+      - name: Build (zigbuild)
+        if: matrix.settings.use-zigbuild && !contains(matrix.settings.target, 'musl')
+        run: cargo zigbuild --release -p ktav-cabi --target ${{ matrix.settings.target }}.2.17
+
+      - name: Build (zigbuild musl)
+        if: matrix.settings.use-zigbuild && contains(matrix.settings.target, 'musl')
+        run: cargo zigbuild --release -p ktav-cabi --target ${{ matrix.settings.target }}
+
+      - name: Build (native)
+        if: ${{ !matrix.settings.use-zigbuild }}
+        run: cargo build --release -p ktav-cabi --target ${{ matrix.settings.target }}
+
+      - name: Stage artifact
+        shell: bash
+        run: |
+          mkdir -p stage
+          cp "target/${{ matrix.settings.target }}/release/${{ matrix.settings.artifact }}" \
+             "stage/${{ matrix.settings.artifact }}"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cabi-${{ matrix.settings.rid }}
+          path: stage/${{ matrix.settings.artifact }}
+          if-no-files-found: error
+
+  # ------------------------------------------------------------------
   # Build wasm (web + bundler) — one job, any runner.
   # ------------------------------------------------------------------
   build-wasm:
@@ -144,7 +243,7 @@ jobs:
   publish:
     name: Publish to npm
     runs-on: ubuntu-latest
-    needs: [build-native, build-wasm]
+    needs: [build-native, build-cabi, build-wasm]
     if: startsWith(github.ref, 'refs/tags/v') && inputs.dry-run != 'true'
     environment:
       name: npm
@@ -181,6 +280,27 @@ jobs:
 
       - name: Move native binaries into platform subpackages
         run: npx napi artifacts --npm-dir npm --build-output-dir artifacts
+
+      - name: Download cabi artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: cabi-staging
+          pattern: cabi-*
+
+      - name: Drop cabi binaries into platform subpackages
+        shell: bash
+        run: |
+          set -e
+          for dir in cabi-staging/cabi-*/; do
+            rid="${dir#cabi-staging/cabi-}"
+            rid="${rid%/}"
+            file=$(ls "$dir")
+            target="npm/${rid}/${file}"
+            mkdir -p "npm/${rid}"
+            cp -v "${dir}${file}" "$target"
+          done
+          echo "--- after layout ---"
+          find npm -maxdepth 2 -type f -name '*ktav_cabi*' | sort
 
       - name: Publish platform subpackages
         env:

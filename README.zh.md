@@ -100,6 +100,38 @@ loads("port:i 8080\n");
 
 Node / Bun 的使用方无需此步 —— 原生二进制会在导入时加载。
 
+### 原生 FFI 子导出(Deno、Bun)—— `@ktav-lang/ktav/ffi`
+
+Deno 用户想要原生速度而不付出 WASM 开销,Bun 用户想用 `bun:ffi`
+而非 N-API —— 都可以选择这个子导出,直接调用 C ABI 共享库
+(`ktav_cabi`,与 Java / Go / .NET 绑定共用同一个二进制):
+
+```ts
+import { loads, dumps } from "@ktav-lang/ktav/ffi";
+
+// 这里 loads / dumps 是 ASYNC(首次调用要 dlopen)
+const cfg = await loads("port:i 8080\n");
+const text = await dumps({ port: 8443 });
+```
+
+| 运行时   | 机制               | 权限标志                                                                |
+|----------|--------------------|-------------------------------------------------------------------------|
+| Deno     | `Deno.dlopen`      | `--allow-ffi=<libktav_cabi 路径>`(或不限路径的 `--allow-ffi`)          |
+| Bun      | `bun:ffi`          | 无需 —— Bun 默认信任 FFI                                               |
+| Node     | n/a                | 抛错 —— 改用默认导入(本身已经是 N-API 原生)                          |
+| Browser  | n/a                | 抛错 —— 改用 `@ktav-lang/ktav/wasm`                                    |
+
+库文件随对应的 `@ktav-lang/js-<rid>` optional dep 一起分发(就是
+存放 `.node` 二进制的那一个),所以 `npm install @ktav-lang/ktav`
+即可。本地 cabi 构建可通过 `KTAV_LIB_PATH` 覆盖。
+
+权衡:在大文档 parse / dump 上比 WASM 快约 3–5 倍;Deno 上需要
+权限授予;失去了 Deno 的"任意沙箱可用"特性。除非测过有真实需求,
+否则建议保持默认导入。
+
+可运行示例:[`examples/deno/ffi.ts`](examples/deno/ffi.ts)、
+[`examples/bun/ffi.ts`](examples/bun/ffi.ts)。
+
 ## 公开 API
 
 ```ts

@@ -105,6 +105,41 @@ loads("port:i 8080\n");
 Node / Bun это пропускают — нативный бинарник подгружается в момент
 импорта.
 
+### Нативный FFI subexport (Deno, Bun) — `@ktav-lang/ktav/ffi`
+
+Для пользователей Deno, кому нужна нативная скорость без WASM-overhead'а,
+и для пользователей Bun, кому больше нравится `bun:ffi` чем N-API, —
+есть opt-in subexport, который ходит напрямую в C ABI shared library
+(`ktav_cabi`, тот же бинарник что у биндингов Java / Go / .NET):
+
+```ts
+import { loads, dumps } from "@ktav-lang/ktav/ffi";
+
+// loads / dumps здесь ASYNC (ждут dlopen на первом вызове)
+const cfg = await loads("port:i 8080\n");
+const text = await dumps({ port: 8443 });
+```
+
+| Runtime  | Механизм           | Permission flag                                                              |
+|----------|--------------------|------------------------------------------------------------------------------|
+| Deno     | `Deno.dlopen`      | `--allow-ffi=<путь-до-libktav_cabi>` (или `--allow-ffi` для любых FFI)       |
+| Bun      | `bun:ffi`          | не нужен — Bun доверяет FFI                                                  |
+| Node     | n/a                | бросает — используйте default import (уже N-API нативный)                    |
+| Browser  | n/a                | бросает — используйте `@ktav-lang/ktav/wasm`                                 |
+
+Файл библиотеки лежит в соответствующем `@ktav-lang/js-<rid>`
+optional dep (тот же что хранит `.node`-бинарник), так что
+`npm install @ktav-lang/ktav` — достаточно. Переопределить через
+`KTAV_LIB_PATH` для локальных cabi-билдов.
+
+Трейд-офф: ~3–5× быстрее WASM на parse / dump больших документов;
+требует permission grant на Deno; теряет deno-свойство "работает в
+любом песочничном окружении". Используйте default import, если не
+измерили реальную потребность.
+
+Запускаемые примеры: [`examples/deno/ffi.ts`](examples/deno/ffi.ts),
+[`examples/bun/ffi.ts`](examples/bun/ffi.ts).
+
 ## Публичный API
 
 ```ts

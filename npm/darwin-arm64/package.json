@@ -6,7 +6,8 @@
   ],
   "main": "ktav.darwin-arm64.node",
   "files": [
-    "ktav.darwin-arm64.node"
+    "ktav.darwin-arm64.node",
+    "libktav_cabi.dylib"
   ],
   "description": "Universal JS/TS bindings for Ktav — a plain configuration format with three rules, zero indentation, and zero quoting. WASM-backed, ships for Node, Deno, Bun, and browsers from a single package.",
   "keywords": [

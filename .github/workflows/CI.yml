@@ -37,6 +37,7 @@ jobs:
       - run: rustup target add wasm32-unknown-unknown
       - run: cargo clippy -p ktav-napi --all-targets -- -D warnings
       - run: cargo clippy -p ktav-wasm --target wasm32-unknown-unknown -- -D warnings
+      - run: cargo clippy -p ktav-cabi --all-targets -- -D warnings
 
   # ------------------------------------------------------------------
   # TypeScript typecheck — reuses the same tsc the publish path runs.
@@ -128,6 +129,22 @@ jobs:
       - run: npm run build
       - run: npm run test:bun
 
+      # FFI subexport: build the ktav_cabi cdylib, point the loader at
+      # it via KTAV_LIB_PATH (no platform-subpackage layout in CI).
+      - name: Build cabi
+        run: cargo build --release -p ktav-cabi
+      - name: Export KTAV_LIB_PATH (Linux)
+        if: runner.os == 'Linux'
+        run: echo "KTAV_LIB_PATH=${{ github.workspace }}/target/release/libktav_cabi.so" >> $GITHUB_ENV
+      - name: Export KTAV_LIB_PATH (macOS)
+        if: runner.os == 'macOS'
+        run: echo "KTAV_LIB_PATH=${{ github.workspace }}/target/release/libktav_cabi.dylib" >> $GITHUB_ENV
+      - name: Export KTAV_LIB_PATH (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: echo "KTAV_LIB_PATH=${{ github.workspace }}/target/release/ktav_cabi.dll" >> $GITHUB_ENV
+      - run: npm run test:bun-ffi
+
   test-deno:
     name: Tests — Deno / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -156,6 +173,21 @@ jobs:
       - run: npm run build:wasm
       - run: npm run build:ts
       - run: npm run test:deno
+
+      # FFI subexport.
+      - name: Build cabi
+        run: cargo build --release -p ktav-cabi
+      - name: Export KTAV_LIB_PATH (Linux)
+        if: runner.os == 'Linux'
+        run: echo "KTAV_LIB_PATH=${{ github.workspace }}/target/release/libktav_cabi.so" >> $GITHUB_ENV
+      - name: Export KTAV_LIB_PATH (macOS)
+        if: runner.os == 'macOS'
+        run: echo "KTAV_LIB_PATH=${{ github.workspace }}/target/release/libktav_cabi.dylib" >> $GITHUB_ENV
+      - name: Export KTAV_LIB_PATH (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: echo "KTAV_LIB_PATH=${{ github.workspace }}/target/release/ktav_cabi.dll" >> $GITHUB_ENV
+      - run: npm run test:deno-ffi
 
   test-browser:
     name: Tests — Browser (chromium) / ${{ matrix.os }}

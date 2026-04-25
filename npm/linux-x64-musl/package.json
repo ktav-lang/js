@@ -6,7 +6,8 @@
   ],
   "main": "ktav.linux-x64-musl.node",
   "files": [
-    "ktav.linux-x64-musl.node"
+    "ktav.linux-x64-musl.node",
+    "libktav_cabi.so"
   ],
   "description": "Universal JS/TS bindings for Ktav — a plain configuration format with three rules, zero indentation, and zero quoting. WASM-backed, ships for Node, Deno, Bun, and browsers from a single package.",
   "keywords": [

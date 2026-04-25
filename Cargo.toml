@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/wasm",
     "crates/napi",
+    "crates/cabi",
 ]
 
 # Shared metadata — version / edition / licensing stays in sync across

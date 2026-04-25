@@ -6,7 +6,8 @@
   ],
   "main": "ktav.win32-x64-msvc.node",
   "files": [
-    "ktav.win32-x64-msvc.node"
+    "ktav.win32-x64-msvc.node",
+    "ktav_cabi.dll"
   ],
   "description": "Universal JS/TS bindings for Ktav — a plain configuration format with three rules, zero indentation, and zero quoting. WASM-backed, ships for Node, Deno, Bun, and browsers from a single package.",
   "keywords": [

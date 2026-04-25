@@ -10,16 +10,33 @@ MINOR 版本升级视为破坏性。
 本 changelog 跟踪**包发布**,不涉及 Ktav 格式本身的变更 —— 后者见
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md)。
 
-## 0.1.1 —— 新增 aarch64-linux-musl 原生二进制
-
-补齐 0.1.0 延后的唯一平台。
+## 0.1.1 —— `/ffi` 子导出(Deno + Bun)、aarch64-linux-musl 原生二进制
 
 ### 新增
 
+- **`@ktav-lang/ktav/ffi` 子导出** —— 通过 `Deno.dlopen`(Deno)
+  和 `bun:ffi`(Bun)直接调用 C ABI。与 Java / Go / .NET 绑定共用
+  同一个 `ktav_cabi` 共享库,以及 `{"$i":"…"}` / `{"$f":"…"}`
+  的 JSON wire 格式。在大文档上比 WASM 路径快约 3–5 倍。
+  默认导入保持不变 —— 这是给测出有真实需求的用户准备的 opt-in。
+  在 Node 上抛错(改用默认导入,本身已经是 N-API 原生);
+  在浏览器上抛错(改用 `@ktav-lang/ktav/wasm`)。
+  - Deno 需要 `--allow-ffi=<path>`;Bun 无需权限。
+  - `ktav_cabi` 二进制随对应的 `@ktav-lang/js-<rid>` optional dep
+    一起分发(就是装 `.node` 的那一个)。本地 cabi 构建可通过
+    `$KTAV_LIB_PATH` 覆盖。
+- **`@ktav-lang/ktav/wasm` 子导出** —— 显式访问 WASM 构建,
+  对于条件 `exports` 映射无法正确选择(某些 bundler)的环境很有用。
 - **`@ktav-lang/js-linux-arm64-musl`** —— 面向 Alpine Linux ARM64
-  的原生 N-API 二进制。已加入 `optionalDependencies`；
-  `npm install @ktav-lang/ktav` 在该平台上会自动选用原生 `.node`，
+  的原生 N-API 二进制。已加入 `optionalDependencies`;
+  `npm install @ktav-lang/ktav` 在该平台上会自动选用原生 `.node`,
   不再报 missing-binary。
+
+### 测试
+
+- 为 `/ffi` 路径新增 Bun + Deno smoke 套件
+  (`tests/run-bun-ffi.mjs`、`tests/run-deno-ffi.ts`)。
+  CI 在 Linux / macOS / Windows 上分别运行。
 
 ### 构建管线
 
