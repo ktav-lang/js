@@ -10,6 +10,7 @@ export type { KtavArray, KtavError, KtavInput, KtavObject, KtavValue, Ktav } fro
 
 import { decode, encode } from "./ffi-codec.js";
 import { resolveLibPath } from "./ffi-loader.js";
+export { setLibraryPath } from "./ffi-loader.js";
 
 // `bun:ffi` is a Bun built-in — its types are not in @types/node and
 // pulling in @types/bun for this single use site would inflate dev

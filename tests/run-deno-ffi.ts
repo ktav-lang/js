@@ -9,7 +9,10 @@
 // the compiled `dist/ts/ffi-deno.js` since deno honours `.js`
 // suffixes via the package exports map only when imported by name.
 
-import { loads, dumps } from "../dist/ts/ffi-deno.js";
+import * as testPaths from "./shared/test-paths.mjs";
+import { loads, dumps, setLibraryPath } from "../dist/ts/ffi-deno.js";
+
+if (testPaths.cabiBuilt()) setLibraryPath(testPaths.cabi);
 
 let passed = 0, failed = 0;
 

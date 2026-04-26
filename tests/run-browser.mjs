@@ -9,6 +9,8 @@ import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, resolve, dirname, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import * as testPaths from "./shared/test-paths.mjs";
+
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(here, "..");
 
@@ -24,15 +26,6 @@ const mime = {
 // Collect fixtures — we can't ship the FS walker into the browser, so
 // we gather valid / invalid fixture lists server-side and hand them to
 // the page as a manifest JSON.
-function specDir() {
-    const env = process.env.KTAV_SPEC_DIR;
-    if (env && existsSync(join(env, "versions"))) return env.replace(/\\/g, "/");
-    const submodule = join(repo, "spec");
-    if (existsSync(join(submodule, "versions"))) return submodule.replace(/\\/g, "/");
-    const sibling = resolve(repo, "..", "spec");
-    if (existsSync(join(sibling, "versions"))) return sibling.replace(/\\/g, "/");
-    return null;
-}
 function walkKtavFiles(dir) {
     if (!existsSync(dir)) return [];
     const out = [];
@@ -44,7 +37,7 @@ function walkKtavFiles(dir) {
     return out;
 }
 
-const spec = specDir();
+const spec = testPaths.specPresent() ? testPaths.spec.replace(/\\/g, "/") : null;
 // Everything in the manifest is repo-relative — the runner page
 // fetches these via `/` + path, the static server resolves them back
 // against `repo`. Absolute paths would leak host-specific prefixes
@@ -58,8 +51,8 @@ const relFromRepo = (p) => {
 const manifest = spec
     ? {
         specDir: relFromRepo(spec),
-        valid: walkKtavFiles(`${spec}/versions/0.1/tests/valid`).map(relFromRepo),
-        invalid: walkKtavFiles(`${spec}/versions/0.1/tests/invalid`).map(relFromRepo),
+        valid: walkKtavFiles(`${spec}/valid`).map(relFromRepo),
+        invalid: walkKtavFiles(`${spec}/invalid`).map(relFromRepo),
     }
     : { specDir: null, valid: [], invalid: [] };
 

@@ -6,9 +6,12 @@
 //
 // Skip conditions:
 //   - Not running under Bun → exit 0 with note.
-//   - KTAV_LIB_PATH unset AND no platform-subpackage installed → exit 0.
+//   - cabi binary not built at `target/release/...` → exit 0.
 
-import { loads, dumps } from "../dist/ts/ffi-bun.js";
+import * as testPaths from "./shared/test-paths.mjs";
+import { loads, dumps, setLibraryPath } from "../dist/ts/ffi-bun.js";
+
+if (testPaths.cabiBuilt()) setLibraryPath(testPaths.cabi);
 
 function isBun() {
     return typeof globalThis.Bun !== "undefined";

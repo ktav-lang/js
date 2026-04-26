@@ -16,6 +16,7 @@ export type { KtavArray, KtavError, KtavInput, KtavObject, KtavValue, Ktav } fro
 
 import { decode, encode } from "./ffi-codec.js";
 import { resolveLibPath } from "./ffi-loader.js";
+export { setLibraryPath } from "./ffi-loader.js";
 
 // Deno-specific globals. Declared inline so this module can be
 // type-checked against `@types/node` without pulling in `@types/deno`.

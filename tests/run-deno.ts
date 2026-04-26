@@ -10,10 +10,10 @@
 import { loads, dumps, ready } from "../dist/ts/web.js";
 // @ts-expect-error — plain .mjs, no type-decls; run-time is fine.
 import { runAll } from "./shared/assertions.mjs";
+// @ts-expect-error — plain .mjs, no type-decls; run-time is fine.
+import * as testPaths from "./shared/test-paths.mjs";
 
 await ready();
-
-const repo = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 
 function walkKtavFiles(dir: string): string[] {
     try {
@@ -30,29 +30,12 @@ function walkKtavFiles(dir: string): string[] {
     return out;
 }
 
-function specDir(): string | null {
-    const env = Deno.env.get("KTAV_SPEC_DIR");
-    const candidates = [
-        env,
-        `${repo}/spec`,
-        `${repo}/../spec`,
-    ].filter(Boolean) as string[];
-    for (const c of candidates) {
-        try {
-            if (Deno.statSync(`${c}/versions`).isDirectory) return c;
-        } catch {
-            // missing, try next
-        }
-    }
-    return null;
-}
-
 const { passed, failed, total } = runAll({
     loads,
     dumps,
     readTextFile: (p: string) => Deno.readTextFileSync(p),
     walkKtavFiles,
-    specDir: specDir(),
+    specDir: testPaths.specPresent() ? testPaths.spec.replace(/\\/g, "/") : null,
     label: "deno",
     log: (m: string) => console.log(m),
 });

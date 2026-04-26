@@ -129,20 +129,10 @@ jobs:
       - run: npm run build
       - run: npm run test:bun
 
-      # FFI subexport: build the ktav_cabi cdylib, point the loader at
-      # it via KTAV_LIB_PATH (no platform-subpackage layout in CI).
+      # FFI subexport: build the ktav_cabi cdylib — the test runner
+      # picks it up from `target/release/` automatically.
       - name: Build cabi
         run: cargo build --release -p ktav-cabi
-      - name: Export KTAV_LIB_PATH (Linux)
-        if: runner.os == 'Linux'
-        run: echo "KTAV_LIB_PATH=${{ github.workspace }}/target/release/libktav_cabi.so" >> $GITHUB_ENV
-      - name: Export KTAV_LIB_PATH (macOS)
-        if: runner.os == 'macOS'
-        run: echo "KTAV_LIB_PATH=${{ github.workspace }}/target/release/libktav_cabi.dylib" >> $GITHUB_ENV
-      - name: Export KTAV_LIB_PATH (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: echo "KTAV_LIB_PATH=${{ github.workspace }}/target/release/ktav_cabi.dll" >> $GITHUB_ENV
       - run: npm run test:bun-ffi
 
   test-deno:
@@ -174,19 +164,10 @@ jobs:
       - run: npm run build:ts
       - run: npm run test:deno
 
-      # FFI subexport.
+      # FFI subexport: build the ktav_cabi cdylib — the test runner
+      # picks it up from `target/release/` automatically.
       - name: Build cabi
         run: cargo build --release -p ktav-cabi
-      - name: Export KTAV_LIB_PATH (Linux)
-        if: runner.os == 'Linux'
-        run: echo "KTAV_LIB_PATH=${{ github.workspace }}/target/release/libktav_cabi.so" >> $GITHUB_ENV
-      - name: Export KTAV_LIB_PATH (macOS)
-        if: runner.os == 'macOS'
-        run: echo "KTAV_LIB_PATH=${{ github.workspace }}/target/release/libktav_cabi.dylib" >> $GITHUB_ENV
-      - name: Export KTAV_LIB_PATH (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: echo "KTAV_LIB_PATH=${{ github.workspace }}/target/release/ktav_cabi.dll" >> $GITHUB_ENV
       - run: npm run test:deno-ffi
 
   test-browser:

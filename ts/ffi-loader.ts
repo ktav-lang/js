@@ -24,6 +24,16 @@ interface RuntimeShim {
 
 const SUBPKG_PREFIX = "@ktav-lang/js";
 
+let testOverride: string | undefined;
+
+/**
+ * Test hook — pins the on-disk path the loader will dlopen. Production
+ * users override via `KTAV_LIB_PATH`.
+ */
+export function setLibraryPath(path: string): void {
+    testOverride = path;
+}
+
 // Mapping host OS / arch / libc into the napi-rs RID convention used
 // by the optionalDependencies in package.json. The libc dimension is
 // only relevant on Linux — we try `-gnu` first (majority install) and
@@ -55,6 +65,12 @@ export interface LoaderOptions {
 }
 
 export async function resolveLibPath(opts: LoaderOptions): Promise<string> {
+    if (testOverride) {
+        if (!(await opts.runtime.exists(testOverride))) {
+            throw new Error(`setLibraryPath("${testOverride}") — file not found`);
+        }
+        return testOverride;
+    }
     const override = opts.runtime.env("KTAV_LIB_PATH");
     if (override && override.length > 0) {
         if (!(await opts.runtime.exists(override))) {

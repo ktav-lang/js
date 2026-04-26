@@ -6,6 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { runAll } from "./shared/assertions.mjs";
+import * as testPaths from "./shared/test-paths.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(here, "..");
@@ -31,22 +32,12 @@ function walkKtavFiles(dir) {
     return out;
 }
 
-function specDir() {
-    const env = process.env.KTAV_SPEC_DIR;
-    if (env && existsSync(join(env, "versions"))) return env.replace(/\\/g, "/");
-    const submodule = join(repo, "spec");
-    if (existsSync(join(submodule, "versions"))) return submodule.replace(/\\/g, "/");
-    const sibling = resolve(repo, "..", "spec");
-    if (existsSync(join(sibling, "versions"))) return sibling.replace(/\\/g, "/");
-    return null;
-}
-
 const { passed, failed, total } = runAll({
     loads: mod.loads,
     dumps: mod.dumps,
     readTextFile: (p) => readFileSync(p, "utf8"),
     walkKtavFiles,
-    specDir: specDir(),
+    specDir: testPaths.specPresent() ? testPaths.spec.replace(/\\/g, "/") : null,
     label: "node-wasm",
     log: (m) => console.log(m),
 });
