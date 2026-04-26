@@ -12,6 +12,19 @@ MINOR bump — ломающий.
 формата Ktav — для последнего см.
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
+## 0.1.3 — 2026-04-26
+
+### Изменено
+
+- **Подхватили `ktav 0.1.4`** — untyped путь `parse() → Value` в
+  upstream Rust crate (тот, что используют `cabi`/`napi`/`wasm`)
+  теперь ~30% быстрее на маленьких документах и ~13% на больших,
+  благодаря однострочной правке initial capacity для `Frame::Object`
+  (4 → 8). Каждый `loads` получит ускорение прозрачно — Node, Deno,
+  Bun и browser build.
+
+npm: `@ktav-lang/ktav@0.1.3`.
+
 ## 0.1.2 — фиксы Bun FFI + sync package-lock
 
 Patch-релиз поверх 0.1.1.

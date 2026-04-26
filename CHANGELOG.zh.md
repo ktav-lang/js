@@ -10,6 +10,18 @@ MINOR 版本升级视为破坏性。
 本 changelog 跟踪**包发布**,不涉及 Ktav 格式本身的变更 —— 后者见
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md)。
 
+## 0.1.3 —— 2026-04-26
+
+### 变更
+
+- **升级到 `ktav 0.1.4`** —— 上游 Rust crate 中
+  `cabi`/`napi`/`wasm` 共用的 untyped `parse() → Value` 路径,小
+  文档加速约 30%、大文档加速约 13%,只是 `Frame::Object` 的初始
+  容量微调(4 → 8)。每次 `loads` 都会透明地受益 —— Node、Deno、
+  Bun、浏览器 build 全部覆盖。
+
+npm:`@ktav-lang/ktav@0.1.3`。
+
 ## 0.1.2 —— Bun FFI 修复 + package-lock 同步
 
 0.1.1 的补丁版本。
