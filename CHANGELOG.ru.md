@@ -12,6 +12,37 @@ MINOR bump — ломающий.
 формата Ktav — для последнего см.
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
+## 0.1.4 — 2026-05-03
+
+### Изменено
+
+- **Подхватили `ktav 0.1.5`** — в upstream Rust crate появился API
+  структурированных ошибок (`Error::Structured(ErrorKind)` с
+  byte-offset spans), retroactive `#[non_exhaustive]` на error-enum-ах,
+  и публичный event-based парсер `ktav::thin`. Поведение JS-биндинга
+  для пользователя не меняется: брошенные `Error`-значения несут то
+  же читаемое сообщение (Display-строки семи канонических категорий
+  byte-identical к ktav 0.1.4 — проверено собственными pinning-тестами
+  ktav). Маппинг `ktav::ErrorKind` на структурную JS-иерархию ошибок
+  (`KtavMissingSeparatorSpaceError`, `KtavDuplicateKeyError` и т.д.) —
+  отдельная follow-up работа, описанная в
+  [`STRUCTURED_ERRORS.md`](https://github.com/ktav-lang/.github/blob/main/STRUCTURED_ERRORS.md).
+
+### Исправлено
+
+- **`npm ci --omit=optional` в CI/release workflow-ах.** Строгая
+  валидация в более новых версиях `npm ci` спотыкается на
+  placeholder-записях, которые `npm install` пишет для per-platform
+  `optionalDependencies` (`@ktav-lang/js-<triple>`), когда их
+  ещё-не-опубликованная версия декларирована в `package.json`.
+  Добавили `--omit=optional` ко всем восьми вызовам `npm ci` в
+  `ci.yml` и `release.yml` — это пропускает валидацию; per-platform
+  пакеты по-прежнему собираются и публикуются собственными
+  matrix-job-ами workflow-а.
+
+npm: `ktav@0.1.4` (main) + `@ktav-lang/js-<triple>@0.1.4` (восемь
+платформенных пакетов).
+
 ## 0.1.3 — 2026-04-26
 
 ### Изменено

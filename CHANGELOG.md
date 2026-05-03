@@ -11,6 +11,35 @@ This changelog tracks **package releases**, not changes to the Ktav
 format itself — for the latter see
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
+## 0.1.4 — 2026-05-03
+
+### Changed
+
+- **Picked up `ktav 0.1.5`** — the upstream Rust crate now exposes
+  `Error::Structured(ErrorKind)` with byte-offset spans, retroactive
+  `#[non_exhaustive]` on the error enums, and a public `ktav::thin`
+  event-based parser. The JS binding's user-visible behaviour is
+  unchanged: thrown `Error` values carry the same human-readable
+  message (Display strings for the seven canonical categories are
+  byte-identical to ktav 0.1.4 — verified by ktav's own pinning
+  tests). Mapping `ktav::ErrorKind` to a structured JS error class
+  hierarchy (`KtavMissingSeparatorSpaceError`, `KtavDuplicateKeyError`,
+  etc.) is separate follow-up work tracked in the workspace's
+  [`STRUCTURED_ERRORS.md`](https://github.com/ktav-lang/.github/blob/main/STRUCTURED_ERRORS.md).
+
+### Fixed
+
+- **`npm ci --omit=optional` in CI/release workflows.** Strict
+  `npm ci` validation in newer npm versions trips over the placeholder
+  entries that `npm install` writes for the per-platform
+  `optionalDependencies` (`@ktav-lang/js-<triple>`) when their
+  not-yet-published version is declared in `package.json`. Adding
+  `--omit=optional` to all eight `npm ci` invocations across `ci.yml`
+  and `release.yml` skips that validation; the per-platform packages
+  are still built and published by the workflow's own matrix jobs.
+
+npm: `ktav@0.1.4` (main) + `@ktav-lang/js-<triple>@0.1.4` (eight platform packages).
+
 ## 0.1.3 — 2026-04-26
 
 ### Changed

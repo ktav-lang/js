@@ -10,6 +10,31 @@ MINOR 版本升级视为破坏性。
 本 changelog 跟踪**包发布**,不涉及 Ktav 格式本身的变更 —— 后者见
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md)。
 
+## 0.1.4 —— 2026-05-03
+
+### 变更
+
+- **已采用 `ktav 0.1.5`** —— 上游 Rust crate 引入了结构化错误 API
+  (`Error::Structured(ErrorKind)` 带字节偏移 span)、对错误枚举追溯
+  应用了 `#[non_exhaustive]`,以及公开的事件式解析器 `ktav::thin`。
+  JS 绑定对用户可见的行为没有变化:抛出的 `Error` 值仍携带相同的
+  人类可读消息(七个标准类别的 Display 字符串与 ktav 0.1.4 完全
+  字节相同,由 ktav 自己的 pinning 测试验证)。将 `ktav::ErrorKind`
+  映射到结构化 JS 错误类层级(`KtavMissingSeparatorSpaceError`、
+  `KtavDuplicateKeyError` 等)是单独的后续工作,记录在
+  [`STRUCTURED_ERRORS.md`](https://github.com/ktav-lang/.github/blob/main/STRUCTURED_ERRORS.md)。
+
+### 修复
+
+- **CI/release workflow 中使用 `npm ci --omit=optional`。** 较新版本
+  `npm ci` 的严格校验会在 `package.json` 声明尚未发布版本的 per-platform
+  `optionalDependencies`(`@ktav-lang/js-<triple>`)时被 `npm install`
+  写入的占位条目卡住。在 `ci.yml` 与 `release.yml` 的全部 8 处
+  `npm ci` 调用上加 `--omit=optional` 以跳过该校验;per-platform 包
+  仍由 workflow 本身的 matrix 作业构建并发布。
+
+npm:`ktav@0.1.4`(main)+ `@ktav-lang/js-<triple>@0.1.4`(8 个平台包)。
+
 ## 0.1.3 —— 2026-04-26
 
 ### 变更
