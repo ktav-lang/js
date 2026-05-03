@@ -10,7 +10,7 @@ MINOR 版本升级视为破坏性。
 本 changelog 跟踪**包发布**,不涉及 Ktav 格式本身的变更 —— 后者见
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md)。
 
-## 0.1.4 —— 2026-05-03
+## 0.1.5 —— 2026-05-03
 
 ### 变更
 
@@ -26,14 +26,15 @@ MINOR 版本升级视为破坏性。
 
 ### 修复
 
-- **CI/release workflow 中使用 `npm ci --omit=optional`。** 较新版本
-  `npm ci` 的严格校验会在 `package.json` 声明尚未发布版本的 per-platform
-  `optionalDependencies`(`@ktav-lang/js-<triple>`)时被 `npm install`
-  写入的占位条目卡住。在 `ci.yml` 与 `release.yml` 的全部 8 处
-  `npm ci` 调用上加 `--omit=optional` 以跳过该校验;per-platform 包
-  仍由 workflow 本身的 matrix 作业构建并发布。
+- **CI/release workflow 由 `npm ci` 改为 `npm install`。** 当
+  `package.json` 中以 npm registry 上尚不存在的版本声明 per-platform
+  `optionalDependencies`(`@ktav-lang/js-<triple>`)时,严格的
+  `npm ci` 会拒绝 lockfile —— 而这正是发布时的状态,因为这些包
+  正要由 workflow 自己的 matrix 作业构建并发布。`npm install` 会让
+  `package.json` 与 lockfile 调和后继续。代价:略慢(重新解析少数
+  条目),但消除了自 0.1.3 起阻塞每一次发布尝试的循环依赖死锁。
 
-npm:`ktav@0.1.4`(main)+ `@ktav-lang/js-<triple>@0.1.4`(8 个平台包)。
+npm:`ktav@0.1.5`(main)+ `@ktav-lang/js-<triple>@0.1.5`(8 个平台包)。
 
 ## 0.1.3 —— 2026-04-26
 

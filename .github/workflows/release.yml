@@ -101,7 +101,7 @@ jobs:
         with:
           tool: cargo-zigbuild
 
-      - run: npm ci --omit=optional
+      - run: npm install
       - name: Build
         run: ${{ matrix.settings.build }}
       - name: Upload artifact
@@ -228,7 +228,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: rustup target add wasm32-unknown-unknown
       - run: cargo install wasm-pack --locked
-      - run: npm ci --omit=optional
+      - run: npm install
       - run: node scripts/build-wasm.mjs
       - uses: actions/upload-artifact@v7
         with:
@@ -273,7 +273,7 @@ jobs:
           name: wasm
           path: dist/wasm
 
-      - run: npm ci --omit=optional
+      - run: npm install
 
       - name: Build TypeScript
         run: npm run build:ts

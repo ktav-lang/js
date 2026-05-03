@@ -12,7 +12,7 @@ MINOR bump — ломающий.
 формата Ktav — для последнего см.
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
-## 0.1.4 — 2026-05-03
+## 0.1.5 — 2026-05-03
 
 ### Изменено
 
@@ -30,17 +30,18 @@ MINOR bump — ломающий.
 
 ### Исправлено
 
-- **`npm ci --omit=optional` в CI/release workflow-ах.** Строгая
-  валидация в более новых версиях `npm ci` спотыкается на
-  placeholder-записях, которые `npm install` пишет для per-platform
-  `optionalDependencies` (`@ktav-lang/js-<triple>`), когда их
-  ещё-не-опубликованная версия декларирована в `package.json`.
-  Добавили `--omit=optional` ко всем восьми вызовам `npm ci` в
-  `ci.yml` и `release.yml` — это пропускает валидацию; per-platform
-  пакеты по-прежнему собираются и публикуются собственными
-  matrix-job-ами workflow-а.
+- **CI/release workflow-ы переведены с `npm ci` на `npm install`.**
+  Строгая валидация `npm ci` отвергает lockfile, когда `package.json`
+  декларирует per-platform `optionalDependencies`
+  (`@ktav-lang/js-<triple>`) в версии, которой ещё нет на npm-реестре
+  — а это именно состояние на момент релиза, когда эти пакеты как раз
+  собираются и публикуются собственными matrix-job-ами workflow-а.
+  `npm install` примиряет `package.json` с lockfile и продолжает.
+  Trade-off: чуть медленнее (передоразрешает несколько записей), но
+  устраняет chicken-and-egg deadlock, который блокировал каждую
+  попытку релиза начиная с 0.1.3.
 
-npm: `ktav@0.1.4` (main) + `@ktav-lang/js-<triple>@0.1.4` (восемь
+npm: `ktav@0.1.5` (main) + `@ktav-lang/js-<triple>@0.1.5` (восемь
 платформенных пакетов).
 
 ## 0.1.3 — 2026-04-26

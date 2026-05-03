@@ -56,7 +56,7 @@ jobs:
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: npm ci --omit=optional
+      - run: npm install
       - run: rustup target add wasm32-unknown-unknown
       - name: Install wasm-pack
         uses: taiki-e/install-action@v2
@@ -94,7 +94,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: rustup target add wasm32-unknown-unknown
-      - run: npm ci --omit=optional
+      - run: npm install
       - name: Install wasm-pack
         uses: taiki-e/install-action@v2
         with:
@@ -122,7 +122,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: rustup target add wasm32-unknown-unknown
-      - run: npm ci --omit=optional
+      - run: npm install
       - uses: taiki-e/install-action@v2
         with:
           tool: wasm-pack
@@ -156,7 +156,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: rustup target add wasm32-unknown-unknown
-      - run: npm ci --omit=optional
+      - run: npm install
       - uses: taiki-e/install-action@v2
         with:
           tool: wasm-pack
@@ -188,7 +188,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: rustup target add wasm32-unknown-unknown
-      - run: npm ci --omit=optional
+      - run: npm install
       - uses: taiki-e/install-action@v2
         with:
           tool: wasm-pack
