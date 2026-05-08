@@ -11,6 +11,40 @@ This changelog tracks **package releases**, not changes to the Ktav
 format itself — for the latter see
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
+## 0.3.0 — 2026-05-08
+
+### Changed (breaking)
+
+- **Picked up `ktav 0.3.0`** — `key: (value)` and `key: ((value))`
+  now error with `ErrorKind::InlineNonEmptyCompound { body: "paren-string" }`
+  rather than parsing as plain string scalars. These shapes were
+  visually indistinguishable from multi-line openers and would
+  confuse readers; the raw-marker form `key:: (value)` remains the
+  canonical way to encode such literals. The `ktav-lsp` formatter
+  auto-rewrites the legacy form on save. See the
+  [`ktav` crate CHANGELOG](https://github.com/ktav-lang/rust/blob/main/CHANGELOG.md#030--2026-05-08)
+  for the full delta.
+
+  The JS binding is a thin WASM / napi wrapper — no behaviour change
+  beyond what `ktav` upstream produces. Inputs that previously parsed
+  as `(value)` strings now throw a parse error; round-trip
+  (`parse(stringify(v))` deep-equals `v`) is unchanged.
+
+### Fixed
+
+- **Diagnostic spans for `DuplicateKey` / `KeyPathConflict`** now
+  point at the offending key rather than the closing `}` / `]` of the
+  compound. Editors / IDEs consuming the binding's error messages
+  underline the key location. This is a span-value fix from upstream;
+  no API change.
+
+### Spec
+
+- spec submodule synced (paren-string handling tightened — fixtures
+  for `inline_paren_string_double` / `inline_paren_string_single` added
+  to invalid; `partial_parens` removed from valid).
+
+
 ## 0.2.0 — 2026-05-07
 
 ### Changed (breaking)
