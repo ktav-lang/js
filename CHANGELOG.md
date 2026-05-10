@@ -11,6 +11,52 @@ This changelog tracks **package releases**, not changes to the Ktav
 format itself — for the latter see
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
+## 0.3.1 — 2026-05-10
+
+Backward-compatible feature release tracking
+[`ktav 0.3.1`](https://github.com/ktav-lang/rust/blob/main/CHANGELOG.md#031--2026-05-10)
+and [spec 0.1.1](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md#011--2026-05-10).
+
+### Added
+
+- **Top-level Array support** (spec § 5.0.1) — a document whose first
+  content line has an array-item shape (bare scalar, `:: text`,
+  `:i 42`, `:f 3.14`, lone `{` / `[`, or a multi-line opener `(` / `((`)
+  now `loads` as a root-level JS `Array`. Previously the parser
+  required an Object root and rejected such inputs as
+  `MissingSeparator`. `dumps` accepts an Array at the top level too
+  and renders it bare (item-per-line, no enclosing `[...]`).
+  Empty / comments-only documents still default to an empty Object
+  (preserves 0.3.0 behaviour). `KtavInput` is widened to
+  `Record<string, unknown> | unknown[]`.
+- **`stringifyForceStrings(value)`** — new exported function on every
+  runtime entry (`node`, `web`, `bundler`, `/ffi` for Deno + Bun).
+  Renders the JS value as a Ktav document with every scalar coerced
+  to a String — typed integers (`:i`), typed floats (`:f`), booleans,
+  and `null` are flattened to their textual form; compounds keep
+  their structure. Round-trips back through `loads` as the same set
+  of String scalars. Useful for "everything is a string" dumps for
+  downstream consumers that don't understand the typed markers, or
+  for diff-friendly canonical text. JS-idiomatic camelCase wrapper
+  around the upstream `ktav::to_string_force_strings` Rust function.
+- New cabi export `ktav_dumps_force_strings` with the same JSON-wire
+  contract as `ktav_dumps`, drives the FFI subexports on Deno + Bun.
+
+### Compatibility
+
+Strictly additive. Every document valid under 0.3.0 stays valid
+under 0.3.1 and produces the same JS value (still an Object). Only
+inputs 0.3.0 rejected as `MissingSeparator` (bare-scalar first
+lines) are now accepted as Arrays. `dumps` previously rejected
+top-level arrays with "must be an object"; that error is gone.
+Code that relied on the rejection should re-shape its input.
+
+### Spec
+
+- spec submodule synced to `0.1.1` (top-level Array fixtures added
+  under `valid/top_level_array/` and `invalid/top_level/`).
+
+
 ## 0.3.0 — 2026-05-08
 
 ### Changed (breaking)

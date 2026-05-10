@@ -40,14 +40,35 @@ pub fn loads(s: &str) -> Result<JsValue, JsError> {
 }
 
 /// Serialize a JavaScript value as a Ktav document. The top-level value
-/// must be a plain object — Ktav documents are objects.
+/// must be a plain object or an array — both are valid Ktav root kinds
+/// since spec 0.1.1 (top-level Arrays render bare, item-per-line, with
+/// no enclosing `[...]`).
 #[wasm_bindgen(js_name = dumps)]
 pub fn dumps(obj: JsValue) -> Result<String, JsError> {
     let value = js_to_value(&obj)?;
-    if !matches!(value, Value::Object(_)) {
-        return Err(JsError::new("Top-level Ktav value must be an object"));
+    if !matches!(value, Value::Object(_) | Value::Array(_)) {
+        return Err(JsError::new(
+            "Top-level Ktav value must be an object or an array",
+        ));
     }
     render::render(&value).map_err(|e| JsError::new(&e.to_string()))
+}
+
+/// Serialize a JavaScript value as a Ktav document with every scalar
+/// coerced to a String — typed integers (`:i`), typed floats (`:f`),
+/// booleans, and `null` are flattened to their textual form. Compounds
+/// retain their structure. Mirrors `ktav::to_string_force_strings` from
+/// the upstream Rust crate; exposed under the JS-idiomatic name
+/// `stringifyForceStrings` from the TypeScript facade.
+#[wasm_bindgen(js_name = stringifyForceStrings)]
+pub fn stringify_force_strings(obj: JsValue) -> Result<String, JsError> {
+    let value = js_to_value(&obj)?;
+    if !matches!(value, Value::Object(_) | Value::Array(_)) {
+        return Err(JsError::new(
+            "Top-level Ktav value must be an object or an array",
+        ));
+    }
+    ktav::to_string_force_strings(&value).map_err(|e| JsError::new(&e.to_string()))
 }
 
 /// Map a `ktav::Value` to a native JavaScript value.

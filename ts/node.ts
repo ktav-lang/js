@@ -36,6 +36,7 @@ function candidateTriples(): string[] {
 interface NativeBinding {
     loads: (s: string) => unknown;
     dumps: (obj: unknown) => string;
+    stringifyForceStrings: (obj: unknown) => string;
 }
 
 const require_ = createRequire(import.meta.url);
@@ -74,4 +75,8 @@ export function loads<T = KtavValue>(s: string): T {
 
 export function dumps<T extends KtavInput = KtavInput>(obj: T): string {
     return native.dumps(obj);
+}
+
+export function stringifyForceStrings<T extends KtavInput = KtavInput>(obj: T): string {
+    return native.stringifyForceStrings(obj);
 }

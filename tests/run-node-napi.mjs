@@ -5,7 +5,7 @@
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
-import { loads, dumps } from "../dist/ts/node.js";
+import { loads, dumps, stringifyForceStrings } from "../dist/ts/node.js";
 import { runAll } from "./shared/assertions.mjs";
 import * as testPaths from "./shared/test-paths.mjs";
 
@@ -23,6 +23,7 @@ function walkKtavFiles(dir) {
 const { passed, failed, total } = runAll({
     loads,
     dumps,
+    stringifyForceStrings,
     readTextFile: (p) => readFileSync(p, "utf8"),
     walkKtavFiles,
     specDir: testPaths.specPresent() ? testPaths.spec.replace(/\\/g, "/") : null,

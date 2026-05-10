@@ -26,16 +26,38 @@ pub fn loads<'env>(env: &'env Env, s: String) -> Result<Unknown<'env>> {
 }
 
 /// Serialize a JavaScript value as a Ktav document. The top-level value
-/// must be a plain object — Ktav documents are objects.
+/// must be a plain object or an array — both are valid Ktav root kinds
+/// since spec 0.1.1 (top-level Arrays render bare, item-per-line, with
+/// no enclosing `[...]`).
 #[napi]
 pub fn dumps(env: &Env, obj: Unknown) -> Result<String> {
     let value = js_to_value(env, &obj)?;
-    if !matches!(value, Value::Object(_)) {
+    if !matches!(value, Value::Object(_) | Value::Array(_)) {
         return Err(Error::from_reason(
-            "Top-level Ktav value must be an object".to_string(),
+            "Top-level Ktav value must be an object or an array".to_string(),
         ));
     }
     render::render(&value).map_err(|e| Error::from_reason(e.to_string()))
+}
+
+/// Serialize a JavaScript value as a Ktav document with every scalar
+/// coerced to a String — typed integers (`:i`), typed floats (`:f`),
+/// booleans, and `null` are flattened to their textual form. Compounds
+/// retain their structure. Useful for "everything is a string" dumps
+/// for downstream consumers that don't understand the typed markers.
+///
+/// Exposed under the JS-idiomatic name `stringifyForceStrings` from the
+/// TypeScript facade; the napi binding keeps the snake_case name to
+/// stay structurally aligned with the upstream `ktav::to_string_force_strings`.
+#[napi(js_name = "stringifyForceStrings")]
+pub fn stringify_force_strings(env: &Env, obj: Unknown) -> Result<String> {
+    let value = js_to_value(env, &obj)?;
+    if !matches!(value, Value::Object(_) | Value::Array(_)) {
+        return Err(Error::from_reason(
+            "Top-level Ktav value must be an object or an array".to_string(),
+        ));
+    }
+    ktav::to_string_force_strings(&value).map_err(|e| Error::from_reason(e.to_string()))
 }
 
 /// Map a `ktav::Value` to a native JavaScript value via N-API.

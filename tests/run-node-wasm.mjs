@@ -35,6 +35,7 @@ function walkKtavFiles(dir) {
 const { passed, failed, total } = runAll({
     loads: mod.loads,
     dumps: mod.dumps,
+    stringifyForceStrings: mod.stringifyForceStrings,
     readTextFile: (p) => readFileSync(p, "utf8"),
     walkKtavFiles,
     specDir: testPaths.specPresent() ? testPaths.spec.replace(/\\/g, "/") : null,

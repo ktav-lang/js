@@ -75,6 +75,10 @@ async function getLib(): Promise<FFILib> {
             args: [ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr],
             returns: ffi.FFIType.i32,
         },
+        ktav_dumps_force_strings: {
+            args: [ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr],
+            returns: ffi.FFIType.i32,
+        },
         ktav_free: {
             args: [ffi.FFIType.ptr, ffi.FFIType.u64],
             returns: ffi.FFIType.void,
@@ -88,10 +92,18 @@ async function getLib(): Promise<FFILib> {
     return cachedLib;
 }
 
-async function callNative(op: "loads" | "dumps", input: Uint8Array): Promise<Uint8Array> {
+async function callNative(
+    op: "loads" | "dumps" | "dumps_force_strings",
+    input: Uint8Array,
+): Promise<Uint8Array> {
     const { ffi, symbols } = await getLib();
-    const sym = (op === "loads" ? symbols.ktav_loads : symbols.ktav_dumps) as
-        (...args: unknown[]) => number;
+    const sym = (
+        op === "loads"
+            ? symbols.ktav_loads
+            : op === "dumps"
+                ? symbols.ktav_dumps
+                : symbols.ktav_dumps_force_strings
+    ) as (...args: unknown[]) => number;
 
     // Bun FFI sweet-spot: pass TypedArrays / Buffers directly for
     // `FFIType.ptr` args — Bun pins the ArrayBuffer and forwards the
@@ -156,15 +168,27 @@ export async function loads<T = KtavValue>(src: string): Promise<T> {
 }
 
 export async function dumps<T extends KtavInput = KtavInput>(value: T): Promise<string> {
-    if (value === null || typeof value !== "object" || Array.isArray(value)) {
-        throw new Error("top-level Ktav document must be an object");
+    if (value === null || typeof value !== "object") {
+        throw new Error("top-level Ktav document must be an object or an array");
     }
     const input = encode(value);
     const result = await callNative("dumps", input);
     return new TextDecoder().decode(result);
 }
 
+export async function stringifyForceStrings<T extends KtavInput = KtavInput>(
+    value: T,
+): Promise<string> {
+    if (value === null || typeof value !== "object") {
+        throw new Error("top-level Ktav document must be an object or an array");
+    }
+    const input = encode(value);
+    const result = await callNative("dumps_force_strings", input);
+    return new TextDecoder().decode(result);
+}
+
 export const ktav: Pick<Ktav, never> & {
     loads: typeof loads;
     dumps: typeof dumps;
-} = { loads, dumps };
+    stringifyForceStrings: typeof stringifyForceStrings;
+} = { loads, dumps, stringifyForceStrings };

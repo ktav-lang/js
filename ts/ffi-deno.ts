@@ -45,6 +45,10 @@ const FFI_SYMBOLS = {
         parameters: ["pointer", "usize", "pointer", "pointer", "pointer", "pointer"],
         result: "i32",
     },
+    ktav_dumps_force_strings: {
+        parameters: ["pointer", "usize", "pointer", "pointer", "pointer", "pointer"],
+        result: "i32",
+    },
     ktav_free: {
         parameters: ["pointer", "usize"],
         result: "void",
@@ -86,10 +90,18 @@ async function getLib() {
 
 // ── FFI plumbing ─────────────────────────────────────────────────────
 
-async function callNative(op: "loads" | "dumps", input: Uint8Array): Promise<Uint8Array> {
+async function callNative(
+    op: "loads" | "dumps" | "dumps_force_strings",
+    input: Uint8Array,
+): Promise<Uint8Array> {
     const lib = await getLib();
-    const sym = (op === "loads" ? lib.symbols.ktav_loads : lib.symbols.ktav_dumps) as
-        (...args: unknown[]) => number;
+    const sym = (
+        op === "loads"
+            ? lib.symbols.ktav_loads
+            : op === "dumps"
+                ? lib.symbols.ktav_dumps
+                : lib.symbols.ktav_dumps_force_strings
+    ) as (...args: unknown[]) => number;
     const ktavFree = lib.symbols.ktav_free as (ptr: bigint, len: bigint) => void;
 
     const outBuf = new BigUint64Array(1);
@@ -150,11 +162,22 @@ export async function loads<T = KtavValue>(src: string): Promise<T> {
 }
 
 export async function dumps<T extends KtavInput = KtavInput>(value: T): Promise<string> {
-    if (value === null || typeof value !== "object" || Array.isArray(value)) {
-        throw new Error("top-level Ktav document must be an object");
+    if (value === null || typeof value !== "object") {
+        throw new Error("top-level Ktav document must be an object or an array");
     }
     const input = encode(value);
     const result = await callNative("dumps", input);
+    return new TextDecoder().decode(result);
+}
+
+export async function stringifyForceStrings<T extends KtavInput = KtavInput>(
+    value: T,
+): Promise<string> {
+    if (value === null || typeof value !== "object") {
+        throw new Error("top-level Ktav document must be an object or an array");
+    }
+    const input = encode(value);
+    const result = await callNative("dumps_force_strings", input);
     return new TextDecoder().decode(result);
 }
 
@@ -162,4 +185,5 @@ export async function dumps<T extends KtavInput = KtavInput>(value: T): Promise<
 export const ktav: Pick<Ktav, never> & {
     loads: typeof loads;
     dumps: typeof dumps;
-} = { loads, dumps };
+    stringifyForceStrings: typeof stringifyForceStrings;
+} = { loads, dumps, stringifyForceStrings };

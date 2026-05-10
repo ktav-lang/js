@@ -23,4 +23,8 @@ export function dumps(_value: unknown): never {
     throw new Error(MESSAGE);
 }
 
-export const ktav = { loads, dumps };
+export function stringifyForceStrings(_value: unknown): never {
+    throw new Error(MESSAGE);
+}
+
+export const ktav = { loads, dumps, stringifyForceStrings };

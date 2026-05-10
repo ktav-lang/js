@@ -49,3 +49,7 @@ export function loads<T = KtavValue>(s: string): T {
 export function dumps<T extends KtavInput = KtavInput>(obj: T): string {
     return wasm.dumps(obj);
 }
+
+export function stringifyForceStrings<T extends KtavInput = KtavInput>(obj: T): string {
+    return wasm.stringifyForceStrings(obj);
+}

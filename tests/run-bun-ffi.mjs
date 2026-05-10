@@ -9,7 +9,7 @@
 //   - cabi binary not built at `target/release/...` → exit 0.
 
 import * as testPaths from "./shared/test-paths.mjs";
-import { loads, dumps, setLibraryPath } from "../dist/ts/ffi-bun.js";
+import { loads, dumps, stringifyForceStrings, setLibraryPath } from "../dist/ts/ffi-bun.js";
 
 if (testPaths.cabiBuilt()) setLibraryPath(testPaths.cabi);
 
@@ -93,10 +93,29 @@ await check("parse error throws", async () => {
     if (!threw) throw new Error("expected error on unterminated array");
 });
 
-await check("dumps rejects non-object root", async () => {
+await check("dumps rejects scalar root", async () => {
     let threw = false;
-    try { await dumps([1, 2, 3]); } catch { threw = true; }
-    if (!threw) throw new Error("expected rejection of array root");
+    try { await dumps(42); } catch { threw = true; }
+    if (!threw) throw new Error("expected rejection of scalar root");
+});
+
+// spec 0.1.1: top-level Array now accepted by dumps and parsed by loads.
+await check("0.1.1: top-level Array round-trip", async () => {
+    const arr = ["alpha", 1, 2.5, true, null];
+    const text = await dumps(arr);
+    const back = await loads(text);
+    if (!Array.isArray(back)) throw new Error("expected Array, got " + typeof back);
+    if (back.join(",") !== "alpha,1,2.5,true,") throw new Error("array mismatch: " + JSON.stringify(back));
+});
+
+// 0.3.1: stringifyForceStrings — every scalar coerced to a String.
+await check("0.3.1: stringifyForceStrings flattens scalars", async () => {
+    const text = await stringifyForceStrings({ port: 8080, ratio: 0.5, tls: true });
+    if (/:i\s/.test(text) || /:f\s/.test(text)) throw new Error(":i/:f leaked: " + text);
+    const back = await loads(text);
+    if (back.port !== "8080") throw new Error("port=" + back.port);
+    if (back.ratio !== "0.5") throw new Error("ratio=" + back.ratio);
+    if (back.tls !== "true") throw new Error("tls=" + back.tls);
 });
 
 console.log(`\n[bun-ffi] ${passed}/${passed + failed} passed`);
