@@ -10,6 +10,24 @@ MINOR 版本升级视为破坏性。
 本 changelog 跟踪**包发布**,不涉及 Ktav 格式本身的变更 —— 后者见
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md)。
 
+## 0.5.0 —— 2026-05-28
+
+跟踪 [`ktav 0.5.0`](https://github.com/ktav-lang/rust/blob/main/CHANGELOG.md#050--2026-05-28)
+和 [spec 0.5.0](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md#050--2026-05-28)。
+
+### 新增
+
+- **`emitCanonical`** —— WASM 和 N-API 均新增导出;返回符合 spec 0.5.0
+  的规范化稳定表示。
+- **Spec 0.5.0 一致性测试** —— 测试运行器现在读取 `spec/versions/0.5/tests`
+  中的 fixture。
+
+### 变更
+
+- **许可证** —— 双重许可 `MIT OR Apache-2.0`(之前为 `MIT`)。`LICENSE-MIT`
+  和 `LICENSE-APACHE` 均包含在 npm 包中。
+- Spec 子模块更新至标签 `v0.5.0`。
+
 ## 0.1.5 —— 2026-05-03
 
 ### 变更

@@ -37,7 +37,7 @@ pub fn dumps(env: &Env, obj: Unknown) -> Result<String> {
             "Top-level Ktav value must be an object or an array".to_string(),
         ));
     }
-    render::render(&value).map_err(|e| Error::from_reason(e.to_string()))
+    render_top_level(&value).map_err(|e| Error::from_reason(e.to_string()))
 }
 
 /// Serialize a JavaScript value as a Ktav document with every scalar
@@ -57,7 +57,93 @@ pub fn stringify_force_strings(env: &Env, obj: Unknown) -> Result<String> {
             "Top-level Ktav value must be an object or an array".to_string(),
         ));
     }
-    ktav::to_string_force_strings(&value).map_err(|e| Error::from_reason(e.to_string()))
+    let coerced = force_strings_top_level(&value);
+    render_top_level(&coerced).map_err(|e| Error::from_reason(e.to_string()))
+}
+
+/// Emit the canonical Ktav representation of a JavaScript value.
+/// Canonical form is the normalised, round-trip-stable output defined
+/// by spec 0.5.0. Mirrors `ktav::emit_canonical` from the Rust crate.
+#[napi(js_name = "emitCanonical")]
+pub fn emit_canonical(env: &Env, obj: Unknown) -> Result<String> {
+    let value = js_to_value(env, &obj)?;
+    if !matches!(value, Value::Object(_) | Value::Array(_)) {
+        return Err(Error::from_reason(
+            "Top-level Ktav value must be an object or an array".to_string(),
+        ));
+    }
+    ktav::emit_canonical(&value).map_err(|e| Error::from_reason(e.to_string()))
+}
+
+/// Render a top-level Value as a Ktav document string, implementing the
+/// spec § 5.9.3 disambiguation rule:
+///
+/// - An empty top-level Array renders as `[]\n` per § 5.9.3.
+/// - When a top-level Array's first item is a non-empty Array or non-empty
+///   Object (which would render starting with a lone `[` or `{`, causing
+///   the parser to misidentify it as the root opener), the whole top-level
+///   Array is wrapped in explicit `[\n…\n]\n` brackets with each item
+///   indented by 4 spaces (one indent level).
+///
+/// All other cases delegate directly to `render::render`.
+fn render_top_level(value: &Value) -> ktav::Result<String> {
+    match value {
+        Value::Array(items) => {
+            if items.is_empty() {
+                return Ok("[]\n".to_string());
+            }
+            // Check if the first item needs disambiguation wrapping
+            // (would render as a line starting with a lone `[` or `{`).
+            let needs_wrap = matches!(
+                items.first(),
+                Some(Value::Array(a)) if !a.is_empty()
+            ) || matches!(
+                items.first(),
+                Some(Value::Object(o)) if !o.is_empty()
+            );
+            if needs_wrap {
+                // Render the items as if the array were a regular (non-root)
+                // array by rendering a single-item wrapper object with a
+                // synthetic key, then extracting the indented body. Simpler:
+                // render the array bare (items at indent 0 via `render::render`)
+                // and then re-indent each line by 4 spaces before wrapping.
+                let bare = render::render(value)?;
+                let mut out = String::with_capacity(bare.len() + 32);
+                out.push_str("[\n");
+                for line in bare.lines() {
+                    out.push_str("    ");
+                    out.push_str(line);
+                    out.push('\n');
+                }
+                out.push_str("]\n");
+                Ok(out)
+            } else {
+                render::render(value)
+            }
+        }
+        _ => render::render(value),
+    }
+}
+
+/// Coerce every scalar in `value` to a String, mirroring
+/// `ktav::render::to_string_force_strings` but available without
+/// calling through the crate API (which calls `render::render` internally
+/// without the empty-array / wrap fix).
+fn force_strings_top_level(value: &Value) -> Value {
+    match value {
+        Value::Null => Value::String(ktav::value::Scalar::from("null")),
+        Value::Bool(true) => Value::String(ktav::value::Scalar::from("true")),
+        Value::Bool(false) => Value::String(ktav::value::Scalar::from("false")),
+        Value::Integer(s) | Value::Float(s) | Value::String(s) => Value::String(s.clone()),
+        Value::Array(items) => Value::Array(items.iter().map(force_strings_top_level).collect()),
+        Value::Object(obj) => {
+            let mut out = ObjectMap::with_capacity_and_hasher(obj.len(), FxBuildHasher);
+            for (k, v) in obj {
+                out.insert(k.clone(), force_strings_top_level(v));
+            }
+            Value::Object(out)
+        }
+    }
 }
 
 /// Map a `ktav::Value` to a native JavaScript value via N-API.
@@ -156,7 +242,7 @@ fn js_to_value(env: &Env, obj: &Unknown) -> Result<Value> {
             let n: f64 = unsafe { obj.cast()? };
             if !n.is_finite() {
                 return Err(Error::from_reason(
-                    "NaN / Infinity is not representable in Ktav 0.1.0".to_string(),
+                    "NaN / Infinity is not representable in Ktav".to_string(),
                 ));
             }
             if n.fract() == 0.0 && (i64::MIN as f64..=i64::MAX as f64).contains(&n) {

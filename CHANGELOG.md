@@ -11,6 +11,26 @@ This changelog tracks **package releases**, not changes to the Ktav
 format itself — for the latter see
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
+## 0.5.0 — 2026-05-28
+
+Tracks [`ktav 0.5.0`](https://github.com/ktav-lang/rust/blob/main/CHANGELOG.md#050--2026-05-28)
+and [spec 0.5.0](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md#050--2026-05-28).
+
+### Added
+
+- **`emitCanonical`** — new export on both the WASM and N-API paths;
+  produces the normalised, round-trip-stable canonical representation
+  defined by spec 0.5.0. Mirrors `ktav::emit_canonical` in the Rust
+  crate.
+- **Spec 0.5.0 conformance suite** — test runner now points at
+  `spec/versions/0.5/tests` and exercises the full 0.5.0 fixture set.
+
+### Changed
+
+- **License** — dual-licensed `MIT OR Apache-2.0` (was `MIT`). Both
+  `LICENSE-MIT` and `LICENSE-APACHE` are shipped in the npm package.
+- Spec submodule updated to tag `v0.5.0` (commit `4d0a8aa`).
+
 ## 0.3.1 — 2026-05-10
 
 Backward-compatible feature release tracking

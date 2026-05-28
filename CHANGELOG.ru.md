@@ -12,6 +12,24 @@ MINOR bump — ломающий.
 формата Ktav — для последнего см.
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
+## 0.5.0 — 2026-05-28
+
+Следует за [`ktav 0.5.0`](https://github.com/ktav-lang/rust/blob/main/CHANGELOG.md#050--2026-05-28)
+и [spec 0.5.0](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md#050--2026-05-28).
+
+### Добавлено
+
+- **`emitCanonical`** — новый экспорт в WASM и N-API; возвращает нормализованное
+  канонически стабильное представление по spec 0.5.0.
+- **Тестовый пакет spec 0.5.0** — тесты теперь читают фикстуры из
+  `spec/versions/0.5/tests`.
+
+### Изменено
+
+- **Лицензия** — двойная `MIT OR Apache-2.0` (ранее `MIT`). Оба файла
+  `LICENSE-MIT` и `LICENSE-APACHE` включены в npm-пакет.
+- Субмодуль spec обновлён до тега `v0.5.0`.
+
 ## 0.1.5 — 2026-05-03
 
 ### Изменено

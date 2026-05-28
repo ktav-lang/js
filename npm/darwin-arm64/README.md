@@ -1,3 +1,3 @@
 # `@ktav-lang/js-darwin-arm64`
 
-This is the **aarch64-apple-darwin** binary for `@ktav-lang/js`
+This is the **aarch64-apple-darwin** binary for `@ktav-lang/ktav`

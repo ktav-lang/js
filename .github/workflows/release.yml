@@ -312,7 +312,7 @@ jobs:
             # happens when a previous run got partway through the
             # matrix then hit a separate error. Every other non-zero
             # exit propagates.
-            if ! out=$(npm publish --access public --provenance --tag latest "$dir" 2>&1); then
+            if ! out=$(npm publish --access public --tag latest "$dir" 2>&1); then
               echo "$out"
               if echo "$out" | grep -qE "EPUBLISHCONFLICT|previously published|cannot publish over"; then
                 echo "[publish] $dir already on registry — skipping"
@@ -326,7 +326,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          if ! out=$(npm publish --access public --provenance --tag latest 2>&1); then
+          if ! out=$(npm publish --access public --tag latest 2>&1); then
             echo "$out"
             if echo "$out" | grep -qE "EPUBLISHCONFLICT|previously published|cannot publish over"; then
               echo "[publish] main package already on registry — skipping"

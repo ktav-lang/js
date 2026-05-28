@@ -10,7 +10,7 @@ import type { KtavInput, KtavValue } from "./api.js";
 export type { KtavArray, KtavError, KtavInput, KtavObject, KtavValue, Ktav } from "./api.js";
 
 // Locate the platform-specific `.node` binary. At publish time these
-// live in `optionalDependencies` subpackages (@ktav-lang/js-<triple>)
+// live in `optionalDependencies` subpackages (@ktav-lang/ktav-<triple>)
 // and npm installs only the matching one. For local dev / CI the
 // file sits next to this script under `dist/native/`.
 //

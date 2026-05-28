@@ -29,15 +29,15 @@ async function check(name: string, fn: () => Promise<void>) {
 
 const SRC = `
 service: web
-port:i 8080
-ratio:f 0.75
+port: 8080
+ratio: 0.75
 tls: true
 tags: [
     prod
     eu-west-1
 ]
 db.host: primary.internal
-db.timeout:i 30
+db.timeout: 30
 `;
 
 await check("loads basic document", async () => {
@@ -70,12 +70,13 @@ await check("round-trip simple document", async () => {
 });
 
 await check("arbitrary precision integer round-trip", async () => {
+    // Under spec 0.5.0 integers that overflow i64 are kept as strings.
     const huge = "99999999999999999999999999999";
-    const cfg: any = await loads("value:i " + huge);
-    if (typeof cfg.value !== "bigint") throw new Error("not bigint");
-    if (cfg.value.toString() !== huge) throw new Error("bigint=" + cfg.value);
+    const cfg: any = await loads("value: " + huge);
+    if (typeof cfg.value !== "string") throw new Error("not string: " + typeof cfg.value);
+    if (cfg.value !== huge) throw new Error("value=" + cfg.value);
 
-    const text = await dumps({ v: BigInt(huge) });
+    const text = await dumps({ v: huge });
     if (!text.includes(huge)) throw new Error("dump missing huge int");
 });
 

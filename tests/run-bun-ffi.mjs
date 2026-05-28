@@ -37,15 +37,15 @@ async function check(name, fn) {
 
 const SRC = `
 service: web
-port:i 8080
-ratio:f 0.75
+port: 8080
+ratio: 0.75
 tls: true
 tags: [
     prod
     eu-west-1
 ]
 db.host: primary.internal
-db.timeout:i 30
+db.timeout: 30
 `;
 
 await check("loads basic document", async () => {
@@ -78,12 +78,13 @@ await check("round-trip simple document", async () => {
 });
 
 await check("arbitrary precision integer round-trip", async () => {
+    // Under spec 0.5.0 integers that overflow i64 are kept as strings.
     const huge = "99999999999999999999999999999";
-    const cfg = await loads("value:i " + huge);
-    if (typeof cfg.value !== "bigint") throw new Error("not bigint: " + typeof cfg.value);
-    if (cfg.value.toString() !== huge) throw new Error("bigint=" + cfg.value);
+    const cfg = await loads("value: " + huge);
+    if (typeof cfg.value !== "string") throw new Error("not string: " + typeof cfg.value);
+    if (cfg.value !== huge) throw new Error("value=" + cfg.value);
 
-    const text = await dumps({ v: BigInt(huge) });
+    const text = await dumps({ v: huge });
     if (!text.includes(huge)) throw new Error("dump missing huge int: " + text);
 });
 
@@ -99,7 +100,7 @@ await check("dumps rejects scalar root", async () => {
     if (!threw) throw new Error("expected rejection of scalar root");
 });
 
-// spec 0.1.1: top-level Array now accepted by dumps and parsed by loads.
+// spec 0.5.0: top-level Array now accepted by dumps and parsed by loads.
 await check("0.1.1: top-level Array round-trip", async () => {
     const arr = ["alpha", 1, 2.5, true, null];
     const text = await dumps(arr);

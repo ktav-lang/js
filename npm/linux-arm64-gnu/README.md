@@ -1,3 +1,3 @@
 # `@ktav-lang/js-linux-arm64-gnu`
 
-This is the **aarch64-unknown-linux-gnu** binary for `@ktav-lang/js`
+This is the **aarch64-unknown-linux-gnu** binary for `@ktav-lang/ktav`

@@ -1,6 +1,6 @@
 {
   "name": "@ktav-lang/js-darwin-x64",
-  "version": "0.1.5",
+  "version": "0.5.0",
   "cpu": [
     "x64"
   ],

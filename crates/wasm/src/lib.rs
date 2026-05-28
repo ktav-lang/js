@@ -8,7 +8,7 @@
 //! wraps both backends with generic-typed `loads<T>` / `dumps<T>`
 //! signatures so consumers see one API.
 //!
-//! ## Type mapping
+//! ## Type mapping (spec 0.5.0)
 //!
 //! | Ktav               | JavaScript           |
 //! |--------------------|----------------------|
@@ -51,7 +51,21 @@ pub fn dumps(obj: JsValue) -> Result<String, JsError> {
             "Top-level Ktav value must be an object or an array",
         ));
     }
-    render::render(&value).map_err(|e| JsError::new(&e.to_string()))
+    render_top_level(&value).map_err(|e| JsError::new(&e.to_string()))
+}
+
+/// Emit the canonical Ktav representation of a JavaScript value.
+/// Canonical form is the normalised, round-trip-stable output defined
+/// by spec 0.5.0. Mirrors `ktav::emit_canonical` from the Rust crate.
+#[wasm_bindgen(js_name = emitCanonical)]
+pub fn emit_canonical(obj: JsValue) -> Result<String, JsError> {
+    let value = js_to_value(&obj)?;
+    if !matches!(value, Value::Object(_) | Value::Array(_)) {
+        return Err(JsError::new(
+            "Top-level Ktav value must be an object or an array",
+        ));
+    }
+    ktav::emit_canonical(&value).map_err(|e| JsError::new(&e.to_string()))
 }
 
 /// Serialize a JavaScript value as a Ktav document with every scalar
@@ -68,7 +82,8 @@ pub fn stringify_force_strings(obj: JsValue) -> Result<String, JsError> {
             "Top-level Ktav value must be an object or an array",
         ));
     }
-    ktav::to_string_force_strings(&value).map_err(|e| JsError::new(&e.to_string()))
+    let coerced = force_strings_value(&value);
+    render_top_level(&coerced).map_err(|e| JsError::new(&e.to_string()))
 }
 
 /// Map a `ktav::Value` to a native JavaScript value.
@@ -226,6 +241,63 @@ fn format_float(v: f64) -> String {
             out.push_str(s);
             out.push_str(".0");
             out
+        }
+    }
+}
+
+/// Render a top-level Value as a Ktav document string, implementing the
+/// spec § 5.9.3 disambiguation rule:
+///
+/// - An empty top-level Array renders as `[]\n` per § 5.9.3.
+/// - When a top-level Array's first item is a non-empty Array or non-empty
+///   Object, the whole top-level Array is wrapped in explicit `[\n…\n]\n`
+///   brackets with each item indented by 4 spaces.
+///
+/// All other cases delegate to `render::render`.
+fn render_top_level(value: &Value) -> ktav::Result<String> {
+    match value {
+        Value::Array(items) => {
+            if items.is_empty() {
+                return Ok("[]\n".to_string());
+            }
+            let needs_wrap = matches!(items.first(), Some(Value::Array(a)) if !a.is_empty())
+                || matches!(items.first(), Some(Value::Object(o)) if !o.is_empty());
+            if needs_wrap {
+                // Render the items bare (at indent 0), then re-indent by 4 spaces.
+                let bare = render::render(value)?;
+                let mut out = String::with_capacity(bare.len() + 32);
+                out.push_str("[\n");
+                for line in bare.lines() {
+                    out.push_str("    ");
+                    out.push_str(line);
+                    out.push('\n');
+                }
+                out.push_str("]\n");
+                Ok(out)
+            } else {
+                render::render(value)
+            }
+        }
+        _ => render::render(value),
+    }
+}
+
+/// Coerce every scalar leaf in `value` to a String, mirroring
+/// `ktav::render::to_string_force_strings` but using `render_top_level`
+/// instead of `render::render` so the empty-array / wrap fixes apply.
+fn force_strings_value(value: &Value) -> Value {
+    match value {
+        Value::Null => Value::String(Scalar::from("null")),
+        Value::Bool(true) => Value::String(Scalar::from("true")),
+        Value::Bool(false) => Value::String(Scalar::from("false")),
+        Value::Integer(s) | Value::Float(s) | Value::String(s) => Value::String(s.clone()),
+        Value::Array(items) => Value::Array(items.iter().map(force_strings_value).collect()),
+        Value::Object(obj) => {
+            let mut out: ObjectMap = IndexMap::with_capacity_and_hasher(obj.len(), FxBuildHasher);
+            for (k, v) in obj {
+                out.insert(k.clone(), force_strings_value(v));
+            }
+            Value::Object(out)
         }
     }
 }
