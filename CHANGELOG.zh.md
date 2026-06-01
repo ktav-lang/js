@@ -10,6 +10,30 @@ MINOR 版本升级视为破坏性。
 本 changelog 跟踪**包发布**,不涉及 Ktav 格式本身的变更 —— 后者见
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md)。
 
+## 0.6.0 —— 2026-06-01
+
+同步至 Ktav 0.6.0 —— 键现在支持转义。
+
+### 新增
+
+- 键处理完整的 §3.7 转义集合,并新增两个转义:
+  - `\.` → `.`(字面量点 —— **不**会切分 dotted-path)
+  - `\:` → `:`(字面量冒号 —— **不**作为键/值分隔符)
+- 示例: `a\.b: v` → `{"a.b": "v"}`,`a\:b: v` → `{"a:b": "v"}`,
+  `x.y\.z: v` → `{"x": {"y.z": "v"}}`。
+
+### 破坏性变更
+
+- 键中的字面量反斜杠现在需要写作 `\\`(此前键中的 `\` 是普通字节)。
+  实际中很少出现;按 pre-1.0 SemVer 为 MINOR bump。
+
+### 变更
+
+- 跟踪 ktav-rust 0.6.0 / Ktav 规范 0.6.0。绑定源码未改动 —— escape
+  语义的变化完全在 Rust 内核中实现,WASM / N-API / FFI 路径均透明。
+
+---
+
 ## 0.5.0 —— 2026-05-28
 
 跟踪 [`ktav 0.5.0`](https://github.com/ktav-lang/rust/blob/main/CHANGELOG.md#050--2026-05-28)

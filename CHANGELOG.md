@@ -11,6 +11,32 @@ This changelog tracks **package releases**, not changes to the Ktav
 format itself — for the latter see
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
+## 0.6.0 — 2026-06-01
+
+Sync to Ktav 0.6.0 — keys now support escaping.
+
+### Added
+
+- Keys process the full §3.7 escape set, with two new escapes:
+  - `\.` → `.` (literal dot — does **not** split a dotted path)
+  - `\:` → `:` (literal colon — does **not** act as the key/value separator)
+- Examples: `a\.b: v` → `{"a.b": "v"}`, `a\:b: v` → `{"a:b": "v"}`,
+  `x.y\.z: v` → `{"x": {"y.z": "v"}}`.
+
+### Breaking
+
+- A literal backslash inside a key now requires `\\` (previously `\` in
+  a key was a plain byte). Rare in practice; per pre-1.0 SemVer this is
+  a MINOR bump.
+
+### Changed
+
+- Tracks ktav-rust 0.6.0 / Ktav spec 0.6.0. Binding source unchanged —
+  the escape change is internal to the Rust core and transparent across
+  the WASM / N-API / FFI boundaries.
+
+---
+
 ## 0.5.0 — 2026-05-28
 
 Tracks [`ktav 0.5.0`](https://github.com/ktav-lang/rust/blob/main/CHANGELOG.md#050--2026-05-28)

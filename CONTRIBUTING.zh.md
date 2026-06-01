@@ -149,3 +149,9 @@ Linux / macOS 完全不需要这些 —— 默认 toolchain 就是 GNU / Darwin�
 
 如何上报漏洞见 [SECURITY.md](SECURITY.md)。简短版本:请私下发邮件至
 **phpcraftdream@gmail.com**,不要为安全问题开公开 issue。
+
+### 贡献的许可
+
+除非您另有明确声明,否则您有意提交以纳入本项目的任何贡献(按
+Apache-2.0 许可证中的定义),均按 **MIT OR Apache-2.0** 双重许可,
+不附加任何额外条款或条件。

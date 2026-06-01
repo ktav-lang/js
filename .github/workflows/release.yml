@@ -16,6 +16,10 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  # mlugg/setup-zig@v2 still ships a Node 20 entrypoint; GitHub forces
+  # JS actions onto Node 24 from 2026-06-02 anyway. Opt in early to
+  # silence the deprecation warning and exercise the new runtime now.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   # ------------------------------------------------------------------

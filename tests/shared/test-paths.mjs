@@ -29,7 +29,7 @@ function cabiName() {
 }
 
 export const cabi = join(repo, "target", "release", cabiName());
-export const spec = join(repo, "spec", "versions", "0.5", "tests");
+export const spec = join(repo, "spec", "versions", "0.6", "tests");
 
 export function cabiBuilt() {
     return existsSync(cabi);

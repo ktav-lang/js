@@ -1,6 +1,6 @@
 {
   "name": "@ktav-lang/ktav",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Universal JS/TS bindings for Ktav — a plain configuration format with three rules, zero indentation, and zero quoting. WASM-backed, ships for Node, Deno, Bun, and browsers from a single package.",
   "license": "MIT OR Apache-2.0",
   "author": "Marat K <phpcraftdream@gmail.com>",
@@ -112,14 +112,14 @@
     ]
   },
   "optionalDependencies": {
-    "@ktav-lang/js-win32-x64-msvc": "0.5.0",
-    "@ktav-lang/js-win32-arm64-msvc": "0.5.0",
-    "@ktav-lang/js-darwin-x64": "0.5.0",
-    "@ktav-lang/js-darwin-arm64": "0.5.0",
-    "@ktav-lang/js-linux-x64-gnu": "0.5.0",
-    "@ktav-lang/js-linux-arm64-gnu": "0.5.0",
-    "@ktav-lang/js-linux-x64-musl": "0.5.0",
-    "@ktav-lang/js-linux-arm64-musl": "0.5.0"
+    "@ktav-lang/js-win32-x64-msvc": "0.6.0",
+    "@ktav-lang/js-win32-arm64-msvc": "0.6.0",
+    "@ktav-lang/js-darwin-x64": "0.6.0",
+    "@ktav-lang/js-darwin-arm64": "0.6.0",
+    "@ktav-lang/js-linux-x64-gnu": "0.6.0",
+    "@ktav-lang/js-linux-arm64-gnu": "0.6.0",
+    "@ktav-lang/js-linux-x64-musl": "0.6.0",
+    "@ktav-lang/js-linux-arm64-musl": "0.6.0"
   },
   "devDependencies": {
     "@napi-rs/cli": "^3.6.2",

@@ -159,3 +159,10 @@ trees.
 See [SECURITY.md](SECURITY.md) for how to report vulnerabilities.
 Short version: email **phpcraftdream@gmail.com** privately, please
 don't open a public issue for security problems.
+
+### License of contributions
+
+Unless you explicitly state otherwise, any contribution intentionally
+submitted for inclusion in this project by you, as defined in the
+Apache-2.0 license, shall be dual-licensed as **MIT OR Apache-2.0**,
+without any additional terms or conditions.

@@ -183,6 +183,19 @@ On encode, `Number.isInteger(x)` decides `:i` vs `:f`; `bigint` always
 encodes as `:i`. `NaN` and `±Infinity` are rejected — Ktav 0.1.0 does
 not represent them.
 
+## Key escaping
+
+Since spec 0.6.0 a literal `.` or `:` inside a key segment is written
+with a backslash:
+
+```text
+a\.b: v        // key is the single segment "a.b" → { "a.b": "v" }
+a\:b: v        // key contains a colon            → { "a:b": "v" }
+x.y\.z: v      // split on the first dot only     → { "x": { "y.z": "v" } }
+```
+
+A literal backslash in a key is `\\`.
+
 ## Single-file browser build
 
 `dist/wasm/web/ktav.inline.js` is a variant with the WASM binary
