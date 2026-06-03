@@ -7,6 +7,8 @@
 
 **语言:** [English](README.md) · [Русский](README.ru.md) · **简体中文**
 
+**演练场：** 在浏览器中互转 JSON / YAML / TOML / INI ⇄ Ktav — **[ktav-lang.github.io](https://ktav-lang.github.io/)**。
+
 **规范:** 本包实现 **Ktav 0.1**。格式独立于本包版本化维护,参见
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec) 的正式文档。
 

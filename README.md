@@ -7,6 +7,8 @@
 
 **Languages:** **English** · [Русский](README.ru.md) · [简体中文](README.zh.md)
 
+**Playground:** convert JSON / YAML / TOML / INI ⇄ Ktav in your browser at **[ktav-lang.github.io](https://ktav-lang.github.io/)**.
+
 **Specification:** this package implements **Ktav 0.1**. The format is
 versioned and maintained independently of this package — see
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec) for the formal
