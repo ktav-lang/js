@@ -14,7 +14,7 @@
 
 **Песочница:** конвертация JSON / YAML / TOML / INI ⇄ Ktav прямо в браузере — **[ktav-lang.github.io](https://ktav-lang.github.io/)**.
 
-**Спецификация:** этот пакет реализует **Ktav 0.1**. Формат версионируется
+**Спецификация:** этот пакет реализует **Ktav**. Формат версионируется
 и развивается отдельно от пакета — см.
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec) для нормативного
 документа.
@@ -64,15 +64,15 @@ interface Config {
 
 const cfg = loads<Config>(`
 service: web
-port:i 8080
-ratio:f 0.75
+port: 8080
+ratio: 0.75
 tls: true
 tags: [
     prod
     eu-west-1
 ]
 db.host: primary.internal
-db.timeout:i 30
+db.timeout: 30
 `);
 
 cfg.port;        // 8080 — типизирован как number
@@ -106,7 +106,7 @@ const text = dumps(doc);
 ```ts
 import { ready, loads } from "@ktav-lang/ktav";
 await ready();
-loads("port:i 8080\n");
+loads("port: 8080\n");
 ```
 
 Node / Bun это пропускают — нативный бинарник подгружается в момент
@@ -123,7 +123,7 @@ Node / Bun это пропускают — нативный бинарник п�
 import { loads, dumps } from "@ktav-lang/ktav/ffi";
 
 // loads / dumps здесь ASYNC (ждут dlopen на первом вызове)
-const cfg = await loads("port:i 8080\n");
+const cfg = await loads("port: 8080\n");
 const text = await dumps({ port: 8443 });
 ```
 
@@ -167,20 +167,20 @@ function ready(input?: URL | Response | ArrayBuffer): Promise<void>;
 |------------------|-----------------------------------------------------|
 | `null`           | `null`                                              |
 | `true` / `false` | `boolean`                                           |
-| `:i <digits>`    | `number` (безопасный диапазон) / `bigint` (шире)    |
-| `:f <number>`    | `number`                                            |
-| скаляр без маркера | `string`                                          |
+| голое целое      | `number` (безопасный диапазон) / `bigint` (шире)    |
+| голое десятичное | `number`                                            |
+| прочий скаляр    | `string`                                            |
 | `[ ... ]`        | `Array`                                             |
 | `{ ... }`        | обычный объект (порядок вставки сохраняется)        |
 
-Ktav живёт по принципу **«никакой магии в типах»** — голый `port: 8080`
-на уровне парсера остаётся строкой. Нужны числа — используйте
-типизированные маркеры `:i` / `:f`, либо приводите на прикладном
-уровне.
+Ktav типизирует числа по **лексической форме** — голый `port: 8080`
+это `number`, `ratio: 0.5` — float, а всё, что не является голым
+числом, остаётся `string`. Чтобы число-подобное значение осталось
+строкой, форсируйте его через `::` (`zip:: 01007`).
 
-На сериализации `Number.isInteger(x)` решает `:i` или `:f`; `bigint`
-всегда кодируется как `:i`. `NaN` и `±Infinity` отвергаются — Ktav
-0.1.0 их не представляет.
+На сериализации `Number.isInteger(x)` решает, целое или десятичное
+выводить; `bigint` всегда кодируется как голое целое. `NaN` и
+`±Infinity` отвергаются — Ktav их не представляет.
 
 ## Экранирование в ключах
 

@@ -14,7 +14,7 @@
 
 **演练场：** 在浏览器中互转 JSON / YAML / TOML / INI ⇄ Ktav — **[ktav-lang.github.io](https://ktav-lang.github.io/)**。
 
-**规范:** 本包实现 **Ktav 0.1**。格式独立于本包版本化维护,参见
+**规范:** 本包实现 **Ktav**。格式独立于本包版本化维护,参见
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec) 的正式文档。
 
 ---
@@ -60,15 +60,15 @@ interface Config {
 
 const cfg = loads<Config>(`
 service: web
-port:i 8080
-ratio:f 0.75
+port: 8080
+ratio: 0.75
 tls: true
 tags: [
     prod
     eu-west-1
 ]
 db.host: primary.internal
-db.timeout:i 30
+db.timeout: 30
 `);
 
 cfg.port;        // 8080 —— 类型为 number
@@ -102,7 +102,7 @@ const text = dumps(doc);
 ```ts
 import { ready, loads } from "@ktav-lang/ktav";
 await ready();
-loads("port:i 8080\n");
+loads("port: 8080\n");
 ```
 
 Node / Bun 的使用方无需此步 —— 原生二进制会在导入时加载。
@@ -117,7 +117,7 @@ Deno 用户想要原生速度而不付出 WASM 开销,Bun 用户想用 `bun:ffi`
 import { loads, dumps } from "@ktav-lang/ktav/ffi";
 
 // 这里 loads / dumps 是 ASYNC(首次调用要 dlopen)
-const cfg = await loads("port:i 8080\n");
+const cfg = await loads("port: 8080\n");
 const text = await dumps({ port: 8443 });
 ```
 
@@ -158,17 +158,18 @@ function ready(input?: URL | Response | ArrayBuffer): Promise<void>;
 |------------------|----------------------------------------------------|
 | `null`           | `null`                                             |
 | `true` / `false` | `boolean`                                          |
-| `:i <digits>`    | `number` (安全范围) / `bigint` (更大)              |
-| `:f <number>`    | `number`                                           |
-| 裸标量           | `string`                                           |
+| 裸整数           | `number` (安全范围) / `bigint` (更大)              |
+| 裸小数           | `number`                                           |
+| 其他标量         | `string`                                           |
 | `[ ... ]`        | `Array`                                            |
 | `{ ... }`        | 普通对象 (保留插入顺序)                            |
 
-Ktav 坚持**"不耍小聪明"** —— 裸 `port: 8080` 在解析层面仍然是字符串。
-需要数字时请使用类型标记 `:i` / `:f`,或在应用层自行转换。
+Ktav 按**词法形式**为数字定型 —— 裸 `port: 8080` 是 `number`,
+`ratio: 0.5` 是浮点数,而任何并非裸数字的内容都保持为 `string`。
+要让看起来像数字的值保持为字符串,用 `::` 强制(`zip:: 01007`)。
 
-编码时,`Number.isInteger(x)` 决定使用 `:i` 还是 `:f`;`bigint` 始终
-编码为 `:i`。`NaN` 与 `±Infinity` 会被拒绝 —— Ktav 0.1.0 不表示它们。
+编码时,`Number.isInteger(x)` 决定输出整数还是小数;`bigint` 始终
+编码为裸整数。`NaN` 与 `±Infinity` 会被拒绝 —— Ktav 不表示它们。
 
 ## 键的转义
 

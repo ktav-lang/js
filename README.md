@@ -14,7 +14,7 @@
 
 **Playground:** convert JSON / YAML / TOML / INI ⇄ Ktav in your browser at **[ktav-lang.github.io](https://ktav-lang.github.io/)**.
 
-**Specification:** this package implements **Ktav 0.1**. The format is
+**Specification:** this package implements **Ktav**. The format is
 versioned and maintained independently of this package — see
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec) for the formal
 document.
@@ -64,15 +64,15 @@ interface Config {
 
 const cfg = loads<Config>(`
 service: web
-port:i 8080
-ratio:f 0.75
+port: 8080
+ratio: 0.75
 tls: true
 tags: [
     prod
     eu-west-1
 ]
 db.host: primary.internal
-db.timeout:i 30
+db.timeout: 30
 `);
 
 cfg.port;        // 8080 — typed as number
@@ -95,12 +95,12 @@ const doc = {
 };
 const text = dumps(doc);
 // name: frontend
-// port:i 8443
+// port: 8443
 // tls: true
-// ratio:f 0.95
+// ratio: 0.95
 // upstreams: [
-//     { host: a.example  port:i 1080 }
-//     { host: b.example  port:i 1080 }
+//     { host: a.example  port: 1080 }
+//     { host: b.example  port: 1080 }
 // ]
 // notes: null
 ```
@@ -115,7 +115,7 @@ target defers instantiation:
 ```ts
 import { ready, loads } from "@ktav-lang/ktav";
 await ready();
-loads("port:i 8080\n");
+loads("port: 8080\n");
 ```
 
 Node / Bun consumers skip this — the native binary is loaded at import
@@ -132,7 +132,7 @@ opt-in subexport that talks directly to the C ABI shared library
 import { loads, dumps } from "@ktav-lang/ktav/ffi";
 
 // loads / dumps are ASYNC here (waiting on dlopen on first call)
-const cfg = await loads("port:i 8080\n");
+const cfg = await loads("port: 8080\n");
 const text = await dumps({ port: 8443 });
 ```
 
@@ -176,19 +176,20 @@ structural `KtavValue` type.
 |------------------|-------------------------------------------|
 | `null`           | `null`                                    |
 | `true` / `false` | `boolean`                                 |
-| `:i <digits>`    | `number` (safe range) / `bigint` (larger) |
-| `:f <number>`    | `number`                                  |
-| bare scalar      | `string`                                  |
+| bare integer     | `number` (safe range) / `bigint` (larger) |
+| bare decimal     | `number`                                  |
+| other scalar     | `string`                                  |
 | `[ ... ]`        | `Array`                                   |
 | `{ ... }`        | plain object (insertion-ordered)          |
 
-Ktav keeps **"no magic types"** — a bare `port: 8080` stays a string at
-the parser level. Use the typed markers `:i` / `:f` when you want
-numbers, or coerce at the application layer.
+Ktav types numbers by **lexical form** — a bare `port: 8080` is a
+`number`, `ratio: 0.5` a float, and anything that isn't a bare number
+stays a `string`. Force a numeric-looking value to stay a string with
+`::` (`zip:: 01007`).
 
-On encode, `Number.isInteger(x)` decides `:i` vs `:f`; `bigint` always
-encodes as `:i`. `NaN` and `±Infinity` are rejected — Ktav 0.1.0 does
-not represent them.
+On encode, `Number.isInteger(x)` decides integer vs decimal output;
+`bigint` always encodes as a bare integer. `NaN` and `±Infinity` are
+rejected — Ktav does not represent them.
 
 ## Key escaping
 
