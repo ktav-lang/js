@@ -10,6 +10,10 @@ MINOR 版本升级视为破坏性。
 本 changelog 跟踪**包发布**,不涉及 Ktav 格式本身的变更 —— 后者见
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md)。
 
+## [0.6.1] — 2026-06-05
+
+- 文档：将所有 README 示例改写为 spec 0.6 语法（裸数字替代已移除的 `:i`/`:f` 标记；`##` 注释替代 `#`）。
+
 ## 0.6.0 —— 2026-06-01
 
 同步至 Ktav 0.6.0 —— 键现在支持转义。
