@@ -9,7 +9,7 @@
 //   - cabi binary not built at `target/release/...` → exit 0.
 
 import * as testPaths from "./shared/test-paths.mjs";
-import { loads, dumps, stringifyForceStrings, setLibraryPath } from "../dist/ts/ffi-bun.js";
+import { loads, loadsStrict, dumps, stringifyForceStrings, setLibraryPath } from "../dist/ts/ffi-bun.js";
 
 if (testPaths.cabiBuilt()) setLibraryPath(testPaths.cabi);
 
@@ -57,6 +57,14 @@ await check("loads basic document", async () => {
     if (cfg.tags.join(",") !== "prod,eu-west-1") throw new Error("tags: " + cfg.tags);
     if (cfg.db.host !== "primary.internal") throw new Error("db.host: " + cfg.db.host);
     if (cfg.db.timeout !== 30) throw new Error("db.timeout: " + cfg.db.timeout);
+});
+
+await check("loadsStrict rejects lossy and accepts canonical floats", async () => {
+    let threw = false;
+    try { await loadsStrict("version: 1.10\n"); } catch { threw = true; }
+    if (!threw) throw new Error("expected strict rejection");
+    const cfg = await loadsStrict("small: 1e-3\nlarge: 1e10\n");
+    if (cfg.small !== 0.001 || cfg.large !== 10000000000) throw new Error("strict values");
 });
 
 await check("round-trip simple document", async () => {

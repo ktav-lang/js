@@ -34,6 +34,7 @@ function walkKtavFiles(dir) {
 
 const { passed, failed, total } = runAll({
     loads: mod.loads,
+    loadsStrict: mod.loadsStrict,
     dumps: mod.dumps,
     stringifyForceStrings: mod.stringifyForceStrings,
     readTextFile: (p) => readFileSync(p, "utf8"),

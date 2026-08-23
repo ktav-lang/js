@@ -16,6 +16,10 @@ export function loads<T = KtavValue>(s: string): T {
     return wasm.loads(s) as T;
 }
 
+export function loadsStrict<T = KtavValue>(s: string): T {
+    return wasm.loadsStrict(s) as T;
+}
+
 export function dumps<T extends KtavInput = KtavInput>(obj: T): string {
     return wasm.dumps(obj);
 }

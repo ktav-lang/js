@@ -10,6 +10,27 @@ MINOR 版本升级视为破坏性。
 本 changelog 跟踪**包发布**,不涉及 Ktav 格式本身的变更 —— 后者见
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md)。
 
+## [0.6.4] — 2026-08-23
+
+与 Ktav 规范和 Rust core 0.6.4 同步。
+
+### 新增
+
+- WASM、N-API 和 C-ABI FFI 入口新增 `loadsStrict()`，用于严格检查
+  canonical scalar。writer 生成的科学计数法浮点形式会被接受。
+
+### 修复
+
+- 移除 WASM 和 N-API 中重复的顶层数组包装，嵌套数组现在可无多余层级
+  地 round-trip。
+- 本地 N-API 构建和 FFI 测试路径现在遵循 `CARGO_TARGET_DIR`。
+
+### 变更
+
+- 包、平台子包、workspace metadata 和 lockfile 版本统一为 `0.6.4`。
+- Rust 依赖使用 `ktav = "0.6"`，lockfile 解析到 `0.6.4`。
+- 规范 submodule 固定到已发布的 Ktav 0.6.4 提交。
+
 ## [0.6.1] — 2026-06-05
 
 - 文档：将所有 README 示例改写为 spec 0.6 语法（裸数字替代已移除的 `:i`/`:f` 标记；`##` 注释替代 `#`）。

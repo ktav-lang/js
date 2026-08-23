@@ -114,10 +114,11 @@ Deno 用户想要原生速度而不付出 WASM 开销,Bun 用户想用 `bun:ffi`
 (`ktav_cabi`,与 Java / Go / .NET 绑定共用同一个二进制):
 
 ```ts
-import { loads, dumps } from "@ktav-lang/ktav/ffi";
+import { loads, loadsStrict, dumps } from "@ktav-lang/ktav/ffi";
 
 // 这里 loads / dumps 是 ASYNC(首次调用要 dlopen)
 const cfg = await loads("port: 8080\n");
+await loadsStrict("port: 8080\n");
 const text = await dumps({ port: 8443 });
 ```
 
@@ -143,11 +144,15 @@ const text = await dumps({ port: 8443 });
 
 ```ts
 function loads<T = KtavValue>(s: string): T;
+function loadsStrict<T = KtavValue>(s: string): T;
 function dumps<T extends KtavInput = KtavInput>(obj: T): string;
 
 // 仅 web / Deno / 浏览器;Node + Bun 忽略此函数
 function ready(input?: URL | Response | ArrayBuffer): Promise<void>;
 ```
+
+`loadsStrict` 会执行 canonical scalar 验证：拒绝有损写法，但接受
+canonical writer 生成的形式。
 
 `loads` 上的泛型参数是**未经检查的类型断言** —— 当你已知数据形状、
 希望获得 IDE 自动补全时使用。不传则得到结构化类型 `KtavValue`。
@@ -173,7 +178,7 @@ Ktav 按**词法形式**为数字定型 —— 裸 `port: 8080` 是 `number`,
 
 ## 键的转义
 
-自 spec 0.6.0 起,键段内的字面量 `.` 或 `:` 通过反斜杠书写:
+自 spec 0.6.4 起,键段内的字面量 `.` 或 `:` 通过反斜杠书写:
 
 ```text
 a\.b: v        // 键是单个段 "a.b"        → { "a.b": "v" }

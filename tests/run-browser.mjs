@@ -51,7 +51,9 @@ const relFromRepo = (p) => {
 const manifest = spec
     ? {
         specDir: relFromRepo(spec),
-        valid: walkKtavFiles(`${spec}/valid`).map(relFromRepo),
+        valid: walkKtavFiles(`${spec}/valid`)
+            .filter(f => !f.endsWith(".canonical.ktav"))
+            .map(relFromRepo),
         invalid: walkKtavFiles(`${spec}/invalid`).map(relFromRepo),
     }
     : { specDir: null, valid: [], invalid: [] };

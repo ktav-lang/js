@@ -71,6 +71,10 @@ async function getLib(): Promise<FFILib> {
             args: [ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr],
             returns: ffi.FFIType.i32,
         },
+        ktav_loads_strict: {
+            args: [ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr],
+            returns: ffi.FFIType.i32,
+        },
         ktav_dumps: {
             args: [ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr],
             returns: ffi.FFIType.i32,
@@ -93,13 +97,15 @@ async function getLib(): Promise<FFILib> {
 }
 
 async function callNative(
-    op: "loads" | "dumps" | "dumps_force_strings",
+    op: "loads" | "loads_strict" | "dumps" | "dumps_force_strings",
     input: Uint8Array,
 ): Promise<Uint8Array> {
     const { ffi, symbols } = await getLib();
     const sym = (
         op === "loads"
             ? symbols.ktav_loads
+            : op === "loads_strict"
+                ? symbols.ktav_loads_strict
             : op === "dumps"
                 ? symbols.ktav_dumps
                 : symbols.ktav_dumps_force_strings
@@ -167,6 +173,12 @@ export async function loads<T = KtavValue>(src: string): Promise<T> {
     return decode(result) as T;
 }
 
+export async function loadsStrict<T = KtavValue>(src: string): Promise<T> {
+    const bytes = new TextEncoder().encode(src);
+    const result = await callNative("loads_strict", bytes);
+    return decode(result) as T;
+}
+
 export async function dumps<T extends KtavInput = KtavInput>(value: T): Promise<string> {
     if (value === null || typeof value !== "object") {
         throw new Error("top-level Ktav document must be an object or an array");
@@ -189,6 +201,7 @@ export async function stringifyForceStrings<T extends KtavInput = KtavInput>(
 
 export const ktav: Pick<Ktav, never> & {
     loads: typeof loads;
+    loadsStrict: typeof loadsStrict;
     dumps: typeof dumps;
     stringifyForceStrings: typeof stringifyForceStrings;
-} = { loads, dumps, stringifyForceStrings };
+} = { loads, loadsStrict, dumps, stringifyForceStrings };

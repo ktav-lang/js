@@ -19,6 +19,10 @@ export function loads(_src: string): never {
     throw new Error(MESSAGE);
 }
 
+export function loadsStrict(_src: string): never {
+    throw new Error(MESSAGE);
+}
+
 export function dumps(_value: unknown): never {
     throw new Error(MESSAGE);
 }
@@ -27,4 +31,4 @@ export function stringifyForceStrings(_value: unknown): never {
     throw new Error(MESSAGE);
 }
 
-export const ktav = { loads, dumps, stringifyForceStrings };
+export const ktav = { loads, loadsStrict, dumps, stringifyForceStrings };

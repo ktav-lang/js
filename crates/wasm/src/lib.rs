@@ -39,6 +39,13 @@ pub fn loads(s: &str) -> Result<JsValue, JsError> {
     value_to_js(&value)
 }
 
+/// Parse a Ktav document with strict canonical-scalar validation.
+#[wasm_bindgen(js_name = loadsStrict)]
+pub fn loads_strict(s: &str) -> Result<JsValue, JsError> {
+    let value = ktav::parse_strict(s).map_err(|e| JsError::new(&e.to_string()))?;
+    value_to_js(&value)
+}
+
 /// Serialize a JavaScript value as a Ktav document. The top-level value
 /// must be a plain object or an array — both are valid Ktav root kinds
 /// since spec 0.1.1 (top-level Arrays render bare, item-per-line, with
@@ -255,31 +262,7 @@ fn format_float(v: f64) -> String {
 ///
 /// All other cases delegate to `render::render`.
 fn render_top_level(value: &Value) -> ktav::Result<String> {
-    match value {
-        Value::Array(items) => {
-            if items.is_empty() {
-                return Ok("[]\n".to_string());
-            }
-            let needs_wrap = matches!(items.first(), Some(Value::Array(a)) if !a.is_empty())
-                || matches!(items.first(), Some(Value::Object(o)) if !o.is_empty());
-            if needs_wrap {
-                // Render the items bare (at indent 0), then re-indent by 4 spaces.
-                let bare = render::render(value)?;
-                let mut out = String::with_capacity(bare.len() + 32);
-                out.push_str("[\n");
-                for line in bare.lines() {
-                    out.push_str("    ");
-                    out.push_str(line);
-                    out.push('\n');
-                }
-                out.push_str("]\n");
-                Ok(out)
-            } else {
-                render::render(value)
-            }
-        }
-        _ => render::render(value),
-    }
+    render::render(value)
 }
 
 /// Coerce every scalar leaf in `value` to a String, mirroring

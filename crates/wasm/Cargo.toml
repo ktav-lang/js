@@ -10,7 +10,7 @@ publish = false
 
 # Which version of the Ktav format specification these bindings implement.
 [package.metadata.ktav]
-spec-version = "0.6.0"
+spec-version = "0.6.4"
 
 [lib]
 name = "ktav"

@@ -28,7 +28,10 @@ function cabiName() {
     return "libktav_cabi.so";
 }
 
-export const cabi = join(repo, "target", "release", cabiName());
+const cargoTarget = process.env.CARGO_TARGET_DIR
+    ? resolve(process.env.CARGO_TARGET_DIR)
+    : join(repo, "target");
+export const cabi = join(cargoTarget, "release", cabiName());
 export const spec = join(repo, "spec", "versions", "0.6", "tests");
 
 export function cabiBuilt() {

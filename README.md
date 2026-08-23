@@ -129,10 +129,11 @@ opt-in subexport that talks directly to the C ABI shared library
 (`ktav_cabi`, the same binary used by the Java / Go / .NET bindings):
 
 ```ts
-import { loads, dumps } from "@ktav-lang/ktav/ffi";
+import { loads, loadsStrict, dumps } from "@ktav-lang/ktav/ffi";
 
 // loads / dumps are ASYNC here (waiting on dlopen on first call)
 const cfg = await loads("port: 8080\n");
+await loadsStrict("port: 8080\n");
 const text = await dumps({ port: 8443 });
 ```
 
@@ -160,11 +161,15 @@ Runnable examples: [`examples/deno/ffi.ts`](examples/deno/ffi.ts),
 
 ```ts
 function loads<T = KtavValue>(s: string): T;
+function loadsStrict<T = KtavValue>(s: string): T;
 function dumps<T extends KtavInput = KtavInput>(obj: T): string;
 
 // web / Deno / browser only; Node + Bun ignore it
 function ready(input?: URL | Response | ArrayBuffer): Promise<void>;
 ```
+
+`loadsStrict` applies canonical-scalar validation and rejects lossy
+spellings while accepting forms emitted by the canonical writer.
 
 The generic parameter on `loads` is an **unchecked cast** — use it when
 you know the shape for IDE autocomplete. Pass nothing for the
@@ -193,7 +198,7 @@ rejected — Ktav does not represent them.
 
 ## Key escaping
 
-Since spec 0.6.0 a literal `.` or `:` inside a key segment is written
+Since spec 0.6.4 a literal `.` or `:` inside a key segment is written
 with a backslash:
 
 ```text

@@ -7,7 +7,7 @@
 // exercise the same import path real Deno consumers would see via
 // package.json `exports`. That bundle uses the inline wasm build,
 // so there's no `.wasm` fetch — just `await ready()` once.
-import { loads, dumps, stringifyForceStrings, ready } from "../dist/ts/web.js";
+import { loads, loadsStrict, dumps, stringifyForceStrings, ready } from "../dist/ts/web.js";
 // @ts-expect-error — plain .mjs, no type-decls; run-time is fine.
 import { runAll } from "./shared/assertions.mjs";
 // @ts-expect-error — plain .mjs, no type-decls; run-time is fine.
@@ -32,6 +32,7 @@ function walkKtavFiles(dir: string): string[] {
 
 const { passed, failed, total } = runAll({
     loads,
+    loadsStrict,
     dumps,
     stringifyForceStrings,
     readTextFile: (p: string) => Deno.readTextFileSync(p),

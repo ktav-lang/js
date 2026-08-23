@@ -51,6 +51,12 @@ export interface Ktav {
     loads<T = KtavValue>(s: string): T;
 
     /**
+     * Parse a Ktav document with strict canonical-scalar validation.
+     * Canonical writer forms are accepted; lossy scalar spellings throw.
+     */
+    loadsStrict<T = KtavValue>(s: string): T;
+
+    /**
      * Serialize a JavaScript value as a Ktav document. The top-level
      * value must be a plain object or an array — both are valid Ktav
      * roots since spec 0.1.1.

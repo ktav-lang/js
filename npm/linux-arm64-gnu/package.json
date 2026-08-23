@@ -1,6 +1,6 @@
 {
   "name": "@ktav-lang/js-linux-arm64-gnu",
-  "version": "0.6.0",
+  "version": "0.6.4",
   "cpu": [
     "arm64"
   ],

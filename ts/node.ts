@@ -35,6 +35,7 @@ function candidateTriples(): string[] {
 
 interface NativeBinding {
     loads: (s: string) => unknown;
+    loadsStrict: (s: string) => unknown;
     dumps: (obj: unknown) => string;
     stringifyForceStrings: (obj: unknown) => string;
 }
@@ -71,6 +72,10 @@ const native: NativeBinding = resolveNative();
 
 export function loads<T = KtavValue>(s: string): T {
     return native.loads(s) as T;
+}
+
+export function loadsStrict<T = KtavValue>(s: string): T {
+    return native.loadsStrict(s) as T;
 }
 
 export function dumps<T extends KtavInput = KtavInput>(obj: T): string {

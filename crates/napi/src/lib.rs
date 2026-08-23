@@ -25,6 +25,13 @@ pub fn loads<'env>(env: &'env Env, s: String) -> Result<Unknown<'env>> {
     value_to_js(env, &value)
 }
 
+/// Parse a Ktav document with strict canonical-scalar validation.
+#[napi(js_name = "loadsStrict")]
+pub fn loads_strict<'env>(env: &'env Env, s: String) -> Result<Unknown<'env>> {
+    let value = ktav::parse_strict(&s).map_err(|e| Error::from_reason(e.to_string()))?;
+    value_to_js(env, &value)
+}
+
 /// Serialize a JavaScript value as a Ktav document. The top-level value
 /// must be a plain object or an array — both are valid Ktav root kinds
 /// since spec 0.1.1 (top-level Arrays render bare, item-per-line, with
@@ -87,42 +94,7 @@ pub fn emit_canonical(env: &Env, obj: Unknown) -> Result<String> {
 ///
 /// All other cases delegate directly to `render::render`.
 fn render_top_level(value: &Value) -> ktav::Result<String> {
-    match value {
-        Value::Array(items) => {
-            if items.is_empty() {
-                return Ok("[]\n".to_string());
-            }
-            // Check if the first item needs disambiguation wrapping
-            // (would render as a line starting with a lone `[` or `{`).
-            let needs_wrap = matches!(
-                items.first(),
-                Some(Value::Array(a)) if !a.is_empty()
-            ) || matches!(
-                items.first(),
-                Some(Value::Object(o)) if !o.is_empty()
-            );
-            if needs_wrap {
-                // Render the items as if the array were a regular (non-root)
-                // array by rendering a single-item wrapper object with a
-                // synthetic key, then extracting the indented body. Simpler:
-                // render the array bare (items at indent 0 via `render::render`)
-                // and then re-indent each line by 4 spaces before wrapping.
-                let bare = render::render(value)?;
-                let mut out = String::with_capacity(bare.len() + 32);
-                out.push_str("[\n");
-                for line in bare.lines() {
-                    out.push_str("    ");
-                    out.push_str(line);
-                    out.push('\n');
-                }
-                out.push_str("]\n");
-                Ok(out)
-            } else {
-                render::render(value)
-            }
-        }
-        _ => render::render(value),
-    }
+    render::render(value)
 }
 
 /// Coerce every scalar in `value` to a String, mirroring

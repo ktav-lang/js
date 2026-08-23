@@ -11,6 +11,27 @@ This changelog tracks **package releases**, not changes to the Ktav
 format itself — for the latter see
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
+## [0.6.4] — 2026-08-23
+
+Synchronized with Ktav spec and Rust core 0.6.4.
+
+### Added
+
+- Added `loadsStrict()` to WASM, N-API, and C-ABI FFI entrypoints for strict
+  canonical-scalar validation. Canonical scientific float forms are accepted.
+
+### Fixed
+
+- Removed duplicate top-level array wrapping in WASM and N-API; nested arrays
+  now round-trip without an extra level.
+- Local N-API build and FFI test path resolution now respect `CARGO_TARGET_DIR`.
+
+### Changed
+
+- Package, platform subpackages, workspace metadata, and lockfile are `0.6.4`.
+- Rust dependency is `ktav = "0.6"`, with the lockfile resolved to `0.6.4`.
+- Spec submodule is pinned to the published Ktav 0.6.4 commit.
+
 ## [0.6.1] — 2026-06-05
 
 - Docs: rewrite all README examples to spec 0.6 syntax (bare numbers instead of removed `:i`/`:f` markers; `##` comments instead of `#`).

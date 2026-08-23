@@ -63,7 +63,10 @@ function build() {
 function copyArtifact() {
     const target = rustTarget();
     const ext = platform === "win32" ? "ktav_napi.dll" : platform === "darwin" ? "libktav_napi.dylib" : "libktav_napi.so";
-    const src = resolve(root, `target/${target}/release/${ext}`);
+    const cargoTarget = process.env.CARGO_TARGET_DIR
+        ? resolve(process.env.CARGO_TARGET_DIR)
+        : resolve(root, "target");
+    const src = resolve(cargoTarget, target, "release", ext);
     if (!existsSync(src)) {
         console.error(`[build:napi] expected artifact missing: ${src}`);
         process.exit(1);

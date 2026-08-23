@@ -9,7 +9,7 @@
     console.log("[runner] fetching assertions.mjs");
     const { runAll } = await import("/tests/shared/assertions.mjs");
     console.log("[runner] fetching dist/ts/web.js");
-    const { loads, dumps, stringifyForceStrings, ready } = await import("/dist/ts/web.js");
+    const { loads, loadsStrict, dumps, stringifyForceStrings, ready } = await import("/dist/ts/web.js");
     console.log("[runner] imports resolved");
 
     await ready();
@@ -38,6 +38,7 @@
     const log = document.getElementById("log");
     const result = runAll({
         loads,
+        loadsStrict,
         dumps,
         stringifyForceStrings,
         readTextFile: (p) => {

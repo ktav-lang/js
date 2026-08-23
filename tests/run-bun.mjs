@@ -6,7 +6,7 @@
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
-import { loads, dumps, stringifyForceStrings } from "../dist/ts/node.js";
+import { loads, loadsStrict, dumps, stringifyForceStrings } from "../dist/ts/node.js";
 import { runAll } from "./shared/assertions.mjs";
 import * as testPaths from "./shared/test-paths.mjs";
 
@@ -23,6 +23,7 @@ function walkKtavFiles(dir) {
 
 const { passed, failed, total } = runAll({
     loads,
+    loadsStrict,
     dumps,
     stringifyForceStrings,
     readTextFile: (p) => readFileSync(p, "utf8"),

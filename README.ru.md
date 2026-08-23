@@ -120,10 +120,11 @@ Node / Bun это пропускают — нативный бинарник п�
 (`ktav_cabi`, тот же бинарник что у биндингов Java / Go / .NET):
 
 ```ts
-import { loads, dumps } from "@ktav-lang/ktav/ffi";
+import { loads, loadsStrict, dumps } from "@ktav-lang/ktav/ffi";
 
 // loads / dumps здесь ASYNC (ждут dlopen на первом вызове)
 const cfg = await loads("port: 8080\n");
+await loadsStrict("port: 8080\n");
 const text = await dumps({ port: 8443 });
 ```
 
@@ -151,11 +152,15 @@ optional dep (тот же что хранит `.node`-бинарник), так 
 
 ```ts
 function loads<T = KtavValue>(s: string): T;
+function loadsStrict<T = KtavValue>(s: string): T;
 function dumps<T extends KtavInput = KtavInput>(obj: T): string;
 
 // только web / Deno / браузер; Node + Bun игнорируют
 function ready(input?: URL | Response | ArrayBuffer): Promise<void>;
 ```
+
+`loadsStrict` применяет проверку канонических скаляров: отклоняет lossy-формы,
+но принимает записи, которые выдаёт canonical writer.
 
 Дженерик-параметр у `loads` — **непроверяемый каст**: используйте его,
 когда знаете форму данных и хотите автокомплит в IDE. Ничего не
@@ -184,7 +189,7 @@ Ktav типизирует числа по **лексической форме** 
 
 ## Экранирование в ключах
 
-Начиная со spec 0.6.0 литеральные `.` или `:` внутри сегмента ключа
+Начиная со spec 0.6.4 литеральные `.` или `:` внутри сегмента ключа
 записываются через backslash:
 
 ```text
