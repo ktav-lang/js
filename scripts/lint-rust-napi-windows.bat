@@ -1,5 +1,5 @@
 @echo off
-:: Wrap `cargo clippy-napi` with vcvars + optional xwin SDK libs, so
+:: Wrap `cargo clippy -p ktav-napi` with vcvars + optional xwin SDK libs, so
 :: the MSVC linker it needs for proc-macro / build.rs host-side is
 :: available on dev machines. CI Linux runners skip this entirely.
 
@@ -37,5 +37,5 @@ if exist "%XWIN%\sdk\lib\ucrt\x86_64\ucrt.lib" (
 )
 
 cd /d "%~dp0\.."
-cargo clippy-napi -- -D warnings
+cargo clippy -p ktav-napi --all-targets -- -D warnings
 exit /b !errorlevel!

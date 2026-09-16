@@ -23,21 +23,23 @@ function run(cmd, opts = {}) {
     execSync(cmd, { cwd: root, stdio: "inherit", ...opts });
 }
 
-// `ktav-wasm`: the `clippy-wasm` alias (see .cargo/config.toml)
-// locks in the `--target wasm32-unknown-unknown --all-targets`
-// incantation. On Windows we force the GNU toolchain so the host
+// `ktav-wasm`: lock in the `--target wasm32-unknown-unknown --all-targets`
+// incantation explicitly (mirrors the `clippy-wasm` alias in
+// .cargo/config.toml, spelled out here because on cargo 1.97 the alias
+// body leaks into the underlying invocation and breaks the run).
+// On Windows we force the GNU toolchain so the host
 // linker is MinGW's ld rather than MSVC's link.exe, which would
 // pull the build scripts / proc-macros through vcvars. On Unix
 // the default toolchain is fine.
 const toolchainPrefix = platform === "win32" ? "+stable-x86_64-pc-windows-gnu " : "";
-run(`cargo ${toolchainPrefix}clippy-wasm -- -D warnings`);
+run(`cargo ${toolchainPrefix}clippy -p ktav-wasm --target wasm32-unknown-unknown --all-targets -- -D warnings`);
 
 // `ktav-napi`: MSVC-target bound on Windows (linked against
 // node.dll imports), the bat wrapper loads vcvars + optional
-// xwin libs before invoking `cargo clippy-napi`. Elsewhere, plain
-// alias is enough.
+// xwin libs before invoking clippy. Elsewhere, plain clippy is
+// enough.
 if (platform === "win32") {
     run(`cmd /c scripts\\lint-rust-napi-windows.bat`);
 } else {
-    run(`cargo clippy-napi -- -D warnings`);
+    run(`cargo clippy -p ktav-napi --all-targets -- -D warnings`);
 }
