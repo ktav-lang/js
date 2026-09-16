@@ -34,3 +34,6 @@ desktop.ini
 
 # Logs
 *.log
+
+# /wrush task worktrees — always created here, in-tree
+/worktrees/
