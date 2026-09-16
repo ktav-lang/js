@@ -21,17 +21,40 @@
     // Map. `runAll` calls `readTextFile` synchronously, so we must
     // fetch every fixture before kicking the suite off.
     const cache = new Map();
-    const allFiles = [...manifest.valid, ...manifest.invalid];
+    const byteCache = new Map();
+    const allFiles = [...manifest.valid, ...manifest.invalid, ...manifest.parseableUnrepresentable];
     for (const f of allFiles) {
         cache.set(f, await fetch("/" + f.replace(/^\/+/, "")).then(r => r.text()));
         const json = f.replace(/\.ktav$/, ".json");
         cache.set(json, await fetch("/" + json.replace(/^\/+/, "")).then(r => r.text()));
+    }
+    // unrepresentable/ fixtures ship JSON only — fetch text and raw bytes
+    // (the byte cache also backs readBytes for the invalid_utf8 fixture).
+    for (const f of manifest.unrepresentable) {
+        cache.set(f, await fetch("/" + f.replace(/^\/+/, "")).then(r => r.text()));
+        byteCache.set(f, new Uint8Array(
+            await fetch("/" + f.replace(/^\/+/, "")).then(r => r.arrayBuffer()),
+        ));
+    }
+    // invalid_utf8 fixtures must be readable as raw bytes.
+    for (const f of manifest.invalid) {
+        if (f.includes("/invalid_utf8/")) {
+            byteCache.set(f, new Uint8Array(
+                await fetch("/" + f.replace(/^\/+/, "")).then(r => r.arrayBuffer()),
+            ));
+        }
     }
 
     function walkKtavFiles(dir) {
         // Manifest already carries per-subdir lists; just pick by prefix.
         if (dir.endsWith("/valid")) return manifest.valid;
         if (dir.endsWith("/invalid")) return manifest.invalid;
+        if (dir.endsWith("/parseable-unrepresentable")) return manifest.parseableUnrepresentable;
+        return [];
+    }
+
+    function listJsonFiles(dir) {
+        if (dir.endsWith("/unrepresentable")) return manifest.unrepresentable;
         return [];
     }
 
@@ -46,7 +69,13 @@
             if (v === undefined) throw new Error("fixture not preloaded: " + p);
             return v;
         },
+        readBytes: (p) => {
+            const v = byteCache.get(p);
+            if (v === undefined) throw new Error("fixture not preloaded: " + p);
+            return v;
+        },
         walkKtavFiles,
+        listJsonFiles,
         specDir: manifest.specDir,
         label: "browser",
         log: (m) => { log.textContent += m + "\n"; },

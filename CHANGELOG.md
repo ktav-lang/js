@@ -11,6 +11,20 @@ This changelog tracks **package releases**, not changes to the Ktav
 format itself — for the latter see
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
+## Unreleased
+
+### Changed
+
+- Conformance runner updated to the spec 0.7 corpus: the new `unrepresentable/`
+  (5 writer-refusal fixtures) and `parseable-unrepresentable/` (4
+  parse-then-refuse fixtures) categories are now executed on every runtime.
+- `invalid/` fixtures now assert the expected error category from each
+  fixture's JSON oracle, and the `invalid_utf8/` fixture is validated via
+  strict UTF-8 decoding at the byte→string boundary (the raw bytes ARE the
+  fixture).
+- Added spec-0.7 smoke tests: quoted keys (§ 5.3.3) and `\uXXXX` escapes
+  (§ 3.7.1), including lone-surrogate rejection and U+0000 key round-trips.
+
 ## [0.6.4] — 2026-08-23
 
 Synchronized with Ktav spec and Rust core 0.6.4.

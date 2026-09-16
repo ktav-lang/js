@@ -21,13 +21,26 @@ function walkKtavFiles(dir) {
     return out;
 }
 
+function listJsonFiles(dir) {
+    if (!existsSync(dir)) return [];
+    const out = [];
+    for (const name of readdirSync(dir)) {
+        const full = join(dir, name);
+        if (statSync(full).isDirectory()) out.push(...listJsonFiles(full));
+        else if (full.endsWith(".json")) out.push(full.replace(/\\/g, "/"));
+    }
+    return out;
+}
+
 const { passed, failed, total } = runAll({
     loads,
     loadsStrict,
     dumps,
     stringifyForceStrings,
     readTextFile: (p) => readFileSync(p, "utf8"),
+    readBytes: (p) => new Uint8Array(readFileSync(p)),
     walkKtavFiles,
+    listJsonFiles,
     specDir: testPaths.specPresent() ? testPaths.spec.replace(/\\/g, "/") : null,
     label: "bun",
     log: (m) => console.log(m),

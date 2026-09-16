@@ -37,6 +37,17 @@ function walkKtavFiles(dir) {
     return out;
 }
 
+function listJsonFiles(dir) {
+    if (!existsSync(dir)) return [];
+    const out = [];
+    for (const name of readdirSync(dir)) {
+        const full = join(dir, name);
+        if (statSync(full).isDirectory()) out.push(...listJsonFiles(full));
+        else if (full.endsWith(".json")) out.push(full.replace(/\\/g, "/"));
+    }
+    return out;
+}
+
 const spec = testPaths.specPresent() ? testPaths.spec.replace(/\\/g, "/") : null;
 // Everything in the manifest is repo-relative — the runner page
 // fetches these via `/` + path, the static server resolves them back
@@ -55,8 +66,10 @@ const manifest = spec
             .filter(f => !f.endsWith(".canonical.ktav"))
             .map(relFromRepo),
         invalid: walkKtavFiles(`${spec}/invalid`).map(relFromRepo),
+        unrepresentable: listJsonFiles(`${spec}/unrepresentable`).map(relFromRepo),
+        parseableUnrepresentable: walkKtavFiles(`${spec}/parseable-unrepresentable`).map(relFromRepo),
     }
-    : { specDir: null, valid: [], invalid: [] };
+    : { specDir: null, valid: [], invalid: [], unrepresentable: [], parseableUnrepresentable: [] };
 
 const server = createServer((req, res) => {
     let urlPath = decodeURIComponent(req.url.split("?")[0]);

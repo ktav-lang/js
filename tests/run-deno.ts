@@ -30,13 +30,30 @@ function walkKtavFiles(dir: string): string[] {
     return out;
 }
 
+function listJsonFiles(dir: string): string[] {
+    try {
+        Deno.statSync(dir);
+    } catch {
+        return [];
+    }
+    const out: string[] = [];
+    for (const entry of Deno.readDirSync(dir)) {
+        const full = `${dir}/${entry.name}`;
+        if (entry.isDirectory) out.push(...listJsonFiles(full));
+        else if (entry.name.endsWith(".json")) out.push(full);
+    }
+    return out;
+}
+
 const { passed, failed, total } = runAll({
     loads,
     loadsStrict,
     dumps,
     stringifyForceStrings,
     readTextFile: (p: string) => Deno.readTextFileSync(p),
+    readBytes: (p: string) => Deno.readFileSync(p),
     walkKtavFiles,
+    listJsonFiles,
     specDir: testPaths.specPresent() ? testPaths.spec.replace(/\\/g, "/") : null,
     label: "deno",
     log: (m: string) => console.log(m),
