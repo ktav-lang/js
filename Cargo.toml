@@ -13,10 +13,10 @@ version = "0.6.4"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/ktav-lang/js"
-rust-version = "1.70"
+rust-version = "1.71"
 
 [workspace.dependencies]
-ktav = "0.6"
+ktav = "0.7"
 indexmap = "2"
 rustc-hash = "2"
 itoa = "1"
