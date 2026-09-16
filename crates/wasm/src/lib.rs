@@ -32,17 +32,25 @@ use rustc_hash::FxBuildHasher;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
+fn envelope_json(err: &ktav::Error, source: &str) -> String {
+    ktav::ErrorEnvelope::from_error(err, source).to_json()
+}
+
+fn message_envelope(text: impl Into<String>) -> String {
+    envelope_json(&ktav::Error::Message(text.into()), "")
+}
+
 /// Parse a Ktav document and return the equivalent JavaScript value.
 #[wasm_bindgen(js_name = loads)]
 pub fn loads(s: &str) -> Result<JsValue, JsError> {
-    let value = ktav::parse(s).map_err(|e| JsError::new(&e.to_string()))?;
+    let value = ktav::parse(s).map_err(|e| JsError::new(&envelope_json(&e, s)))?;
     value_to_js(&value)
 }
 
 /// Parse a Ktav document with strict canonical-scalar validation.
 #[wasm_bindgen(js_name = loadsStrict)]
 pub fn loads_strict(s: &str) -> Result<JsValue, JsError> {
-    let value = ktav::parse_strict(s).map_err(|e| JsError::new(&e.to_string()))?;
+    let value = ktav::parse_strict(s).map_err(|e| JsError::new(&envelope_json(&e, s)))?;
     value_to_js(&value)
 }
 
@@ -54,11 +62,35 @@ pub fn loads_strict(s: &str) -> Result<JsValue, JsError> {
 pub fn dumps(obj: JsValue) -> Result<String, JsError> {
     let value = js_to_value(&obj)?;
     if !matches!(value, Value::Object(_) | Value::Array(_)) {
-        return Err(JsError::new(
-            "Top-level Ktav value must be an object or an array",
-        ));
+        return Err(JsError::new(&message_envelope(
+            "top-level Ktav document must be an object or array",
+        )));
     }
-    render_top_level(&value).map_err(|e| JsError::new(&e.to_string()))
+    render_top_level(&value).map_err(|e| JsError::new(&envelope_json(&e, "")))
+}
+
+/// Format a Ktav document text-to-text: every comment is preserved
+/// verbatim (§ 3.4); blank-line runs collapse to one and blank padding
+/// inside brackets is dropped, making the transform a fixed point; key
+/// order is never changed (§ 5.9). For documents with no comments and no
+/// blank lines the result equals `emitCanonical` of the parse.
+#[wasm_bindgen(js_name = format)]
+pub fn format(s: &str) -> Result<String, JsError> {
+    ktav::format_str(s).map_err(|e| JsError::new(&envelope_json(&e, s)))
+}
+
+/// Emit the canonical text of the parse of Ktav source text
+/// (text-to-text): comments and blank-line grouping are NOT preserved
+/// (canonical form has none — use `format` for that). For byte-exact
+/// canonical output from an existing document use this entry point,
+/// not `emitCanonical`: JS numbers cannot carry the Ktav Integer /
+/// Float distinction, so `1.0` would arrive as `1` and `1e9` as
+/// `1000000000` through the object-based path, while text-to-text
+/// keeps the original scalar spellings byte-exactly.
+#[wasm_bindgen(js_name = canonicalFromSource)]
+pub fn canonical_from_source(s: &str) -> Result<String, JsError> {
+    let value = ktav::parse(s).map_err(|e| JsError::new(&envelope_json(&e, s)))?;
+    ktav::emit_canonical(&value).map_err(|e| JsError::new(&envelope_json(&e, s)))
 }
 
 /// Emit the canonical Ktav representation of a JavaScript value.
@@ -68,11 +100,11 @@ pub fn dumps(obj: JsValue) -> Result<String, JsError> {
 pub fn emit_canonical(obj: JsValue) -> Result<String, JsError> {
     let value = js_to_value(&obj)?;
     if !matches!(value, Value::Object(_) | Value::Array(_)) {
-        return Err(JsError::new(
-            "Top-level Ktav value must be an object or an array",
-        ));
+        return Err(JsError::new(&message_envelope(
+            "top-level Ktav document must be an object or array",
+        )));
     }
-    ktav::emit_canonical(&value).map_err(|e| JsError::new(&e.to_string()))
+    ktav::emit_canonical(&value).map_err(|e| JsError::new(&envelope_json(&e, "")))
 }
 
 /// Serialize a JavaScript value as a Ktav document with every scalar
@@ -86,11 +118,11 @@ pub fn stringify_force_strings(obj: JsValue) -> Result<String, JsError> {
     let value = js_to_value(&obj)?;
     if !matches!(value, Value::Object(_) | Value::Array(_)) {
         return Err(JsError::new(
-            "Top-level Ktav value must be an object or an array",
+            "top-level Ktav document must be an object or array",
         ));
     }
     let coerced = force_strings_value(&value);
-    render_top_level(&coerced).map_err(|e| JsError::new(&e.to_string()))
+    render_top_level(&coerced).map_err(|e| JsError::new(&envelope_json(&e, "")))
 }
 
 /// Map a `ktav::Value` to a native JavaScript value.
@@ -113,10 +145,12 @@ fn value_to_js(value: &Value) -> Result<JsValue, JsError> {
             }
         }
         Value::Float(s) => {
-            let v: f64 = s
-                .as_str()
-                .parse()
-                .map_err(|_| JsError::new(&format!("Invalid Float literal: {}", s.as_str())))?;
+            let v: f64 = s.as_str().parse().map_err(|_| {
+                JsError::new(&message_envelope(format!(
+                    "Invalid Float literal: {}",
+                    s.as_str()
+                )))
+            })?;
             JsValue::from_f64(v)
         }
         Value::String(s) => JsValue::from_str(s.as_str()),
@@ -130,8 +164,9 @@ fn value_to_js(value: &Value) -> Result<JsValue, JsError> {
         Value::Object(obj) => {
             let out = Object::new();
             for (k, v) in obj.iter() {
-                Reflect::set(&out, &JsValue::from_str(k.as_str()), &value_to_js(v)?)
-                    .map_err(|e| JsError::new(&format!("{e:?}")))?;
+                Reflect::set(&out, &JsValue::from_str(k.as_str()), &value_to_js(v)?).map_err(
+                    |e| JsError::new(&message_envelope(format!("Reflect::set failed: {e:?}"))),
+                )?;
             }
             out.into()
         }
@@ -158,19 +193,23 @@ fn js_to_value(obj: &JsValue) -> Result<Value, JsError> {
         // `JsValue::as_string()` returns `None` for a BigInt (distinct
         // from a String), so route through `BigInt::to_string(10)`.
         let bi: &BigInt = obj.unchecked_ref();
-        let s_js = bi
-            .to_string(10)
-            .map_err(|e| JsError::new(&format!("BigInt.toString(10) failed: {e:?}")))?;
-        let s = s_js
-            .as_string()
-            .ok_or_else(|| JsError::new("BigInt.toString(10) did not return a string"))?;
+        let s_js = bi.to_string(10).map_err(|e| {
+            JsError::new(&message_envelope(format!(
+                "BigInt.toString(10) failed: {e:?}"
+            )))
+        })?;
+        let s = s_js.as_string().ok_or_else(|| {
+            JsError::new(&message_envelope(
+                "BigInt.toString(10) did not return a string",
+            ))
+        })?;
         return Ok(Value::Integer(Scalar::from(s.as_str())));
     }
     if let Some(n) = obj.as_f64() {
         if !n.is_finite() {
-            return Err(JsError::new(
+            return Err(JsError::new(&message_envelope(
                 "NaN / Infinity is not representable in Ktav 0.1.0",
-            ));
+            )));
         }
         // Integer detection mirrors `Number.isInteger(x)` — integral and
         // within the i64 range (the broader i53-safe range is a subset).
@@ -202,19 +241,21 @@ fn js_to_value(obj: &JsValue) -> Result<Value, JsError> {
             let val = pair.get(1);
             let key_str = key
                 .as_string()
-                .ok_or_else(|| JsError::new("Object keys must be strings"))?;
+                .ok_or_else(|| JsError::new(&message_envelope("Object keys must be strings")))?;
             map.insert(Scalar::from(key_str.as_str()), js_to_value(&val)?);
         }
         return Ok(Value::Object(map));
     }
-    Err(JsError::new("Unsupported JavaScript value type for Ktav"))
+    Err(JsError::new(&message_envelope(
+        "Unsupported JavaScript value type for Ktav",
+    )))
 }
 
 /// Build a JS `BigInt` from a decimal string literal.
 fn bigint_from_str(s: &str) -> Result<JsValue, JsError> {
     BigInt::new(&JsValue::from_str(s))
         .map(Into::into)
-        .map_err(|e| JsError::new(&format!("BigInt parse failed: {e:?}")))
+        .map_err(|e| JsError::new(&message_envelope(format!("BigInt parse failed: {e:?}"))))
 }
 
 /// Format `f64` with a mandatory decimal point in the mantissa — Ktav's

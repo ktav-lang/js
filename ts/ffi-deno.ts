@@ -11,8 +11,10 @@
 // On Node and the browser this module is unreachable: the package.json
 // `exports` map routes those runtimes to `./ffi-error.js`.
 
+import { ktavMessageError, toKtavError } from "./api.js";
 import type { Ktav, KtavInput, KtavValue } from "./api.js";
-export type { KtavArray, KtavError, KtavInput, KtavObject, KtavValue, Ktav } from "./api.js";
+export type { KtavArray, KtavErrorEnvelope, KtavInput, KtavObject, KtavValue, Ktav } from "./api.js";
+export { KtavError, toKtavError } from "./api.js";
 
 import { decode, encode } from "./ffi-codec.js";
 import { resolveLibPath } from "./ffi-loader.js";
@@ -50,6 +52,18 @@ const FFI_SYMBOLS = {
         result: "i32",
     },
     ktav_dumps_force_strings: {
+        parameters: ["pointer", "usize", "pointer", "pointer", "pointer", "pointer"],
+        result: "i32",
+    },
+    ktav_canonical_from_source: {
+        parameters: ["pointer", "usize", "pointer", "pointer", "pointer", "pointer"],
+        result: "i32",
+    },
+    ktav_format: {
+        parameters: ["pointer", "usize", "pointer", "pointer", "pointer", "pointer"],
+        result: "i32",
+    },
+    ktav_emit_canonical: {
         parameters: ["pointer", "usize", "pointer", "pointer", "pointer", "pointer"],
         result: "i32",
     },
@@ -95,19 +109,20 @@ async function getLib() {
 // ── FFI plumbing ─────────────────────────────────────────────────────
 
 async function callNative(
-    op: "loads" | "loads_strict" | "dumps" | "dumps_force_strings",
+    op: "loads" | "loads_strict" | "dumps" | "dumps_force_strings" | "format" | "emit_canonical" | "canonical_from_source",
     input: Uint8Array,
 ): Promise<Uint8Array> {
     const lib = await getLib();
-    const sym = (
-        op === "loads"
-            ? lib.symbols.ktav_loads
-            : op === "loads_strict"
-                ? lib.symbols.ktav_loads_strict
-            : op === "dumps"
-                ? lib.symbols.ktav_dumps
-                : lib.symbols.ktav_dumps_force_strings
-    ) as (...args: unknown[]) => number;
+    const symbolName = (
+        op === "loads" ? "ktav_loads"
+            : op === "loads_strict" ? "ktav_loads_strict"
+            : op === "dumps" ? "ktav_dumps"
+            : op === "dumps_force_strings" ? "ktav_dumps_force_strings"
+            : op === "format" ? "ktav_format"
+            : op === "canonical_from_source" ? "ktav_canonical_from_source"
+            : "ktav_emit_canonical"
+    );
+    const sym = lib.symbols[symbolName] as (...args: unknown[]) => number;
     const ktavFree = lib.symbols.ktav_free as (ptr: bigint, len: bigint) => void;
 
     const outBuf = new BigUint64Array(1);
@@ -145,7 +160,7 @@ async function callNative(
             const okPtr = Deno.UnsafePointer.create(okPtrRaw);
             if (okPtr) ktavFree(okPtr as unknown as bigint, BigInt(okLen));
         }
-        throw new Error(msg);
+        throw toKtavError(new Error(msg));
     }
 
     const okPtrRaw = outBuf[0];
@@ -175,9 +190,14 @@ export async function loadsStrict<T = KtavValue>(src: string): Promise<T> {
 
 export async function dumps<T extends KtavInput = KtavInput>(value: T): Promise<string> {
     if (value === null || typeof value !== "object") {
-        throw new Error("top-level Ktav document must be an object or an array");
+        throw ktavMessageError("top-level Ktav document must be an object or array");
     }
-    const input = encode(value);
+    let input: Uint8Array;
+    try {
+        input = encode(value);
+    } catch (e) {
+        throw toKtavError(e);
+    }
     const result = await callNative("dumps", input);
     return new TextDecoder().decode(result);
 }
@@ -186,10 +206,42 @@ export async function stringifyForceStrings<T extends KtavInput = KtavInput>(
     value: T,
 ): Promise<string> {
     if (value === null || typeof value !== "object") {
-        throw new Error("top-level Ktav document must be an object or an array");
+        throw ktavMessageError("top-level Ktav document must be an object or array");
     }
-    const input = encode(value);
+    let input: Uint8Array;
+    try {
+        input = encode(value);
+    } catch (e) {
+        throw toKtavError(e);
+    }
     const result = await callNative("dumps_force_strings", input);
+    return new TextDecoder().decode(result);
+}
+
+export async function format(src: string): Promise<string> {
+    const bytes = new TextEncoder().encode(src);
+    const result = await callNative("format", bytes);
+    return new TextDecoder().decode(result);
+}
+
+export async function emitCanonical<T extends KtavInput = KtavInput>(value: T): Promise<string> {
+    if (value === null || typeof value !== "object") {
+        throw ktavMessageError("top-level Ktav document must be an object or array");
+    }
+    let input: Uint8Array;
+    try {
+        input = encode(value);
+    } catch (e) {
+        throw toKtavError(e);
+    }
+    const result = await callNative("emit_canonical", input);
+    return new TextDecoder().decode(result);
+}
+
+
+export async function canonicalFromSource(src: string): Promise<string> {
+    const bytes = new TextEncoder().encode(src);
+    const result = await callNative("canonical_from_source", bytes);
     return new TextDecoder().decode(result);
 }
 
@@ -199,4 +251,7 @@ export const ktav: Pick<Ktav, never> & {
     loadsStrict: typeof loadsStrict;
     dumps: typeof dumps;
     stringifyForceStrings: typeof stringifyForceStrings;
-} = { loads, loadsStrict, dumps, stringifyForceStrings };
+    format: typeof format;
+    emitCanonical: typeof emitCanonical;
+    canonicalFromSource: typeof canonicalFromSource;
+} = { loads, loadsStrict, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource };

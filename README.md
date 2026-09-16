@@ -107,6 +107,31 @@ const text = dumps(doc);
 
 A complete runnable Node example lives in [`examples/node/index.mjs`](examples/node/index.mjs).
 
+### Format — comment-preserving formatter
+
+```ts
+import { format } from "@ktav-lang/ktav";
+
+format(`
+port: 8080
+
+## the port
+
+host: localhost
+`);
+// port: 8080
+//
+// ## the port
+//
+// host: localhost
+```
+
+`format` guarantees: every comment is preserved verbatim; runs of
+blank lines collapse to exactly one; key order is never changed; it is
+a fixed point (`format(format(x)) === format(x)`); and its output
+equals the canonical writer's exactly when the document has no
+comments and no blank lines.
+
 ### WASM consumers (Deno, browser)
 
 Call `ready()` once before the first `loads` / `dumps` — the wasm
@@ -163,6 +188,7 @@ Runnable examples: [`examples/deno/ffi.ts`](examples/deno/ffi.ts),
 function loads<T = KtavValue>(s: string): T;
 function loadsStrict<T = KtavValue>(s: string): T;
 function dumps<T extends KtavInput = KtavInput>(obj: T): string;
+function format(s: string): string;
 
 // web / Deno / browser only; Node + Bun ignore it
 function ready(input?: URL | Response | ArrayBuffer): Promise<void>;
@@ -174,6 +200,32 @@ spellings while accepting forms emitted by the canonical writer.
 The generic parameter on `loads` is an **unchecked cast** — use it when
 you know the shape for IDE autocomplete. Pass nothing for the
 structural `KtavValue` type.
+
+## Errors
+
+Every error thrown by the bindings is a typed `KtavError` carrying
+nine structured fields: `error` (class, e.g. `"UnclosedCompound"`),
+`reason` (stable writer-time code), `line`, `line_text`, `span`
+(`{start, end}` — **byte** offsets into the UTF-8 source, not UTF-16
+indices), `path` (array of exact decoded key segments, never a joined
+string), `body`, `canonical`, and `spec_section`. `message` stays
+human-readable and never contains raw JSON. Fields a particular error
+doesn't carry are `null`.
+
+```ts
+import { loads } from "@ktav-lang/ktav";
+
+try {
+  loads("a: [");
+} catch (e) {
+  e.name;          // "KtavError"
+  e.error;         // "UnclosedCompound"
+  e.line_text;     // "a: ["
+  e.span;          // { start: 3, end: 4 } — UTF-8 byte offsets
+  e.spec_section;  // "§6.1"
+  e.message;       // "Ktav parse error UnclosedCompound"
+}
+```
 
 ## Type mapping
 

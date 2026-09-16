@@ -5,8 +5,10 @@
 // On Node, Deno, and the browser this module is unreachable: the
 // package.json `exports` map routes those runtimes elsewhere.
 
+import { ktavMessageError, toKtavError } from "./api.js";
 import type { Ktav, KtavInput, KtavValue } from "./api.js";
-export type { KtavArray, KtavError, KtavInput, KtavObject, KtavValue, Ktav } from "./api.js";
+export type { KtavArray, KtavErrorEnvelope, KtavInput, KtavObject, KtavValue, Ktav } from "./api.js";
+export { KtavError, toKtavError } from "./api.js";
 
 import { decode, encode } from "./ffi-codec.js";
 import { resolveLibPath } from "./ffi-loader.js";
@@ -83,6 +85,18 @@ async function getLib(): Promise<FFILib> {
             args: [ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr],
             returns: ffi.FFIType.i32,
         },
+        ktav_canonical_from_source: {
+            args: [ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr],
+            returns: ffi.FFIType.i32,
+        },
+        ktav_format: {
+            args: [ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr],
+            returns: ffi.FFIType.i32,
+        },
+        ktav_emit_canonical: {
+            args: [ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr],
+            returns: ffi.FFIType.i32,
+        },
         ktav_free: {
             args: [ffi.FFIType.ptr, ffi.FFIType.u64],
             returns: ffi.FFIType.void,
@@ -97,19 +111,20 @@ async function getLib(): Promise<FFILib> {
 }
 
 async function callNative(
-    op: "loads" | "loads_strict" | "dumps" | "dumps_force_strings",
+    op: "loads" | "loads_strict" | "dumps" | "dumps_force_strings" | "format" | "emit_canonical" | "canonical_from_source",
     input: Uint8Array,
 ): Promise<Uint8Array> {
     const { ffi, symbols } = await getLib();
-    const sym = (
-        op === "loads"
-            ? symbols.ktav_loads
-            : op === "loads_strict"
-                ? symbols.ktav_loads_strict
-            : op === "dumps"
-                ? symbols.ktav_dumps
-                : symbols.ktav_dumps_force_strings
-    ) as (...args: unknown[]) => number;
+    const symbolName = (
+        op === "loads" ? "ktav_loads"
+            : op === "loads_strict" ? "ktav_loads_strict"
+            : op === "dumps" ? "ktav_dumps"
+            : op === "dumps_force_strings" ? "ktav_dumps_force_strings"
+            : op === "format" ? "ktav_format"
+            : op === "canonical_from_source" ? "ktav_canonical_from_source"
+            : "ktav_emit_canonical"
+    );
+    const sym = symbols[symbolName] as (...args: unknown[]) => number;
 
     // Bun FFI sweet-spot: pass TypedArrays / Buffers directly for
     // `FFIType.ptr` args — Bun pins the ArrayBuffer and forwards the
@@ -153,7 +168,7 @@ async function callNative(
         const okPtr = readPtr(outBuf);
         const okLen = readLen(outLen);
         if (okPtr !== 0 && okLen > 0) ktavFree(okPtr, BigInt(okLen));
-        throw new Error(msg);
+        throw toKtavError(new Error(msg));
     }
 
     const okPtr = readPtr(outBuf);
@@ -172,7 +187,6 @@ export async function loads<T = KtavValue>(src: string): Promise<T> {
     const result = await callNative("loads", bytes);
     return decode(result) as T;
 }
-
 export async function loadsStrict<T = KtavValue>(src: string): Promise<T> {
     const bytes = new TextEncoder().encode(src);
     const result = await callNative("loads_strict", bytes);
@@ -181,9 +195,14 @@ export async function loadsStrict<T = KtavValue>(src: string): Promise<T> {
 
 export async function dumps<T extends KtavInput = KtavInput>(value: T): Promise<string> {
     if (value === null || typeof value !== "object") {
-        throw new Error("top-level Ktav document must be an object or an array");
+        throw ktavMessageError("top-level Ktav document must be an object or array");
     }
-    const input = encode(value);
+    let input: Uint8Array;
+    try {
+        input = encode(value);
+    } catch (e) {
+        throw toKtavError(e);
+    }
     const result = await callNative("dumps", input);
     return new TextDecoder().decode(result);
 }
@@ -192,10 +211,41 @@ export async function stringifyForceStrings<T extends KtavInput = KtavInput>(
     value: T,
 ): Promise<string> {
     if (value === null || typeof value !== "object") {
-        throw new Error("top-level Ktav document must be an object or an array");
+        throw ktavMessageError("top-level Ktav document must be an object or array");
     }
-    const input = encode(value);
+    let input: Uint8Array;
+    try {
+        input = encode(value);
+    } catch (e) {
+        throw toKtavError(e);
+    }
     const result = await callNative("dumps_force_strings", input);
+    return new TextDecoder().decode(result);
+}
+
+export async function format(src: string): Promise<string> {
+    const bytes = new TextEncoder().encode(src);
+    const result = await callNative("format", bytes);
+    return new TextDecoder().decode(result);
+}
+
+export async function emitCanonical<T extends KtavInput = KtavInput>(value: T): Promise<string> {
+    if (value === null || typeof value !== "object") {
+        throw ktavMessageError("top-level Ktav document must be an object or array");
+    }
+    let input: Uint8Array;
+    try {
+        input = encode(value);
+    } catch (e) {
+        throw toKtavError(e);
+    }
+    const result = await callNative("emit_canonical", input);
+    return new TextDecoder().decode(result);
+}
+
+export async function canonicalFromSource(src: string): Promise<string> {
+    const bytes = new TextEncoder().encode(src);
+    const result = await callNative("canonical_from_source", bytes);
     return new TextDecoder().decode(result);
 }
 
@@ -204,4 +254,7 @@ export const ktav: Pick<Ktav, never> & {
     loadsStrict: typeof loadsStrict;
     dumps: typeof dumps;
     stringifyForceStrings: typeof stringifyForceStrings;
-} = { loads, loadsStrict, dumps, stringifyForceStrings };
+    format: typeof format;
+    emitCanonical: typeof emitCanonical;
+    canonicalFromSource: typeof canonicalFromSource;
+} = { loads, loadsStrict, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource };

@@ -5,7 +5,7 @@
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
-import { loads, loadsStrict, dumps, stringifyForceStrings } from "../dist/ts/node.js";
+import { loads, loadsStrict, dumps, stringifyForceStrings, format, canonicalFromSource } from "../dist/ts/node.js";
 import { runAll } from "./shared/assertions.mjs";
 import * as testPaths from "./shared/test-paths.mjs";
 
@@ -36,6 +36,8 @@ const { passed, failed, total } = runAll({
     loadsStrict,
     dumps,
     stringifyForceStrings,
+    format,
+    canonicalFromSource,
     readTextFile: (p) => readFileSync(p, "utf8"),
     readBytes: (p) => new Uint8Array(readFileSync(p)),
     walkKtavFiles,

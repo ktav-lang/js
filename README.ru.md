@@ -98,6 +98,31 @@ const text = dumps(doc);
 
 Полный запускаемый пример (Node) — в [`examples/node/index.mjs`](examples/node/index.mjs).
 
+### Форматирование — форматтер с сохранением комментариев
+
+```ts
+import { format } from "@ktav-lang/ktav";
+
+format(`
+port: 8080
+
+## the port
+
+host: localhost
+`);
+// port: 8080
+//
+// ## the port
+//
+// host: localhost
+```
+
+Гарантии `format`: каждый комментарий сохраняется дословно; серии
+пустых строк схлопываются ровно в одну; порядок ключей никогда не
+меняется; это фиксированная точка (`format(format(x)) === format(x)`);
+вывод совпадает с выдачей canonical writer'а тогда и только тогда,
+когда в документе нет ни комментариев, ни пустых строк.
+
 ### Потребители WASM (Deno, браузер)
 
 Один раз вызовите `ready()` до первого `loads` / `dumps` — wasm
@@ -154,6 +179,7 @@ optional dep (тот же что хранит `.node`-бинарник), так 
 function loads<T = KtavValue>(s: string): T;
 function loadsStrict<T = KtavValue>(s: string): T;
 function dumps<T extends KtavInput = KtavInput>(obj: T): string;
+function format(s: string): string;
 
 // только web / Deno / браузер; Node + Bun игнорируют
 function ready(input?: URL | Response | ArrayBuffer): Promise<void>;
@@ -165,6 +191,32 @@ function ready(input?: URL | Response | ArrayBuffer): Promise<void>;
 Дженерик-параметр у `loads` — **непроверяемый каст**: используйте его,
 когда знаете форму данных и хотите автокомплит в IDE. Ничего не
 передавайте — получите структурный тип `KtavValue`.
+
+## Ошибки
+
+Любая ошибка, которую бросают биндинги, — это типизированный `KtavError`
+с девятью структурными полями: `error` (класс, напр. `"UnclosedCompound"`),
+`reason` (стабильный writer-time код), `line`, `line_text`, `span`
+(`{start, end}` — **байтовые** смещения в UTF-8-исходнике, а не UTF-16-индексы),
+`path` (массив точных декодированных сегментов ключа, никогда не склеенная
+строка), `body`, `canonical` и `spec_section`. `message` остаётся
+человекочитаемым и никогда не содержит сырой JSON. Поля, которых у
+конкретной ошибки нет, равны `null`.
+
+```ts
+import { loads } from "@ktav-lang/ktav";
+
+try {
+  loads("a: [");
+} catch (e) {
+  e.name;          // "KtavError"
+  e.error;         // "UnclosedCompound"
+  e.line_text;     // "a: ["
+  e.span;          // { start: 3, end: 4 } — байтовые смещения UTF-8
+  e.spec_section;  // "§6.1"
+  e.message;       // "Ktav parse error UnclosedCompound"
+}
+```
 
 ## Соответствие типов
 

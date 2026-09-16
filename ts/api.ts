@@ -84,12 +84,184 @@ export interface Ktav {
      *   //   tls: true
      */
     stringifyForceStrings<T extends KtavInput = KtavInput>(obj: T): string;
+
+    /**
+     * Format Ktav text to Ktav text. Every comment is preserved
+     * verbatim (spec § 3.4 — no trailing comments, attachment
+     * unambiguous). Blank-line runs collapse to exactly one blank line
+     * and blank padding immediately inside brackets is dropped, which
+     * makes the transform a fixed point:
+     * `format(format(x)) === format(x)`.
+     *
+     * Key order is never changed (spec § 5.9 has no sorting rule). For
+     * a document with no comments AND no blank lines the result equals
+     * `emitCanonical` of its parse.
+     *
+     * @example
+     *   format("a :  1\n\n\n\nb : 2\n")  // "a: 1\n\nb: 2\n"
+     */
+    format(s: string): string;
+
+    /**
+     * Parse `s` and return the canonical text of its parse WITHOUT
+     * passing through a JavaScript value — scalar spellings (`1.0`,
+     * `1e9`, `-0.0`) survive byte-exactly, which the object-taking
+     * `emitCanonical` cannot guarantee. Use this for byte-exact
+     * canonical output from an existing document.
+     */
+    canonicalFromSource(s: string): string;
+
+    /**
+     * Render the canonical Ktav text of a value. Byte-stable across
+     * conforming writers (spec § 8.2). The top-level value must be an
+     * object or array; unrepresentable values throw (match on
+     * `reason` on the thrown {@link KtavError}).
+     *
+     * Limitation: a JS number cannot express Ktav's Integer/Float
+     * distinction, so a value like `1.0` arrives indistinguishable
+     * from `1` and the output may differ from the source's canonical
+     * form. For byte-exact canonical output from an existing document
+     * use {@link canonicalFromSource}.
+     *
+     * @example
+     *   emitCanonical({ port: 8080, host: "localhost" })
+     */
+    emitCanonical(obj: KtavInput): string;
 }
 
 /**
- * Error thrown when input cannot be parsed as valid Ktav. The underlying
- * wasm-bindgen bridge maps `ktav::ParseError` to a JS `Error` — this
- * alias exists so consumers can write `catch (e: KtavError)` without
- * reaching into the wasm glue.
+ * The nine-field error envelope the Rust backends attach to every
+ * failure. Field names keep the exact wire spelling (`line_text`,
+ * `spec_section`) so consumers can read fields positionally against
+ * the Rust / Go / Java bindings — do not camelCase them.
  */
-export type KtavError = Error;
+export interface KtavErrorEnvelope {
+    /** Structured error class, e.g. "DuplicateKey", "Unrepresentable", "Message". */
+    error: string;
+    /** Stable writer-time code (spec § 5.9.0), e.g. "EmptyKeyName"; null for parse errors. */
+    reason: string | null;
+    /** 1-based line number for parse-time errors; null otherwise. */
+    line: number | null;
+    /** Text of the offending line for parse-time errors; null otherwise. */
+    line_text: string | null;
+    /** Byte offsets (start inclusive, end exclusive) into the UTF-8 source text —
+     *  NOT UTF-16 code units. Convert before feeding to LSP / UTF-16 consumers. */
+    span: { start: number; end: number } | null;
+    /** Exact decoded key segments of the offending path — never a joined string. */
+    path: string[] | null;
+    /** Human-readable body when the backend supplies one; null otherwise. */
+    body: string | null;
+    /** Canonical text, when the error carries one; null otherwise. */
+    canonical: string | null;
+    /** Spec section reference, e.g. "§6.15"; null otherwise. */
+    spec_section: string | null;
+}
+
+/**
+ * Typed error thrown by every public Ktav operation. `message` is
+ * always human-readable — the raw nine-field JSON envelope is kept on
+ * the `envelope` member and typed fields, never in `message`.
+ */
+export class KtavError extends Error {
+    readonly error: string;
+    readonly reason: string | null;
+    readonly line: number | null;
+    readonly line_text: string | null;
+    /** Byte offsets into the UTF-8 source (not UTF-16 code units).
+     *  Convert before LSP / UTF-16 use. */
+    readonly span: { start: number; end: number } | null;
+    /** Exact decoded key segments — never a joined string. */
+    readonly path: string[] | null;
+    readonly body: string | null;
+    readonly canonical: string | null;
+    readonly spec_section: string | null;
+
+    /** Raw nine-field envelope, for programmatic inspection. */
+    readonly envelope: KtavErrorEnvelope;
+
+    constructor(env: KtavErrorEnvelope, message?: string) {
+        super(message ?? describeEnvelope(env));
+        this.name = "KtavError";
+        this.error = env.error;
+        this.reason = env.reason;
+        this.line = env.line;
+        this.line_text = env.line_text;
+        this.span = env.span;
+        this.path = env.path;
+        this.body = env.body;
+        this.canonical = env.canonical;
+        this.spec_section = env.spec_section;
+        this.envelope = env;
+    }
+}
+
+function describeEnvelope(env: KtavErrorEnvelope): string {
+    if (env.error === "Message") return "Ktav error";
+    if (env.error === "Unrepresentable" || env.error === "UnrepresentableAt") {
+        // Display only — the `path` member stays an array.
+        const at = env.path !== null && env.path.join(".") !== ""
+            ? ` at path ${env.path.join(".")}`
+            : "";
+        return `Ktav cannot represent ${env.reason}${at}`;
+    }
+    if (env.error === "InvalidUtf8") {
+        return env.spec_section !== null
+            ? `Ktav input is not valid UTF-8 (${env.spec_section})`
+            : "Ktav input is not valid UTF-8";
+    }
+    if (env.line !== null) {
+        return env.body !== null
+            ? `Ktav parse error ${env.error} at line ${env.line}: ${env.body}`
+            : `Ktav parse error ${env.error} at line ${env.line}`;
+    }
+    return `Ktav parse error ${env.error}`;
+}
+
+const ENVELOPE_KEYS = [
+    "error", "reason", "line", "line_text", "span", "path", "body", "canonical", "spec_section",
+] as const;
+
+function parseEnvelope(raw: string): KtavErrorEnvelope | null {
+    let v: unknown;
+    try { v = JSON.parse(raw); } catch { return null; }
+    if (v === null || typeof v !== "object" || Array.isArray(v)) return null;
+    const obj = v as Record<string, unknown>;
+    for (const k of ENVELOPE_KEYS) {
+        if (!(k in obj)) return null;
+    }
+    return obj as unknown as KtavErrorEnvelope;
+}
+
+const MESSAGE_ENVELOPE: KtavErrorEnvelope = {
+    error: "Message",
+    reason: null,
+    line: null,
+    line_text: null,
+    span: null,
+    path: null,
+    body: null,
+    canonical: null,
+    spec_section: null,
+};
+
+/** Build a `KtavError` with an all-null `Message` envelope and readable text. */
+export function ktavMessageError(text: string): KtavError {
+    return new KtavError(MESSAGE_ENVELOPE, text);
+}
+
+/**
+ * Normalize any thrown value into a typed error. `KtavError` instances
+ * pass through; Errors whose `message` parses as a nine-field envelope
+ * JSON (the wire contract of the Rust layer) become `KtavError`s;
+ * anything else becomes a `KtavError` with error "Message" carrying the
+ * original (or fallback) readable text.
+ */
+export function toKtavError(cause: unknown, fallbackMessage?: string): Error {
+    if (cause instanceof KtavError) return cause;
+    if (cause instanceof Error) {
+        const env = parseEnvelope(cause.message);
+        if (env !== null) return new KtavError(env);
+        return new KtavError(MESSAGE_ENVELOPE, fallbackMessage ?? cause.message);
+    }
+    return new KtavError(MESSAGE_ENVELOPE, fallbackMessage ?? String(cause));
+}

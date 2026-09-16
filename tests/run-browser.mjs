@@ -59,6 +59,13 @@ const relFromRepo = (p) => {
     if (fwd.startsWith(repoFwd + "/")) return fwd.slice(repoFwd.length + 1);
     return fwd;
 };
+// repo-relative input path -> repo-relative `.canonical.ktav` path.
+// Only pairs where the canonical file actually exists are included.
+const canonical = {};
+for (const f of walkKtavFiles(`${spec}/valid`).filter(x => !x.endsWith(".canonical.ktav"))) {
+    const c = f.replace(/\.ktav$/, ".canonical.ktav");
+    if (existsSync(c)) canonical[relFromRepo(f)] = relFromRepo(c);
+}
 const manifest = spec
     ? {
         specDir: relFromRepo(spec),
@@ -68,8 +75,9 @@ const manifest = spec
         invalid: walkKtavFiles(`${spec}/invalid`).map(relFromRepo),
         unrepresentable: listJsonFiles(`${spec}/unrepresentable`).map(relFromRepo),
         parseableUnrepresentable: walkKtavFiles(`${spec}/parseable-unrepresentable`).map(relFromRepo),
+        canonical,
     }
-    : { specDir: null, valid: [], invalid: [], unrepresentable: [], parseableUnrepresentable: [] };
+    : { specDir: null, valid: [], invalid: [], unrepresentable: [], parseableUnrepresentable: [], canonical: {} };
 
 const server = createServer((req, res) => {
     let urlPath = decodeURIComponent(req.url.split("?")[0]);

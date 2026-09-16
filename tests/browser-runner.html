@@ -9,7 +9,7 @@
     console.log("[runner] fetching assertions.mjs");
     const { runAll } = await import("/tests/shared/assertions.mjs");
     console.log("[runner] fetching dist/ts/web.js");
-    const { loads, loadsStrict, dumps, stringifyForceStrings, ready } = await import("/dist/ts/web.js");
+    const { loads, loadsStrict, dumps, stringifyForceStrings, format, canonicalFromSource, ready } = await import("/dist/ts/web.js");
     console.log("[runner] imports resolved");
 
     await ready();
@@ -45,6 +45,15 @@
         }
     }
 
+    // Canonical fixtures: preload each `.canonical.ktav`'s raw BYTES so
+    // the sync `readBytes` adapter can serve them (byte-exact canonical
+    // conformance compares bytes, not text).
+    for (const canonicalPath of Object.values(manifest.canonical || {})) {
+        byteCache.set(canonicalPath, new Uint8Array(
+            await fetch("/" + canonicalPath.replace(/^\/+/, "")).then(r => r.arrayBuffer()),
+        ));
+    }
+
     function walkKtavFiles(dir) {
         // Manifest already carries per-subdir lists; just pick by prefix.
         if (dir.endsWith("/valid")) return manifest.valid;
@@ -64,6 +73,8 @@
         loadsStrict,
         dumps,
         stringifyForceStrings,
+        format,
+        canonicalFromSource,
         readTextFile: (p) => {
             const v = cache.get(p);
             if (v === undefined) throw new Error("fixture not preloaded: " + p);

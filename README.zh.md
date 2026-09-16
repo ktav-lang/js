@@ -94,6 +94,30 @@ const text = dumps(doc);
 
 完整可运行的 Node 示例:[`examples/node/index.mjs`](examples/node/index.mjs)。
 
+### 格式化 —— 保留注释的格式化器
+
+```ts
+import { format } from "@ktav-lang/ktav";
+
+format(`
+port: 8080
+
+## the port
+
+host: localhost
+`);
+// port: 8080
+//
+// ## the port
+//
+// host: localhost
+```
+
+`format` 的保证：每条注释都逐字保留；连续空行折叠为恰好一行空行；
+键的顺序永不改变；它是定点变换（`format(format(x)) === format(x)`）；
+当且仅当文档中既无注释也无空行时，其输出与 canonical writer 的输出
+完全一致。
+
 ### WASM 使用方(Deno、浏览器)
 
 首次调用 `loads` / `dumps` 之前调用一次 `ready()` —— wasm 目标
@@ -146,6 +170,7 @@ const text = await dumps({ port: 8443 });
 function loads<T = KtavValue>(s: string): T;
 function loadsStrict<T = KtavValue>(s: string): T;
 function dumps<T extends KtavInput = KtavInput>(obj: T): string;
+function format(s: string): string;
 
 // 仅 web / Deno / 浏览器;Node + Bun 忽略此函数
 function ready(input?: URL | Response | ArrayBuffer): Promise<void>;
@@ -156,6 +181,31 @@ canonical writer 生成的形式。
 
 `loads` 上的泛型参数是**未经检查的类型断言** —— 当你已知数据形状、
 希望获得 IDE 自动补全时使用。不传则得到结构化类型 `KtavValue`。
+
+## 错误
+
+绑定抛出的每一个错误都是类型化的 `KtavError`，携带九个结构化字段：
+`error`（类别，如 `"UnclosedCompound"`）、`reason`（稳定的 writer 阶段
+错误码）、`line`、`line_text`、`span`（`{start, end}` —— UTF-8 源文本的
+**字节**偏移量，而非 UTF-16 索引）、`path`（由精确解码的键段组成的数组，
+绝不是拼接后的字符串）、`body`、`canonical` 与 `spec_section`。
+`message` 保持人类可读，且绝不包含原始 JSON。某个具体错误不具备的字段
+为 `null`。
+
+```ts
+import { loads } from "@ktav-lang/ktav";
+
+try {
+  loads("a: [");
+} catch (e) {
+  e.name;          // "KtavError"
+  e.error;         // "UnclosedCompound"
+  e.line_text;     // "a: ["
+  e.span;          // { start: 3, end: 4 } —— UTF-8 字节偏移量
+  e.spec_section;  // "§6.1"
+  e.message;       // "Ktav parse error UnclosedCompound"
+}
+```
 
 ## 类型映射
 

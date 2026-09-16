@@ -6,8 +6,10 @@
 import { createRequire } from "node:module";
 import { platform, arch } from "node:process";
 
+import { ktavMessageError, toKtavError } from "./api.js";
 import type { KtavInput, KtavValue } from "./api.js";
-export type { KtavArray, KtavError, KtavInput, KtavObject, KtavValue, Ktav } from "./api.js";
+export type { KtavArray, KtavErrorEnvelope, KtavInput, KtavObject, KtavValue, Ktav } from "./api.js";
+export { KtavError, ktavMessageError, toKtavError } from "./api.js";
 
 // Locate the platform-specific `.node` binary. At publish time these
 // live in `optionalDependencies` subpackages (@ktav-lang/ktav-<triple>)
@@ -38,6 +40,9 @@ interface NativeBinding {
     loadsStrict: (s: string) => unknown;
     dumps: (obj: unknown) => string;
     stringifyForceStrings: (obj: unknown) => string;
+    format: (s: string) => string;
+    emitCanonical: (obj: unknown) => string;
+    canonicalFromSource: (s: string) => string;
 }
 
 const require_ = createRequire(import.meta.url);
@@ -71,17 +76,66 @@ function resolveNative(): NativeBinding {
 const native: NativeBinding = resolveNative();
 
 export function loads<T = KtavValue>(s: string): T {
-    return native.loads(s) as T;
+    try {
+        return native.loads(s) as T;
+    } catch (e) {
+        throw toKtavError(e);
+    }
 }
 
 export function loadsStrict<T = KtavValue>(s: string): T {
-    return native.loadsStrict(s) as T;
+    try {
+        return native.loadsStrict(s) as T;
+    } catch (e) {
+        throw toKtavError(e);
+    }
 }
 
 export function dumps<T extends KtavInput = KtavInput>(obj: T): string {
-    return native.dumps(obj);
+    if (obj === null || typeof obj !== "object") {
+        throw ktavMessageError("top-level Ktav document must be an object or array");
+    }
+    try {
+        return native.dumps(obj);
+    } catch (e) {
+        throw toKtavError(e);
+    }
 }
 
 export function stringifyForceStrings<T extends KtavInput = KtavInput>(obj: T): string {
-    return native.stringifyForceStrings(obj);
+    if (obj === null || typeof obj !== "object") {
+        throw ktavMessageError("top-level Ktav document must be an object or array");
+    }
+    try {
+        return native.stringifyForceStrings(obj);
+    } catch (e) {
+        throw toKtavError(e);
+    }
+}
+
+export function format(s: string): string {
+    try {
+        return native.format(s);
+    } catch (e) {
+        throw toKtavError(e);
+    }
+}
+
+export function emitCanonical<T extends KtavInput = KtavInput>(obj: T): string {
+    if (obj === null || typeof obj !== "object") {
+        throw ktavMessageError("top-level Ktav document must be an object or array");
+    }
+    try {
+        return native.emitCanonical(obj);
+    } catch (e) {
+        throw toKtavError(e);
+    }
+}
+
+export function canonicalFromSource(s: string): string {
+    try {
+        return native.canonicalFromSource(s);
+    } catch (e) {
+        throw toKtavError(e);
+    }
 }

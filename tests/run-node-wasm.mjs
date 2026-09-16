@@ -21,6 +21,15 @@ if (!existsSync(wasmJsPath) || !existsSync(wasmBinPath)) {
 const mod = await import(pathToFileURL(wasmJsPath).href);
 await mod.default({ module_or_path: readFileSync(wasmBinPath) });
 
+// Raw wasm-bindgen errors carry the envelope JSON in `message`; the suite asserts
+// the public typed-error contract, so the runner normalizes at its boundary exactly
+// like the TS facade does.
+import { toKtavError } from "../dist/ts/api.js";
+const withKtavErrors = (fn) => (...args) => {
+    try { return fn(...args); }
+    catch (e) { throw toKtavError(e); }
+};
+
 function walkKtavFiles(dir) {
     if (!existsSync(dir)) return [];
     const out = [];
@@ -44,10 +53,12 @@ function listJsonFiles(dir) {
 }
 
 const { passed, failed, total } = runAll({
-    loads: mod.loads,
-    loadsStrict: mod.loadsStrict,
-    dumps: mod.dumps,
-    stringifyForceStrings: mod.stringifyForceStrings,
+    loads: withKtavErrors(mod.loads),
+    loadsStrict: withKtavErrors(mod.loadsStrict),
+    dumps: withKtavErrors(mod.dumps),
+    stringifyForceStrings: withKtavErrors(mod.stringifyForceStrings),
+    format: withKtavErrors(mod.format),
+    canonicalFromSource: withKtavErrors(mod.canonicalFromSource),
     readTextFile: (p) => readFileSync(p, "utf8"),
     readBytes: (p) => new Uint8Array(readFileSync(p)),
     walkKtavFiles,

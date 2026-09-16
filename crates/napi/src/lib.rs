@@ -18,17 +18,25 @@ use napi::{sys, ValueType};
 use napi_derive::napi;
 use rustc_hash::FxBuildHasher;
 
+fn envelope_json(err: &ktav::Error, source: &str) -> String {
+    ktav::ErrorEnvelope::from_error(err, source).to_json()
+}
+
+fn message_envelope(text: impl Into<String>) -> String {
+    envelope_json(&ktav::Error::Message(text.into()), "")
+}
+
 /// Parse a Ktav document and return the equivalent JavaScript value.
 #[napi]
 pub fn loads<'env>(env: &'env Env, s: String) -> Result<Unknown<'env>> {
-    let value = ktav::parse(&s).map_err(|e| Error::from_reason(e.to_string()))?;
+    let value = ktav::parse(&s).map_err(|e| Error::from_reason(envelope_json(&e, &s)))?;
     value_to_js(env, &value)
 }
 
 /// Parse a Ktav document with strict canonical-scalar validation.
 #[napi(js_name = "loadsStrict")]
 pub fn loads_strict<'env>(env: &'env Env, s: String) -> Result<Unknown<'env>> {
-    let value = ktav::parse_strict(&s).map_err(|e| Error::from_reason(e.to_string()))?;
+    let value = ktav::parse_strict(&s).map_err(|e| Error::from_reason(envelope_json(&e, &s)))?;
     value_to_js(env, &value)
 }
 
@@ -40,11 +48,11 @@ pub fn loads_strict<'env>(env: &'env Env, s: String) -> Result<Unknown<'env>> {
 pub fn dumps(env: &Env, obj: Unknown) -> Result<String> {
     let value = js_to_value(env, &obj)?;
     if !matches!(value, Value::Object(_) | Value::Array(_)) {
-        return Err(Error::from_reason(
-            "Top-level Ktav value must be an object or an array".to_string(),
-        ));
+        return Err(Error::from_reason(message_envelope(
+            "top-level Ktav document must be an object or array",
+        )));
     }
-    render_top_level(&value).map_err(|e| Error::from_reason(e.to_string()))
+    render_top_level(&value).map_err(|e| Error::from_reason(envelope_json(&e, "")))
 }
 
 /// Serialize a JavaScript value as a Ktav document with every scalar
@@ -61,11 +69,35 @@ pub fn stringify_force_strings(env: &Env, obj: Unknown) -> Result<String> {
     let value = js_to_value(env, &obj)?;
     if !matches!(value, Value::Object(_) | Value::Array(_)) {
         return Err(Error::from_reason(
-            "Top-level Ktav value must be an object or an array".to_string(),
+            "top-level Ktav document must be an object or array".to_string(),
         ));
     }
     let coerced = force_strings_top_level(&value);
-    render_top_level(&coerced).map_err(|e| Error::from_reason(e.to_string()))
+    render_top_level(&coerced).map_err(|e| Error::from_reason(envelope_json(&e, "")))
+}
+
+/// Format a Ktav document text-to-text: every comment is preserved
+/// verbatim (§ 3.4); blank-line runs collapse to one and blank padding
+/// inside brackets is dropped, making the transform a fixed point; key
+/// order is never changed (§ 5.9). For documents with no comments and no
+/// blank lines the result equals `emitCanonical` of the parse.
+#[napi(js_name = "format")]
+pub fn format(s: String) -> Result<String> {
+    ktav::format_str(&s).map_err(|e| Error::from_reason(envelope_json(&e, &s)))
+}
+
+/// Emit the canonical text of the parse of Ktav source text
+/// (text-to-text): comments and blank-line grouping are NOT preserved
+/// (canonical form has none — use `format` for that). For byte-exact
+/// canonical output from an existing document use this entry point,
+/// not `emitCanonical`: JS numbers cannot carry the Ktav Integer /
+/// Float distinction, so `1.0` would arrive as `1` and `1e9` as
+/// `1000000000` through the object-based path, while text-to-text
+/// keeps the original scalar spellings byte-exactly.
+#[napi(js_name = "canonicalFromSource")]
+pub fn canonical_from_source(s: String) -> Result<String> {
+    let value = ktav::parse(&s).map_err(|e| Error::from_reason(envelope_json(&e, &s)))?;
+    ktav::emit_canonical(&value).map_err(|e| Error::from_reason(envelope_json(&e, &s)))
 }
 
 /// Emit the canonical Ktav representation of a JavaScript value.
@@ -75,11 +107,11 @@ pub fn stringify_force_strings(env: &Env, obj: Unknown) -> Result<String> {
 pub fn emit_canonical(env: &Env, obj: Unknown) -> Result<String> {
     let value = js_to_value(env, &obj)?;
     if !matches!(value, Value::Object(_) | Value::Array(_)) {
-        return Err(Error::from_reason(
-            "Top-level Ktav value must be an object or an array".to_string(),
-        ));
+        return Err(Error::from_reason(message_envelope(
+            "top-level Ktav document must be an object or array",
+        )));
     }
-    ktav::emit_canonical(&value).map_err(|e| Error::from_reason(e.to_string()))
+    ktav::emit_canonical(&value).map_err(|e| Error::from_reason(envelope_json(&e, "")))
 }
 
 /// Render a top-level Value as a Ktav document string, implementing the
@@ -132,7 +164,10 @@ fn value_to_js<'env>(env: &'env Env, value: &Value) -> Result<Unknown<'env>> {
         Value::Integer(s) => integer_to_js(env, s.as_str()),
         Value::Float(s) => {
             let v: f64 = s.as_str().parse().map_err(|_| {
-                Error::from_reason(format!("Invalid Float literal: {}", s.as_str()))
+                Error::from_reason(message_envelope(format!(
+                    "Invalid Float literal: {}",
+                    s.as_str()
+                )))
             })?;
             from_napi_value(env, unsafe { f64::to_napi_value(env.raw(), v)? })
         }
@@ -214,9 +249,9 @@ fn js_to_value(env: &Env, obj: &Unknown) -> Result<Value> {
         ValueType::Number => {
             let n: f64 = unsafe { obj.cast()? };
             if !n.is_finite() {
-                return Err(Error::from_reason(
-                    "NaN / Infinity is not representable in Ktav".to_string(),
-                ));
+                return Err(Error::from_reason(message_envelope(
+                    "NaN / Infinity is not representable in Ktav",
+                )));
             }
             if n.fract() == 0.0 && (i64::MIN as f64..=i64::MAX as f64).contains(&n) {
                 let mut buf = itoa::Buffer::new();
@@ -236,7 +271,7 @@ fn js_to_value(env: &Env, obj: &Unknown) -> Result<Value> {
                 let mut ia: bool = false;
                 let status = unsafe { sys::napi_is_array(env.raw(), obj.raw(), &mut ia) };
                 if status != sys::Status::napi_ok {
-                    return Err(Error::from_reason("napi_is_array failed".to_string()));
+                    return Err(Error::from_reason(message_envelope("napi_is_array failed")));
                 }
                 ia
             };
@@ -245,9 +280,9 @@ fn js_to_value(env: &Env, obj: &Unknown) -> Result<Value> {
                 let len = arr.len();
                 let mut out = Vec::with_capacity(len as usize);
                 for i in 0..len {
-                    let item: Unknown = arr
-                        .get(i)?
-                        .ok_or_else(|| Error::from_reason("Array element missing"))?;
+                    let item: Unknown = arr.get(i)?.ok_or_else(|| {
+                        Error::from_reason(message_envelope("Array element missing"))
+                    })?;
                     out.push(js_to_value(env, &item)?);
                 }
                 return Ok(Value::Array(out));
@@ -261,16 +296,16 @@ fn js_to_value(env: &Env, obj: &Unknown) -> Result<Value> {
             for i in 0..len {
                 let key: String = name_arr
                     .get::<String>(i)?
-                    .ok_or_else(|| Error::from_reason("property name missing"))?;
+                    .ok_or_else(|| Error::from_reason(message_envelope("property name missing")))?;
                 let key_js = env.create_string(&key)?;
                 let val: Unknown = js_obj.get_property(key_js)?;
                 map.insert(Scalar::from(key.as_str()), js_to_value(env, &val)?);
             }
             Ok(Value::Object(map))
         }
-        other => Err(Error::from_reason(format!(
+        other => Err(Error::from_reason(message_envelope(format!(
             "Unsupported JavaScript value type for Ktav: {other:?}"
-        ))),
+        )))),
     }
 }
 

@@ -10,7 +10,7 @@
 // suffixes via the package exports map only when imported by name.
 
 import * as testPaths from "./shared/test-paths.mjs";
-import { loads, loadsStrict, dumps, stringifyForceStrings, setLibraryPath } from "../dist/ts/ffi-deno.js";
+import { loads, loadsStrict, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource, setLibraryPath } from "../dist/ts/ffi-deno.js";
 
 if (testPaths.cabiBuilt()) setLibraryPath(testPaths.cabi);
 
@@ -117,6 +117,41 @@ await check("0.3.1: stringifyForceStrings flattens scalars", async () => {
     if (back.port !== "8080") throw new Error("port=" + back.port);
     if (back.ratio !== "0.5") throw new Error("ratio=" + back.ratio);
     if (back.tls !== "true") throw new Error("tls=" + back.tls);
+});
+
+// 0.7.1: format / emitCanonical / structured errors over the C ABI.
+await check("0.7.1: format preserves comments and is a fixed point", async () => {
+    const doc = "## header comment\n\n\n\nservice: web\nport: 8080\n\n\n\n## footer comment\n";
+    const once: string = await format(doc);
+    if (!once.includes("## header comment")) throw new Error("header comment lost");
+    if (!once.includes("## footer comment")) throw new Error("footer comment lost");
+    if (/\n\n\n/.test(once)) throw new Error("blank-line run not collapsed: " + JSON.stringify(once));
+    const twice: string = await format(once);
+    if (twice !== once) throw new Error("not a fixed point");
+});
+
+await check("0.7.1: emitCanonical writes canonical text", async () => {
+    const text: string = await emitCanonical({ port: 8080 });
+    if (typeof text !== "string" || text.length === 0) throw new Error("empty canonical output");
+    if (!text.includes("port:")) throw new Error("missing port key: " + text);
+});
+
+// 0.7.1: canonicalFromSource — text in, canonical text out; the
+// Ktav Integer/Float distinction never crosses a JS value boundary.
+await check("0.7.1: canonicalFromSource preserves float spelling from source text", async () => {
+    const text: string = await canonicalFromSource("a: 1.0\nb: 1e9\n");
+    if (typeof text !== "string" || text.length === 0) throw new Error("empty canonical output");
+    if (!text.includes("1.0")) throw new Error("float spelling lost (1.0): " + JSON.stringify(text));
+    if (!text.includes("1e9")) throw new Error("float spelling lost (1e9): " + JSON.stringify(text));
+});
+
+await check("0.7.1: parse error carries structured envelope", async () => {
+    let err: any = null;
+    try { await loads("a: ["); } catch (e) { err = e; }
+    if (!err) throw new Error("expected error on unterminated array");
+    if (err.error === undefined) throw new Error("missing error field");
+    if (err.line === undefined) throw new Error("missing line field");
+    if (err.spec_section === undefined) throw new Error("missing spec_section field");
 });
 
 console.log(`\n[deno-ffi] ${passed}/${passed + failed} passed`);

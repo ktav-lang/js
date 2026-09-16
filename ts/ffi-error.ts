@@ -12,8 +12,9 @@ const MESSAGE =
     "  - On Bun, use the same import — `bun:ffi` is permission-free.";
 
 export type {
-    KtavArray, KtavError, KtavInput, KtavObject, KtavValue, Ktav,
+    KtavArray, KtavErrorEnvelope, KtavInput, KtavObject, KtavValue, Ktav,
 } from "./api.js";
+export { KtavError, toKtavError } from "./api.js";
 
 export function loads(_src: string): never {
     throw new Error(MESSAGE);
@@ -31,4 +32,16 @@ export function stringifyForceStrings(_value: unknown): never {
     throw new Error(MESSAGE);
 }
 
-export const ktav = { loads, loadsStrict, dumps, stringifyForceStrings };
+export function format(_src: string): never {
+    throw new Error(MESSAGE);
+}
+
+export function emitCanonical(_value: unknown): never {
+    throw new Error(MESSAGE);
+}
+
+export function canonicalFromSource(_src: string): never {
+    throw new Error(MESSAGE);
+}
+
+export const ktav = { loads, loadsStrict, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource };

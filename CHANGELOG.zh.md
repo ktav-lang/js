@@ -12,6 +12,23 @@ MINOR 版本升级视为破坏性。
 
 ## 未发布
 
+### 新增
+
+- 新增 `format()`（保留注释的格式化器）和 `emitCanonical()`，并在每个
+  入口暴露：Node N-API、Bun、Deno、浏览器/bundler WASM，以及 Deno/Bun
+  的 FFI 子导出（由新的 C ABI 符号 `ktav_format` / `ktav_emit_canonical`
+  支持）。`format()` 的保证：每条注释都逐字保留；连续空行折叠为恰好
+  一行空行；键的顺序永不改变；它是定点变换
+  （`format(format(x)) === format(x)`）；当且仅当文档中既无注释也无
+  空行时，其输出与 canonical writer 的输出完全一致。
+- 新增 `canonicalFromSource(s)` —— 文本到文本的入口，从源文本产生
+  字节级精确的 canonical 输出。它存在的原因是：JS 的 number 无法承载
+  Ktav 的 Integer/Float 区分，因此接受对象的 `emitCanonical({})`
+  无法为含浮点数的文档产生字节级精确的 canonical 文本。
+- Conformance 套件现在会在每个运行时上将 writer 输出与语料库的
+  `.canonical.ktav` fixture 进行字节级比较，运行格式化器不动点测试，
+  并断言结构化错误 envelope 字段。
+
 ### 变更
 
 - Conformance 运行器已更新至 spec 0.7 语料库:新增的 `unrepresentable/`
@@ -26,6 +43,15 @@ MINOR 版本升级视为破坏性。
   `ktav = "0.7"`,三个绑定 crate 的 `[package.metadata.ktav]
   spec-version` 均设为 `"0.7.0"`,workspace `rust-version` 从 1.70
   提升至 1.71(ktav 0.7 的 MSRV)。
+- Rust core 更新至 ktav 0.7.1（workspace `ktav = "0.7.1"`）：新增
+  `format_str` 和结构化错误 envelope。依赖下限之所以提升至 0.7.1，
+  正是因为 `format_str` 与 `ErrorEnvelope` 在任何更早的发布版本中
+  都不存在。
+- 绑定抛出的每个错误现在都是携带 `ktav::ErrorEnvelope` 九个字段的
+  类型化 `KtavError`（`error`、`reason`、`line`、`line_text`、`span`
+  —— UTF-8 字节偏移，`path` —— 精确键段数组，`body`、`canonical`、
+  `spec_section`）；`message` 保持人类可读，且绝不包含原始 JSON。
+  这是对绑定在失败时呈现的文本的破坏性变更 —— 依赖消息字符串进行匹配的调用方会注意到（有意为之；envelope 从未在任何绑定中发布过）。
 
 ### 修复
 
