@@ -8,7 +8,7 @@ repository.workspace = true
 # napi-build v2.3.1 emits `cargo::rerun-if-env-changed` directives, a
 # syntax stabilised in Rust 1.77. We can't inherit the workspace MSRV
 # (1.71) here, so bump this crate specifically. The wasm crate and the
-# shared `ktav` core still hold to 1.70.
+# shared `ktav` core still hold to the workspace 1.71.
 rust-version = "1.77"
 publish = false
 
