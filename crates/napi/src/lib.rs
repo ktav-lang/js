@@ -150,7 +150,8 @@ fn value_to_js<'env>(env: &'env Env, value: &Value) -> Result<Unknown<'env>> {
         Value::Object(obj) => {
             let mut out = Object::new(env)?;
             for (k, v) in obj.iter() {
-                out.set_named_property(k.as_str(), value_to_js(env, v)?)?;
+                let key = env.create_string(k.as_str())?;
+                out.set_property(key, value_to_js(env, v)?)?;
             }
             out.into_unknown(env)
         }
@@ -261,7 +262,8 @@ fn js_to_value(env: &Env, obj: &Unknown) -> Result<Value> {
                 let key: String = name_arr
                     .get::<String>(i)?
                     .ok_or_else(|| Error::from_reason("property name missing"))?;
-                let val: Unknown = js_obj.get_named_property(&key)?;
+                let key_js = env.create_string(&key)?;
+                let val: Unknown = js_obj.get_property(key_js)?;
                 map.insert(Scalar::from(key.as_str()), js_to_value(env, &val)?);
             }
             Ok(Value::Object(map))
