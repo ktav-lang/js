@@ -10,6 +10,30 @@ MINOR 版本升级视为破坏性。
 本 changelog 跟踪**包发布**,不涉及 Ktav 格式本身的变更 —— 后者见
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md)。
 
+## 未发布
+
+### 变更
+
+- Conformance 运行器已更新至 spec 0.7 语料库:新增的 `unrepresentable/`
+  (5 个 writer 拒绝 fixture)和 `parseable-unrepresentable/`(4 个
+  先解析后拒绝 fixture)类别现在会在每个运行时上执行。
+- `invalid/` fixture 现在会断言每个 fixture 的 JSON oracle 所预期的
+  错误类别,`invalid_utf8/` fixture 则在字节→字符串边界通过严格 UTF-8
+  解码校验(原始字节即 fixture 本身)。
+- 新增 spec 0.7 冒烟测试:带引号的键(§ 5.3.3)和 `\uXXXX` 转义
+  (§ 3.7.1),包括 lone-surrogate 拒绝和 U+0000 键 round-trip。
+- Rust core 更新至 ktav 0.7(spec 0.7.0):workspace 依赖提升为
+  `ktav = "0.7"`,三个绑定 crate 的 `[package.metadata.ktav]
+  spec-version` 均设为 `"0.7.0"`,workspace `rust-version` 从 1.70
+  提升至 1.71(ktav 0.7 的 MSRV)。
+
+### 修复
+
+- N-API:包含 U+0000 的对象键 —— 在 spec 0.7 中通过新增的 `\uXXXX`
+  转义合法 —— 不再因 `nul byte found in provided data` 失败;键的
+  设置/读取现在走基于 JsString 的 property API,而不是基于 CString
+  的命名属性调用。
+
 ## [0.6.4] — 2026-08-23
 
 与 Ktav 规范和 Rust core 0.6.4 同步。

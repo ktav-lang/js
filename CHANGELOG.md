@@ -24,6 +24,11 @@ format itself — for the latter see
   fixture).
 - Added spec-0.7 smoke tests: quoted keys (§ 5.3.3) and `\uXXXX` escapes
   (§ 3.7.1), including lone-surrogate rejection and U+0000 key round-trips.
+- Updated the Rust core to ktav 0.7 (spec 0.7.0): workspace dependency bumped to `ktav = "0.7"`, `[package.metadata.ktav] spec-version` set to `"0.7.0"` in all three binding crates, and workspace `rust-version` raised from 1.70 to 1.71 (the ktav 0.7 MSRV).
+
+### Fixed
+
+- N-API: object keys containing U+0000 — legal in spec 0.7 via the new `\uXXXX` escapes — no longer fail with `nul byte found in provided data`; key set/get now goes through the JsString-based property APIs instead of the CString-backed named-property calls.
 
 ## [0.6.4] — 2026-08-23
 
