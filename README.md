@@ -10,7 +10,7 @@
 > keys. Powered by Rust under the hood, shipped as native N-API for Node
 > and Bun, WebAssembly for Deno, browsers, and bundlers.
 
-**Languages:** **English** · [Русский](README.ru.md) · [简体中文](README.zh.md)
+**Languages:** **English** · [Русский](docs/ru/README.ru.md) · [简体中文](docs/zh/README.zh.md)
 
 **Playground:** convert JSON / YAML / TOML / INI ⇄ Ktav in your browser at **[ktav-lang.github.io](https://ktav-lang.github.io/)**.
 
@@ -311,7 +311,7 @@ convention that a MINOR bump is breaking. Package version and the
 
 ## Development
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev setup, the runtime
+See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for the dev setup, the runtime
 test matrix, and the contribution workflow.
 
 ## Support the project

@@ -10,7 +10,7 @@
 > 驱动;面向 Node 与 Bun 以原生 N-API 发布,面向 Deno、浏览器与打包器以
 > WebAssembly 发布。
 
-**语言:** [English](README.md) · [Русский](README.ru.md) · **简体中文**
+**语言:** [English](../../README.md) · [Русский](../ru/README.ru.md) · **简体中文**
 
 **演练场：** 在浏览器中互转 JSON / YAML / TOML / INI ⇄ Ktav — **[ktav-lang.github.io](https://ktav-lang.github.io/)**。
 
@@ -92,7 +92,7 @@ const doc = {
 const text = dumps(doc);
 ```
 
-完整可运行的 Node 示例:[`examples/node/index.mjs`](examples/node/index.mjs)。
+完整可运行的 Node 示例:[`examples/node/index.mjs`](../../examples/node/index.mjs)。
 
 ### 格式化 —— 保留注释的格式化器
 
@@ -161,8 +161,8 @@ const text = await dumps({ port: 8443 });
 权限授予;失去了 Deno 的"任意沙箱可用"特性。除非测过有真实需求,
 否则建议保持默认导入。
 
-可运行示例:[`examples/deno/ffi.ts`](examples/deno/ffi.ts)、
-[`examples/bun/ffi.ts`](examples/bun/ffi.ts)。
+可运行示例:[`examples/deno/ffi.ts`](../../examples/deno/ffi.ts)、
+[`examples/bun/ffi.ts`](../../examples/bun/ffi.ts)。
 
 ## 公开 API
 
@@ -287,7 +287,7 @@ MINOR 版本升级视为破坏性。包版本与 `ktav` crate 版本同步推进
 ## 开发
 
 开发环境、跨运行时测试矩阵与贡献流程见
-[CONTRIBUTING.md](CONTRIBUTING.md)。
+[CONTRIBUTING.md](../CONTRIBUTING.md)。
 
 ## 支持本项目
 
@@ -297,7 +297,7 @@ MINOR 版本升级视为破坏性。包版本与 `ktav` crate 版本同步推进
 
 ## 许可证
 
-MIT OR Apache-2.0。详见 [LICENSE-MIT](LICENSE-MIT) 和 [LICENSE-APACHE](LICENSE-APACHE)。
+MIT OR Apache-2.0。详见 [LICENSE-MIT](../../LICENSE-MIT) 和 [LICENSE-APACHE](../../LICENSE-APACHE)。
 
 ## 其他 Ktav 实现
 

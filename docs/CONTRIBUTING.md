@@ -1,6 +1,6 @@
 # Contributing to ktav (JavaScript / TypeScript)
 
-**Languages:** **English** · [Русский](CONTRIBUTING.ru.md) · [简体中文](CONTRIBUTING.zh.md)
+**Languages:** **English** · [Русский](ru/CONTRIBUTING.ru.md) · [简体中文](zh/CONTRIBUTING.zh.md)
 
 ## Core rules
 

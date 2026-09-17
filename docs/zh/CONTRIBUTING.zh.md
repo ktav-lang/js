@@ -1,6 +1,6 @@
 # 为 ktav (JavaScript / TypeScript) 贡献代码
 
-**语言:** [English](CONTRIBUTING.md) · [Русский](CONTRIBUTING.ru.md) · **简体中文**
+**语言:** [English](../CONTRIBUTING.md) · [Русский](../ru/CONTRIBUTING.ru.md) · **简体中文**
 
 ## 核心规则
 
@@ -147,7 +147,7 @@ Linux / macOS 完全不需要这些 —— 默认 toolchain 就是 GNU / Darwin�
 
 ## 安全
 
-如何上报漏洞见 [SECURITY.md](SECURITY.md)。简短版本:请私下发邮件至
+如何上报漏洞见 [SECURITY.md](../SECURITY.md)。简短版本:请私下发邮件至
 **phpcraftdream@gmail.com**,不要为安全问题开公开 issue。
 
 ### 贡献的许可

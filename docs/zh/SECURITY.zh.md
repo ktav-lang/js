@@ -1,6 +1,6 @@
 # 安全策略
 
-**语言:** [English](SECURITY.md) · [Русский](SECURITY.ru.md) · **简体中文**
+**语言:** [English](../SECURITY.md) · [Русский](../ru/SECURITY.ru.md) · **简体中文**
 
 ## 支持的版本
 

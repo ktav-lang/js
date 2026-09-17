@@ -1,6 +1,6 @@
 # Changelog
 
-**Языки:** [English](CHANGELOG.md) · **Русский** · [简体中文](CHANGELOG.zh.md)
+**Языки:** [English](../../CHANGELOG.md) · **Русский** · [简体中文](../zh/CHANGELOG.zh.md)
 
 Все значимые изменения JavaScript / TypeScript-биндингов документируются
 здесь. Формат основан на

@@ -72,8 +72,8 @@
     "dist/ts/",
     "dist/wasm/",
     "README.md",
-    "README.ru.md",
-    "README.zh.md",
+    "docs/ru/README.ru.md",
+    "docs/zh/README.zh.md",
     "LICENSE-MIT",
     "LICENSE-APACHE",
     "CHANGELOG.md"

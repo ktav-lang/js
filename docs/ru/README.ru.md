@@ -10,7 +10,7 @@
 > через точки в ключах. Под капотом — Rust, поставляется как нативный N-API
 > для Node и Bun, как WebAssembly — для Deno, браузеров и бандлеров.
 
-**Языки:** [English](README.md) · **Русский** · [简体中文](README.zh.md)
+**Языки:** [English](../../README.md) · **Русский** · [简体中文](../zh/README.zh.md)
 
 **Песочница:** конвертация JSON / YAML / TOML / INI ⇄ Ktav прямо в браузере — **[ktav-lang.github.io](https://ktav-lang.github.io/)**.
 
@@ -96,7 +96,7 @@ const doc = {
 const text = dumps(doc);
 ```
 
-Полный запускаемый пример (Node) — в [`examples/node/index.mjs`](examples/node/index.mjs).
+Полный запускаемый пример (Node) — в [`examples/node/index.mjs`](../../examples/node/index.mjs).
 
 ### Форматирование — форматтер с сохранением комментариев
 
@@ -170,8 +170,8 @@ optional dep (тот же что хранит `.node`-бинарник), так 
 любом песочничном окружении". Используйте default import, если не
 измерили реальную потребность.
 
-Запускаемые примеры: [`examples/deno/ffi.ts`](examples/deno/ffi.ts),
-[`examples/bun/ffi.ts`](examples/bun/ffi.ts).
+Запускаемые примеры: [`examples/deno/ffi.ts`](../../examples/deno/ffi.ts),
+[`examples/bun/ffi.ts`](../../examples/bun/ffi.ts).
 
 ## Публичный API
 
@@ -303,7 +303,7 @@ Ktav намеренно маленький. Пять принципов прое
 ## Разработка
 
 Dev-окружение, матрица тестов по рантаймам и процесс вклада описаны в
-[CONTRIBUTING.md](CONTRIBUTING.md).
+[CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## Поддержите проект
 
@@ -313,7 +313,7 @@ Dev-окружение, матрица тестов по рантаймам и �
 
 ## Лицензия
 
-MIT OR Apache-2.0. См. [LICENSE-MIT](LICENSE-MIT) и [LICENSE-APACHE](LICENSE-APACHE).
+MIT OR Apache-2.0. См. [LICENSE-MIT](../../LICENSE-MIT) и [LICENSE-APACHE](../../LICENSE-APACHE).
 
 ## Другие реализации Ktav
 

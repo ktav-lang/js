@@ -1,6 +1,6 @@
 # Вклад в ktav (JavaScript / TypeScript)
 
-**Языки:** [English](CONTRIBUTING.md) · **Русский** · [简体中文](CONTRIBUTING.zh.md)
+**Языки:** [English](../CONTRIBUTING.md) · **Русский** · [简体中文](../zh/CONTRIBUTING.zh.md)
 
 ## Базовые правила
 
@@ -159,7 +159,7 @@ GNU / Darwin, `cargo clippy-wasm` и `cargo clippy-napi` работают
 
 ## Безопасность
 
-См. [SECURITY.md](SECURITY.md) — как сообщать об уязвимостях. Кратко:
+См. [SECURITY.md](../SECURITY.md) — как сообщать об уязвимостях. Кратко:
 пишите на **phpcraftdream@gmail.com** приватно, пожалуйста, не
 открывайте публичные issue по проблемам безопасности.
 

@@ -1,6 +1,6 @@
 # Changelog
 
-**语言:** [English](CHANGELOG.md) · [Русский](CHANGELOG.ru.md) · **简体中文**
+**语言:** [English](../../CHANGELOG.md) · [Русский](../ru/CHANGELOG.ru.md) · **简体中文**
 
 本文档记录 JavaScript / TypeScript 绑定的所有重要变更。格式基于
 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/);版本采用

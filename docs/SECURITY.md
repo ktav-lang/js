@@ -1,6 +1,6 @@
 # Security Policy
 
-**Languages:** **English** · [Русский](SECURITY.ru.md) · [简体中文](SECURITY.zh.md)
+**Languages:** **English** · [Русский](ru/SECURITY.ru.md) · [简体中文](zh/SECURITY.zh.md)
 
 ## Supported versions
 
