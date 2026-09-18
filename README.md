@@ -188,7 +188,10 @@ Runnable examples: [`examples/deno/ffi.ts`](examples/deno/ffi.ts),
 function loads<T = KtavValue>(s: string): T;
 function loadsStrict<T = KtavValue>(s: string): T;
 function dumps<T extends KtavInput = KtavInput>(obj: T): string;
+function stringifyForceStrings<T extends KtavInput = KtavInput>(obj: T): string;
 function format(s: string): string;
+function canonicalFromSource(s: string): string;
+function emitCanonical<T extends KtavInput = KtavInput>(obj: T): string;
 
 // web / Deno / browser only; Node + Bun ignore it
 function ready(input?: URL | Response | ArrayBuffer): Promise<void>;
@@ -197,20 +200,42 @@ function ready(input?: URL | Response | ArrayBuffer): Promise<void>;
 `loadsStrict` applies canonical-scalar validation and rejects lossy
 spellings while accepting forms emitted by the canonical writer.
 
+`stringifyForceStrings` renders like `dumps` but flattens every leaf
+scalar — integer, float, boolean, `null` — to its textual form via the
+raw marker (`::`). Compounds keep their structure, and the result parses
+back through `loads` as the same set of String scalars.
+
+Three functions produce canonical output and they are not
+interchangeable:
+
+| | input | comments | scalar spelling |
+| --- | --- | --- | --- |
+| `format(s)` | source text | **kept** | preserved |
+| `canonicalFromSource(s)` | source text | dropped | preserved |
+| `emitCanonical(obj)` | a JS value | none to keep | may change |
+
+`canonicalFromSource` is text in, canonical text out, with no JavaScript
+value in between — so `1.0`, `1e9` and `-0.0` survive byte-exactly.
+`emitCanonical` cannot promise that: a JS `number` cannot express Ktav's
+Integer/Float distinction, so `1.0` arrives indistinguishable from `1`.
+Use `emitCanonical` when you have a value, `canonicalFromSource` when
+you have a document.
+
 The generic parameter on `loads` is an **unchecked cast** — use it when
 you know the shape for IDE autocomplete. Pass nothing for the
 structural `KtavValue` type.
 
 ## Errors
 
-Every error thrown by the bindings is a typed `KtavError` carrying
-nine structured fields: `error` (class, e.g. `"UnclosedCompound"`),
+Every error thrown by the bindings is a typed `KtavError` carrying the
+nine other structured fields: `error` (class, e.g. `"UnclosedCompound"`),
 `reason` (stable writer-time code), `line`, `line_text`, `span`
 (`{start, end}` — **byte** offsets into the UTF-8 source, not UTF-16
 indices), `path` (array of exact decoded key segments, never a joined
-string), `body`, `canonical`, and `spec_section`. `message` stays
-human-readable and never contains raw JSON. Fields a particular error
-doesn't carry are `null`.
+string), `body`, `canonical`, and `spec_section` — plus, since ktav
+0.7.2, `message`: the envelope's own tenth field, taken verbatim, never
+reassembled from the other nine. It never contains raw JSON. Fields a
+particular error doesn't carry are `null`.
 
 ```ts
 import { loads } from "@ktav-lang/ktav";
@@ -223,7 +248,7 @@ try {
   e.line_text;     // "a: ["
   e.span;          // { start: 3, end: 4 } — UTF-8 byte offsets
   e.spec_section;  // "§6.1"
-  e.message;       // "Ktav parse error UnclosedCompound"
+  e.message;       // "Syntax error: Unclosed array at end of input"
 }
 ```
 

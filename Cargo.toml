@@ -16,7 +16,7 @@ repository = "https://github.com/ktav-lang/js"
 rust-version = "1.71"
 
 [workspace.dependencies]
-ktav = "0.7.1"
+ktav = "0.7.2"
 indexmap = "2"
 rustc-hash = "2"
 itoa = "1"
