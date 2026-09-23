@@ -131,7 +131,7 @@ export interface Ktav {
 
 /**
  * The ten-field error envelope the Rust backends attach to every
- * failure, since ktav 0.7.2. Field names keep the exact wire spelling
+ * failure, since ktav 0.8.0. Field names keep the exact wire spelling
  * (`line_text`, `spec_section`) so consumers can read fields
  * positionally against the Rust / Go / Java bindings — do not
  * camelCase them.
@@ -159,7 +159,7 @@ export interface KtavErrorEnvelope {
     spec_section: string | null;
     /** The core's own rendering of the error, verbatim — never reassembled
      *  from the other fields. Absent only when the envelope came from a
-     *  pre-0.7.2 native binary; {@link KtavError} falls back to a locally
+     *  pre-0.8.0 native binary; {@link KtavError} falls back to a locally
      *  reconstructed message in that case. */
     message?: string;
 }
@@ -204,7 +204,7 @@ export class KtavError extends Error {
     }
 }
 
-/** Fallback rendering for a pre-0.7.2 envelope with no `message` field. */
+/** Fallback rendering for a pre-0.8.0 envelope with no `message` field. */
 function describeEnvelope(env: KtavErrorEnvelope): string {
     if (env.error === "Message") return "Ktav error";
     if (env.error === "Unrepresentable" || env.error === "UnrepresentableAt") {

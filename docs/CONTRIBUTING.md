@@ -48,7 +48,8 @@ the PR description whether it is:
   tightened types) — in which case the version bump lands in the next
   MINOR while we are pre-1.0.
 
-Update `CHANGELOG.md` and the two translations in the same PR.
+Update the CHANGELOG source units under `root-docs/CHANGELOG/` (all
+three `>>>>> lang=` blocks) in the same PR and regenerate the output.
 
 ### 4. One concept per commit
 

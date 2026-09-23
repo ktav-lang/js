@@ -233,7 +233,7 @@ nine other structured fields: `error` (class, e.g. `"UnclosedCompound"`),
 (`{start, end}` — **byte** offsets into the UTF-8 source, not UTF-16
 indices), `path` (array of exact decoded key segments, never a joined
 string), `body`, `canonical`, and `spec_section` — plus, since ktav
-0.7.2, `message`: the envelope's own tenth field, taken verbatim, never
+0.8.0, `message`: the envelope's own tenth field, taken verbatim, never
 reassembled from the other nine. It never contains raw JSON. Fields a
 particular error doesn't carry are `null`.
 

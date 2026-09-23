@@ -6,18 +6,17 @@
 [![Playground](https://img.shields.io/badge/playground-try%20online-7c3aed?style=flat-square&logo=rocket&logoColor=white)](https://ktav-lang.github.io/)
 
 > Универсальные JS/TS-биндинги для [Ktav](https://github.com/ktav-lang/spec) —
-> простого формата конфигов. Форма JSON, без кавычек, без запятых, вложенность
-> через точки в ключах. Под капотом — Rust, поставляется как нативный N-API
-> для Node и Bun, как WebAssembly — для Deno, браузеров и бандлеров.
+> простого формата конфигураций. Форма как у JSON, без кавычек, без запятых,
+> вложенность — через точки в ключах. Под капотом Rust; для Node и Bun
+> поставляется нативный N-API, для Deno, браузеров и бандлеров — WebAssembly.
 
-**Языки:** [English](../../README.md) · **Русский** · [简体中文](../zh/README.zh.md)
+**Languages:** [English](../../README.md) · **Русский** · [简体中文](../zh/README.zh.md)
 
-**Песочница:** конвертация JSON / YAML / TOML / INI ⇄ Ktav прямо в браузере — **[ktav-lang.github.io](https://ktav-lang.github.io/)**.
+**Песочница:** конвертируйте JSON / YAML / TOML / INI ⇄ Ktav прямо в браузере — **[ktav-lang.github.io](https://ktav-lang.github.io/)**.
 
 **Спецификация:** этот пакет реализует **Ktav**. Формат версионируется
-и развивается отдельно от пакета — см.
-[`ktav-lang/spec`](https://github.com/ktav-lang/spec) для нормативного
-документа.
+и развивается независимо от пакета — нормативный документ см. в
+[`ktav-lang/spec`](https://github.com/ktav-lang/spec).
 
 ---
 
@@ -34,20 +33,20 @@ npm install @ktav-lang/ktav
 
 Один пакет обслуживает все целевые рантаймы:
 
-| Рантайм                           | Бэкенд | Как подгружается                                |
-|-----------------------------------|--------|-------------------------------------------------|
-| Node ≥ 18, Bun                    | N-API  | Платформенный `.node` через optional dep        |
-| Deno, браузер                     | WASM   | Цель `web`, потребитель ожидает `ready()`       |
-| Webpack / Vite / Rollup / esbuild | WASM   | Цель `bundler`, бандлер сам резолвит `.wasm`    |
+| Рантайм                           | Бэкенд  | Как загружается                                        |
+|-----------------------------------|---------|--------------------------------------------------------|
+| Node ≥ 18, Bun                    | N-API   | Платформенный `.node` через optional dep              |
+| Deno, браузер                     | WASM    | Цель `web`, потребитель ожидает `ready()`             |
+| Webpack / Vite / Rollup / esbuild | WASM    | Цель `bundler`, `.wasm` резолвит бандлер              |
 
 Нативные бинарники предсобраны для Linux (x64/arm64, glibc + musl),
-macOS (x64/arm64) и Windows (x64/arm64); npm через `optionalDependencies`
-ставит тот, что подходит текущему хосту. Если ничего не подошло —
-загрузчик ранне падает с чёткой диагностикой.
+macOS (x64/arm64) и Windows (x64/arm64); npm ставит тот, что подходит
+текущему хосту, через `optionalDependencies`. Если подходящего нет,
+загрузчик рано падает с понятной диагностикой.
 
 ## Быстрый старт
 
-### Парсинг — типизированно читаем поля
+### Парсинг — типизированное чтение полей разобранного объекта
 
 ```ts
 import { loads, dumps } from "@ktav-lang/ktav";
@@ -75,11 +74,11 @@ db.host: primary.internal
 db.timeout: 30
 `);
 
-cfg.port;        // 8080 — типизирован как number
+cfg.port;        // 8080 — typed as number
 cfg.db.timeout;  // 30
 ```
 
-### Билд + рендер — собираем документ в коде
+### Сборка и рендер — строим документ в коде
 
 ```ts
 const doc = {
@@ -94,9 +93,18 @@ const doc = {
   notes: null,
 };
 const text = dumps(doc);
+// name: frontend
+// port: 8443
+// tls: true
+// ratio: 0.95
+// upstreams: [
+//     { host: a.example  port: 1080 }
+//     { host: b.example  port: 1080 }
+// ]
+// notes: null
 ```
 
-Полный запускаемый пример (Node) — в [`examples/node/index.mjs`](../../examples/node/index.mjs).
+Полный запускаемый пример для Node — в [`examples/node/index.mjs`](../../examples/node/index.mjs).
 
 ### Форматирование — форматтер с сохранением комментариев
 
@@ -120,12 +128,12 @@ host: localhost
 Гарантии `format`: каждый комментарий сохраняется дословно; серии
 пустых строк схлопываются ровно в одну; порядок ключей никогда не
 меняется; это фиксированная точка (`format(format(x)) === format(x)`);
-вывод совпадает с выдачей canonical writer'а тогда и только тогда,
-когда в документе нет ни комментариев, ни пустых строк.
+и его вывод совпадает с выдачей canonical writer'а тогда и только
+тогда, когда в документе нет ни комментариев, ни пустых строк.
 
 ### Потребители WASM (Deno, браузер)
 
-Один раз вызовите `ready()` до первого `loads` / `dumps` — wasm
+Вызовите `ready()` один раз до первого `loads` / `dumps` — wasm-цель
 инстанцируется отложенно:
 
 ```ts
@@ -134,40 +142,40 @@ await ready();
 loads("port: 8080\n");
 ```
 
-Node / Bun это пропускают — нативный бинарник подгружается в момент
-импорта.
+Потребители Node / Bun этот шаг пропускают — нативный бинарник
+загружается в момент импорта.
 
 ### Нативный FFI subexport (Deno, Bun) — `@ktav-lang/ktav/ffi`
 
-Для пользователей Deno, кому нужна нативная скорость без WASM-overhead'а,
-и для пользователей Bun, кому больше нравится `bun:ffi` чем N-API, —
-есть opt-in subexport, который ходит напрямую в C ABI shared library
-(`ktav_cabi`, тот же бинарник что у биндингов Java / Go / .NET):
+Пользователям Deno, которым нужна нативная скорость без WASM-налога,
+и пользователям Bun, которые предпочитают `bun:ffi` пути N-API, —
+предназначен opt-in subexport, работающий напрямую с C ABI shared library
+(`ktav_cabi`, тот же бинарник, что используют биндинги Java / Go / .NET):
 
 ```ts
 import { loads, loadsStrict, dumps } from "@ktav-lang/ktav/ffi";
 
-// loads / dumps здесь ASYNC (ждут dlopen на первом вызове)
+// loads / dumps are ASYNC here (waiting on dlopen on first call)
 const cfg = await loads("port: 8080\n");
 await loadsStrict("port: 8080\n");
 const text = await dumps({ port: 8443 });
 ```
 
-| Runtime  | Механизм           | Permission flag                                                              |
-|----------|--------------------|------------------------------------------------------------------------------|
-| Deno     | `Deno.dlopen`      | `--allow-ffi=<путь-до-libktav_cabi>` (или `--allow-ffi` для любых FFI)       |
-| Bun      | `bun:ffi`          | не нужен — Bun доверяет FFI                                                  |
-| Node     | n/a                | бросает — используйте default import (уже N-API нативный)                    |
-| Browser  | n/a                | бросает — используйте `@ktav-lang/ktav/wasm`                                 |
+| Runtime  | Механизм           | Permission flag                                                             |
+|----------|--------------------|-----------------------------------------------------------------------------|
+| Deno     | `Deno.dlopen`      | `--allow-ffi=<path-to-libktav_cabi>` (или `--allow-ffi` — для любой FFI)    |
+| Bun      | `bun:ffi`          | не нужен — Bun доверяет FFI                                                 |
+| Node     | n/a                | бросает — используйте импорт по умолчанию (уже N-API)                       |
+| Browser  | n/a                | бросает — используйте `@ktav-lang/ktav/wasm`                                |
 
-Файл библиотеки лежит в соответствующем `@ktav-lang/js-<rid>`
-optional dep (тот же что хранит `.node`-бинарник), так что
-`npm install @ktav-lang/ktav` — достаточно. Переопределить через
-`KTAV_LIB_PATH` для локальных cabi-билдов.
+Файл библиотеки поставляется в соответствующем optional dep
+`@ktav-lang/js-<rid>` (том же, что держит `.node`-бинарник), так что
+достаточно `npm install @ktav-lang/ktav` — отдельная загрузка не нужна.
+Переопределяется через `KTAV_LIB_PATH` для локальных cabi-сборок.
 
 Трейд-офф: ~3–5× быстрее WASM на parse / dump больших документов;
-требует permission grant на Deno; теряет deno-свойство "работает в
-любом песочничном окружении". Используйте default import, если не
+на Deno требует выдачи разрешения; теряет свойство Deno «работает
+в любой песочнице». Оставайтесь на импорте по умолчанию, пока не
 измерили реальную потребность.
 
 Запускаемые примеры: [`examples/deno/ffi.ts`](../../examples/deno/ffi.ts),
@@ -184,12 +192,12 @@ function format(s: string): string;
 function canonicalFromSource(s: string): string;
 function emitCanonical<T extends KtavInput = KtavInput>(obj: T): string;
 
-// только web / Deno / браузер; Node + Bun игнорируют
+// web / Deno / browser only; Node + Bun ignore it
 function ready(input?: URL | Response | ArrayBuffer): Promise<void>;
 ```
 
-`loadsStrict` применяет проверку канонических скаляров: отклоняет lossy-формы,
-но принимает записи, которые выдаёт canonical writer.
+`loadsStrict` применяет валидацию канонических скаляров и отклоняет
+lossy-формы, принимая при этом формы, которые выдаёт canonical writer.
 
 `stringifyForceStrings` выводит как `dumps`, но расплющивает каждый
 leaf-скаляр — integer, float, boolean, `null` — в текстовую форму через
@@ -217,15 +225,16 @@ Ktav, поэтому `1.0` приходит неотличимым от `1`. Б�
 
 ## Ошибки
 
-Любая ошибка, которую бросают биндинги, — это типизированный `KtavError`
-с девятью прочими структурными полями: `error` (класс, напр. `"UnclosedCompound"`),
-`reason` (стабильный writer-time код), `line`, `line_text`, `span`
-(`{start, end}` — **байтовые** смещения в UTF-8-исходнике, а не UTF-16-индексы),
-`path` (массив точных декодированных сегментов ключа, никогда не склеенная
-строка), `body`, `canonical` и `spec_section` — а также, начиная с ktav
-0.7.2, `message`: собственное десятое поле конверта, взятое дословно,
-никогда не собранное из остальных девяти. Оно никогда не содержит сырой
-JSON. Поля, которых у конкретной ошибки нет, равны `null`.
+Любая ошибка, которую бросают биндинги, — типизированный `KtavError`
+с девятью прочими структурными полями: `error` (класс, например
+`"UnclosedCompound"`), `reason` (стабильный writer-time код), `line`,
+`line_text`, `span` (`{start, end}` — **байтовые** смещения в UTF-8
+исходнике, а не UTF-16-индексы), `path` (массив точно декодированных
+сегментов ключа, никогда не склеенная строка), `body`, `canonical` и
+`spec_section` — а также, начиная с ktav 0.8.0, `message`: собственное
+десятое поле конверта, взятое дословно, а не собранное из остальных
+девяти. Оно никогда не содержит сырой JSON. Поля, которых у конкретной
+ошибки нет, равны `null`.
 
 ```ts
 import { loads } from "@ktav-lang/ktav";
@@ -236,7 +245,7 @@ try {
   e.name;          // "KtavError"
   e.error;         // "UnclosedCompound"
   e.line_text;     // "a: ["
-  e.span;          // { start: 3, end: 4 } — байтовые смещения UTF-8
+  e.span;          // { start: 3, end: 4 } — UTF-8 byte offsets
   e.spec_section;  // "§6.1"
   e.message;       // "Syntax error: Unclosed array at end of input"
 }
@@ -259,28 +268,28 @@ Ktav типизирует числа по **лексической форме** 
 числом, остаётся `string`. Чтобы число-подобное значение осталось
 строкой, форсируйте его через `::` (`zip:: 01007`).
 
-На сериализации `Number.isInteger(x)` решает, целое или десятичное
-выводить; `bigint` всегда кодируется как голое целое. `NaN` и
+На сериализации `Number.isInteger(x)` решает, выводить целое или
+десятичное; `bigint` всегда кодируется как голое целое. `NaN` и
 `±Infinity` отвергаются — Ktav их не представляет.
 
 ## Экранирование в ключах
 
-Начиная со spec 0.6.4 литеральные `.` или `:` внутри сегмента ключа
-записываются через backslash:
+Начиная со spec 0.6.4, литеральные `.` или `:` внутри сегмента ключа
+записываются с обратным слешем:
 
 ```text
-a\.b: v        // ключ — один сегмент "a.b"     → { "a.b": "v" }
-a\:b: v        // двоеточие внутри ключа        → { "a:b": "v" }
-x.y\.z: v      // делим только по первой точке  → { "x": { "y.z": "v" } }
+a\.b: v        // key is the single segment "a.b" → { "a.b": "v" }
+a\:b: v        // key contains a colon            → { "a:b": "v" }
+x.y\.z: v      // split on the first dot only     → { "x": { "y.z": "v" } }
 ```
 
-Литеральный backslash в ключе пишется как `\\`.
+Литеральный обратный слеш в ключе пишется как `\\`.
 
 ## Однофайловая сборка для браузера
 
 `dist/wasm/web/ktav.inline.js` — вариант с WASM-бинарником, встроенным
-через base64: кладите его прямо в `<script type="module">` без
-соседнего `.wasm`-файла и без HTTP-сервера. Работает и по `file://`.
+через base64: просто положите его в любой `<script type="module">`
+без соседнего `.wasm`-файла и без HTTP-сервера. Работает и по `file://`.
 
 ```html
 <script type="module">
@@ -304,16 +313,16 @@ Ktav намеренно маленький. Пять принципов прое
 4. **Никакой магии в типах** — формат не решает, что `"8080"` — число.
 5. **Явно лучше, чем хитро** — `::` избыточен намеренно.
 
-Биндинги живут по тем же правилам: никакой inference-ы схемы, никакого
-авто-каста, никаких defaults. Хотите типизацию — делайте её на границе
-своим инструментом (Zod, io-ts, рукописные валидаторы) поверх нативных
-структур, которые возвращает эта библиотека.
+Биндинги живут по тем же правилам: никакого вывода схем, никакого
+авто-каста, никаких значений по умолчанию. Хотите типизацию — делайте
+её на границе своим инструментом (Zod, io-ts, рукописные валидаторы)
+поверх нативных структур, которые возвращает эта библиотека.
 
 ## Связанные проекты
 
 - [`ktav-lang/spec`](https://github.com/ktav-lang/spec) — нормативная
   спецификация формата и language-agnostic conformance-тесты.
-- [`ktav-lang/rust`](https://github.com/ktav-lang/rust) — reference
+- [`ktav-lang/rust`](https://github.com/ktav-lang/rust) — эталонная
   Rust-реализация. И N-API-крейт, и WASM-крейт — обёртки над ней.
 - [`ktav-lang/python`](https://github.com/ktav-lang/python) —
   Python-биндинги (PyO3) над тем же крейтом.
@@ -333,7 +342,7 @@ Dev-окружение, матрица тестов по рантаймам и �
 
 У автора много идей, которые могут быть полезны IT во всём мире, — и
 далеко не только для Ktav. Их реализация требует финансирования. Если
-вы хотите помочь — пишите на **phpcraftdream@gmail.com**.
+хотите помочь, пожалуйста, напишите на **phpcraftdream@gmail.com**.
 
 ## Лицензия
 

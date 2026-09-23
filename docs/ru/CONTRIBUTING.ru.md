@@ -1,6 +1,6 @@
 # Вклад в ktav (JavaScript / TypeScript)
 
-**Языки:** [English](../CONTRIBUTING.md) · **Русский** · [简体中文](../zh/CONTRIBUTING.zh.md)
+**Languages:** [English](../CONTRIBUTING.md) · **Русский** · [简体中文](../zh/CONTRIBUTING.zh.md)
 
 ## Базовые правила
 
@@ -49,7 +49,8 @@
   ужесточение типов) — в этом случае bump версии попадает в следующий
   MINOR, пока мы до 1.0.
 
-Обновите `CHANGELOG.md` и два перевода в том же PR.
+Обновите CHANGELOG-юниты под `root-docs/CHANGELOG/` (все три блока
+`>>>>> lang=`) в том же PR и перегенерируйте вывод.
 
 ### 4. Один концепт — один коммит
 

@@ -1,6 +1,6 @@
 {
   "name": "@ktav-lang/js-linux-x64-musl",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "cpu": [
     "x64"
   ],

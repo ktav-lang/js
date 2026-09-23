@@ -40,6 +40,24 @@ jobs:
       - run: cargo clippy -p ktav-cabi --all-targets -- -D warnings
 
   # ------------------------------------------------------------------
+  # Generated docs — README/CHANGELOG/CONTRIBUTING/SECURITY (+ docs/ru,
+  # docs/zh translations) are built by @ktav-lang/polydoc from
+  # root-docs/. A hand-edit of a generated file fails here; fix the
+  # source units and re-run the generator instead.
+  # ------------------------------------------------------------------
+  docs:
+    name: Docs (generated markdown)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm install
+      - run: node scripts/build-docs.mjs --check
+
+  # ------------------------------------------------------------------
   # TypeScript typecheck — reuses the same tsc the publish path runs.
   # ------------------------------------------------------------------
   ts-typecheck:
@@ -202,7 +220,7 @@ jobs:
   test-summary:
     name: Test summary
     runs-on: ubuntu-latest
-    needs: [rust-lint, ts-typecheck, test-node, test-bun, test-deno, test-browser]
+    needs: [rust-lint, docs, ts-typecheck, test-node, test-bun, test-deno, test-browser]
     if: always()
     steps:
       - name: Fail if any upstream job failed

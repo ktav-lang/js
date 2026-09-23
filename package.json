@@ -1,6 +1,6 @@
 {
   "name": "@ktav-lang/ktav",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "description": "Universal JS/TS bindings for Ktav — a plain configuration format with three rules, zero indentation, and zero quoting. WASM-backed, ships for Node, Deno, Bun, and browsers from a single package.",
   "license": "MIT OR Apache-2.0",
   "author": "Marat K <phpcraftdream@gmail.com>",
@@ -92,7 +92,9 @@
     "test:deno": "deno run --allow-read --allow-env tests/run-deno.ts",
     "test:deno-ffi": "deno run --allow-ffi --allow-env --allow-read tests/run-deno-ffi.ts",
     "test:browser": "node tests/run-browser.mjs",
-    "test": "npm run test:node-napi && npm run test:node-wasm && npm run test:bun && npm run test:bun-ffi && npm run test:deno && npm run test:deno-ffi && npm run test:browser"
+    "test": "npm run test:node-napi && npm run test:node-wasm && npm run test:bun && npm run test:bun-ffi && npm run test:deno && npm run test:deno-ffi && npm run test:browser",
+    "docs:build": "node scripts/build-docs.mjs",
+    "docs:check": "node scripts/build-docs.mjs --check"
   },
   "engines": {
     "node": ">=18"
@@ -112,16 +114,17 @@
     ]
   },
   "optionalDependencies": {
-    "@ktav-lang/js-win32-x64-msvc": "0.7.2",
-    "@ktav-lang/js-win32-arm64-msvc": "0.7.2",
-    "@ktav-lang/js-darwin-x64": "0.7.2",
-    "@ktav-lang/js-darwin-arm64": "0.7.2",
-    "@ktav-lang/js-linux-x64-gnu": "0.7.2",
-    "@ktav-lang/js-linux-arm64-gnu": "0.7.2",
-    "@ktav-lang/js-linux-x64-musl": "0.7.2",
-    "@ktav-lang/js-linux-arm64-musl": "0.7.2"
+    "@ktav-lang/js-darwin-arm64": "0.8.0",
+    "@ktav-lang/js-darwin-x64": "0.8.0",
+    "@ktav-lang/js-linux-arm64-gnu": "0.8.0",
+    "@ktav-lang/js-linux-arm64-musl": "0.8.0",
+    "@ktav-lang/js-linux-x64-gnu": "0.8.0",
+    "@ktav-lang/js-linux-x64-musl": "0.8.0",
+    "@ktav-lang/js-win32-arm64-msvc": "0.8.0",
+    "@ktav-lang/js-win32-x64-msvc": "0.8.0"
   },
   "devDependencies": {
+    "@ktav-lang/polydoc": "0.1.0",
     "@napi-rs/cli": "^3.6.2",
     "@types/node": "^25.6.0",
     "playwright": "^1.59.1",

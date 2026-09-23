@@ -55,6 +55,28 @@ format itself — for the latter see
   message strings will notice (intended; the envelope has never shipped
   in any binding).
 
+- Migrated `crates/cabi`/`crates/napi`/`crates/wasm` to a single
+  `ktav::declare_cabi!()` invocation (ktav's `cabi` feature) instead of
+  a hand-rolled C ABI shim; the exported symbol surface is unchanged,
+  so the JS/TS API is unaffected. Dependency floor raised to
+  `ktav = "0.8"`, `[package.metadata.ktav] spec-version` set to
+  `"0.8.0"` in all three crates, spec submodule re-pinned to `v0.8.0`
+  (adds § 5.2: a decimal with a redundant leading zero parses as a
+  String, not an Integer).
+- The package version moves to **0.8.0**, in step with the core and the
+  specification.
+- `npm publish` now runs with `--provenance` so npm's Trusted
+  Publishing (OIDC) engages instead of a long-lived `NPM_TOKEN`.
+- The conformance suite reads `spec/versions/0.8/tests` (it silently
+  kept reading the stale `0.7` corpus after the submodule was re-pinned
+  to `0.8.0` — the path was hardcoded, not derived from the pin) and
+  executes every fixture category the corpus ships, including the new
+  `strict-lossy/` (`loads()` must equal the lax value, `loadsStrict()`
+  must throw with the matching reason, body and canonical form). A
+  guard test fails the build if an unrecognized category directory
+  appears under the corpus, so a future addition can't repeat this
+  silently.
+
 ### Fixed
 
 - N-API: object keys containing U+0000 — legal in spec 0.7 via the new `\uXXXX` escapes — no longer fail with `nul byte found in provided data`; key set/get now goes through the JsString-based property APIs instead of the CString-backed named-property calls.

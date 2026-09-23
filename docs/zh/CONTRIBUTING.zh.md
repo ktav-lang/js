@@ -1,6 +1,6 @@
 # 为 ktav (JavaScript / TypeScript) 贡献代码
 
-**语言:** [English](../CONTRIBUTING.md) · [Русский](../ru/CONTRIBUTING.ru.md) · **简体中文**
+**Languages:** [English](../CONTRIBUTING.md) · [Русский](../ru/CONTRIBUTING.ru.md) · **简体中文**
 
 ## 核心规则
 
@@ -44,7 +44,8 @@
 - **semver 破坏性** (重命名 / 删除、签名变化、更严格的类型) ——
   这种情况下版本升级会进入下一个 MINOR,因为我们还在 pre-1.0。
 
-同一个 PR 中更新 `CHANGELOG.md` 及其两份翻译。
+在同一个 PR 中更新 `root-docs/CHANGELOG/` 下的 CHANGELOG 源单元
+(全部三个 `>>>>> lang=` 块)并重新生成产物。
 
 ### 4. 一个提交一件事
 
