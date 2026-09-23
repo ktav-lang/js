@@ -46,11 +46,12 @@
 //! - `ktav_version()` — NUL-terminated static string, for sanity checks.
 //!
 //! Return code: `0` on success, `1` on error. On error, `out_err` holds
-//! a UTF-8 **JSON envelope** — a nine-field `ktav::ErrorEnvelope`
-//! object (`error`, `reason`, `line`, `line_text`, `span`, `path`,
-//! `body`, `canonical`, `spec_section`, all nine always present,
-//! absent info `null`) — and must still be freed via `ktav_free`. It is
-//! never plain text, so callers never sniff JSON vs plain text.
+//! a UTF-8 **JSON envelope** — a ten-field `ktav::ErrorEnvelope` object
+//! since ktav 0.7.2 (`error`, `reason`, `line`, `line_text`, `span`,
+//! `path`, `body`, `canonical`, `spec_section`, `message`, all ten
+//! always present, absent info `null` except `message`, which never
+//! is) — and must still be freed via `ktav_free`. It is never plain
+//! text, so callers never sniff JSON vs plain text.
 
 use std::os::raw::{c_char, c_int};
 use std::ptr;
@@ -83,13 +84,13 @@ unsafe fn emit_err(msg: String, out_err: *mut *mut c_char, out_err_len: *mut usi
     *out_err_len = len;
 }
 
-/// Render any [`ktav::Error`] as the nine-field JSON envelope string.
+/// Render any [`ktav::Error`] as the ten-field JSON envelope string.
 fn envelope_json(err: &ktav::Error, source: &str) -> String {
     ktav::ErrorEnvelope::from_error(err, source).to_json()
 }
 
 /// Wrap a plain-text failure as `ktav::Error::Message` and render the
-/// envelope, so the error channel is always a nine-field JSON object.
+/// envelope, so the error channel is always a ten-field JSON object.
 fn message_envelope(text: String, source: &str) -> String {
     envelope_json(&ktav::Error::Message(text), source)
 }
@@ -849,7 +850,7 @@ c: [x, y]
     }
 
     #[test]
-    fn parse_error_envelope_has_nine_fields_in_order() {
+    fn parse_error_envelope_has_ten_fields_in_order() {
         let (rc, out, err) = call(
             ktav_loads, b"a: [
 ",
@@ -870,7 +871,8 @@ c: [x, y]
                 "path",
                 "body",
                 "canonical",
-                "spec_section"
+                "spec_section",
+                "message"
             ]
         );
         assert!(obj["path"].is_null() || obj["path"].is_array());

@@ -179,7 +179,10 @@ optional dep (тот же что хранит `.node`-бинарник), так 
 function loads<T = KtavValue>(s: string): T;
 function loadsStrict<T = KtavValue>(s: string): T;
 function dumps<T extends KtavInput = KtavInput>(obj: T): string;
+function stringifyForceStrings<T extends KtavInput = KtavInput>(obj: T): string;
 function format(s: string): string;
+function canonicalFromSource(s: string): string;
+function emitCanonical<T extends KtavInput = KtavInput>(obj: T): string;
 
 // только web / Deno / браузер; Node + Bun игнорируют
 function ready(input?: URL | Response | ArrayBuffer): Promise<void>;
@@ -188,6 +191,26 @@ function ready(input?: URL | Response | ArrayBuffer): Promise<void>;
 `loadsStrict` применяет проверку канонических скаляров: отклоняет lossy-формы,
 но принимает записи, которые выдаёт canonical writer.
 
+`stringifyForceStrings` выводит как `dumps`, но расплющивает каждый
+leaf-скаляр — integer, float, boolean, `null` — в текстовую форму через
+сырой маркер (`::`). Составные значения сохраняют структуру, а результат
+разбирается обратно через `loads` как тот же набор String-скаляров.
+
+Канонический вывод дают три функции, и они не взаимозаменяемы:
+
+| | вход | комментарии | написание скаляра |
+| --- | --- | --- | --- |
+| `format(s)` | исходный текст | **сохраняются** | сохраняется |
+| `canonicalFromSource(s)` | исходный текст | отбрасываются | сохраняется |
+| `emitCanonical(obj)` | значение JS | сохранять нечего | может измениться |
+
+`canonicalFromSource` — это текст на входе и канонический текст на
+выходе, без промежуточного значения JavaScript, поэтому `1.0`, `1e9` и
+`-0.0` переживают преобразование побайтово. `emitCanonical` такого
+обещать не может: `number` в JS не выражает различие Integer/Float из
+Ktav, поэтому `1.0` приходит неотличимым от `1`. Берите `emitCanonical`,
+когда у вас значение, и `canonicalFromSource`, когда у вас документ.
+
 Дженерик-параметр у `loads` — **непроверяемый каст**: используйте его,
 когда знаете форму данных и хотите автокомплит в IDE. Ничего не
 передавайте — получите структурный тип `KtavValue`.
@@ -195,13 +218,14 @@ function ready(input?: URL | Response | ArrayBuffer): Promise<void>;
 ## Ошибки
 
 Любая ошибка, которую бросают биндинги, — это типизированный `KtavError`
-с девятью структурными полями: `error` (класс, напр. `"UnclosedCompound"`),
+с девятью прочими структурными полями: `error` (класс, напр. `"UnclosedCompound"`),
 `reason` (стабильный writer-time код), `line`, `line_text`, `span`
 (`{start, end}` — **байтовые** смещения в UTF-8-исходнике, а не UTF-16-индексы),
 `path` (массив точных декодированных сегментов ключа, никогда не склеенная
-строка), `body`, `canonical` и `spec_section`. `message` остаётся
-человекочитаемым и никогда не содержит сырой JSON. Поля, которых у
-конкретной ошибки нет, равны `null`.
+строка), `body`, `canonical` и `spec_section` — а также, начиная с ktav
+0.7.2, `message`: собственное десятое поле конверта, взятое дословно,
+никогда не собранное из остальных девяти. Оно никогда не содержит сырой
+JSON. Поля, которых у конкретной ошибки нет, равны `null`.
 
 ```ts
 import { loads } from "@ktav-lang/ktav";
@@ -214,7 +238,7 @@ try {
   e.line_text;     // "a: ["
   e.span;          // { start: 3, end: 4 } — байтовые смещения UTF-8
   e.spec_section;  // "§6.1"
-  e.message;       // "Ktav parse error UnclosedCompound"
+  e.message;       // "Syntax error: Unclosed array at end of input"
 }
 ```
 

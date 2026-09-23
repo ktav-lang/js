@@ -130,10 +130,11 @@ export interface Ktav {
 }
 
 /**
- * The nine-field error envelope the Rust backends attach to every
- * failure. Field names keep the exact wire spelling (`line_text`,
- * `spec_section`) so consumers can read fields positionally against
- * the Rust / Go / Java bindings — do not camelCase them.
+ * The ten-field error envelope the Rust backends attach to every
+ * failure, since ktav 0.7.2. Field names keep the exact wire spelling
+ * (`line_text`, `spec_section`) so consumers can read fields
+ * positionally against the Rust / Go / Java bindings — do not
+ * camelCase them.
  */
 export interface KtavErrorEnvelope {
     /** Structured error class, e.g. "DuplicateKey", "Unrepresentable", "Message". */
@@ -149,18 +150,26 @@ export interface KtavErrorEnvelope {
     span: { start: number; end: number } | null;
     /** Exact decoded key segments of the offending path — never a joined string. */
     path: string[] | null;
-    /** Human-readable body when the backend supplies one; null otherwise. */
+    /** Class-specific text payload — the offending source fragment, not prose:
+     *  LossyScalar's source form, BadEscapeSequence's sequence, etc. null otherwise. */
     body: string | null;
     /** Canonical text, when the error carries one; null otherwise. */
     canonical: string | null;
     /** Spec section reference, e.g. "§6.15"; null otherwise. */
     spec_section: string | null;
+    /** The core's own rendering of the error, verbatim — never reassembled
+     *  from the other fields. Absent only when the envelope came from a
+     *  pre-0.7.2 native binary; {@link KtavError} falls back to a locally
+     *  reconstructed message in that case. */
+    message?: string;
 }
 
 /**
  * Typed error thrown by every public Ktav operation. `message` is
- * always human-readable — the raw nine-field JSON envelope is kept on
- * the `envelope` member and typed fields, never in `message`.
+ * the core's own rendering, taken verbatim from the envelope's own
+ * `message` field — the raw ten-field JSON envelope is kept on the
+ * `envelope` member and typed fields too, but `message` itself is
+ * never reassembled from them.
  */
 export class KtavError extends Error {
     readonly error: string;
@@ -176,11 +185,11 @@ export class KtavError extends Error {
     readonly canonical: string | null;
     readonly spec_section: string | null;
 
-    /** Raw nine-field envelope, for programmatic inspection. */
+    /** Raw ten-field envelope, for programmatic inspection. */
     readonly envelope: KtavErrorEnvelope;
 
     constructor(env: KtavErrorEnvelope, message?: string) {
-        super(message ?? describeEnvelope(env));
+        super(message ?? env.message ?? describeEnvelope(env));
         this.name = "KtavError";
         this.error = env.error;
         this.reason = env.reason;
@@ -195,6 +204,7 @@ export class KtavError extends Error {
     }
 }
 
+/** Fallback rendering for a pre-0.7.2 envelope with no `message` field. */
 function describeEnvelope(env: KtavErrorEnvelope): string {
     if (env.error === "Message") return "Ktav error";
     if (env.error === "Unrepresentable" || env.error === "UnrepresentableAt") {
@@ -251,8 +261,8 @@ export function ktavMessageError(text: string): KtavError {
 
 /**
  * Normalize any thrown value into a typed error. `KtavError` instances
- * pass through; Errors whose `message` parses as a nine-field envelope
- * JSON (the wire contract of the Rust layer) become `KtavError`s;
+ * pass through; Errors whose `message` parses as an envelope JSON
+ * object (the wire contract of the Rust layer) become `KtavError`s;
  * anything else becomes a `KtavError` with error "Message" carrying the
  * original (or fallback) readable text.
  */

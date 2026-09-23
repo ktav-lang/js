@@ -9,7 +9,7 @@ rust-version.workspace = true
 publish = false
 
 [package.metadata.ktav]
-spec-version = "0.7.0"
+spec-version = "0.7.1"
 
 [lib]
 name = "ktav_cabi"
