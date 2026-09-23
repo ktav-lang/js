@@ -5,14 +5,14 @@
 // On Node, Deno, and the browser this module is unreachable: the
 // package.json `exports` map routes those runtimes elsewhere.
 
-import { ktavMessageError, toKtavError } from "./api.js";
-import type { Ktav, KtavInput, KtavValue } from "./api.js";
-export type { KtavArray, KtavErrorEnvelope, KtavInput, KtavObject, KtavValue, Ktav } from "./api.js";
-export { KtavError, toKtavError } from "./api.js";
+import { ktavMessageError, toKtavError } from "./internal/api.js";
+import type { Ktav, KtavInput, KtavValue } from "./internal/api.js";
+export type { KtavArray, KtavErrorEnvelope, KtavInput, KtavObject, KtavValue, Ktav } from "./internal/api.js";
+export { KtavError, toKtavError } from "./internal/api.js";
 
-import { decode, encode } from "./ffi-codec.js";
-import { resolveLibPath } from "./ffi-loader.js";
-export { setLibraryPath } from "./ffi-loader.js";
+import { decode, encode } from "./internal/ffi-codec.js";
+import { resolveLibPath } from "./internal/ffi-loader.js";
+export { setLibraryPath } from "./internal/ffi-loader.js";
 
 // `bun:ffi` is a Bun built-in — its types are not in @types/node and
 // pulling in @types/bun for this single use site would inflate dev

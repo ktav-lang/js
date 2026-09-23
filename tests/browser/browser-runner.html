@@ -22,7 +22,7 @@
     // fetch every fixture before kicking the suite off.
     const cache = new Map();
     const byteCache = new Map();
-    const allFiles = [...manifest.valid, ...manifest.invalid, ...manifest.parseableUnrepresentable];
+    const allFiles = [...manifest.valid, ...manifest.invalid, ...manifest.parseableUnrepresentable, ...manifest.strictLossy];
     for (const f of allFiles) {
         cache.set(f, await fetch("/" + f.replace(/^\/+/, "")).then(r => r.text()));
         const json = f.replace(/\.ktav$/, ".json");
@@ -59,6 +59,7 @@
         if (dir.endsWith("/valid")) return manifest.valid;
         if (dir.endsWith("/invalid")) return manifest.invalid;
         if (dir.endsWith("/parseable-unrepresentable")) return manifest.parseableUnrepresentable;
+        if (dir.endsWith("/strict-lossy")) return manifest.strictLossy;
         return [];
     }
 

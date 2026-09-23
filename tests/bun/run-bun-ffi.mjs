@@ -2,14 +2,14 @@
 // `bun:ffi` and exercises the same parse / dump / bigint / error paths
 // covered by the N-API and WASM suites.
 //
-// Run: bun run tests/run-bun-ffi.mjs
+// Run: bun run tests/bun/run-bun-ffi.mjs
 //
 // Skip conditions:
 //   - Not running under Bun → exit 0 with note.
 //   - cabi binary not built at `target/release/...` → exit 0.
 
-import * as testPaths from "./shared/test-paths.mjs";
-import { loads, loadsStrict, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource, setLibraryPath } from "../dist/ts/ffi-bun.js";
+import * as testPaths from "../shared/test-paths.mjs";
+import { loads, loadsStrict, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource, setLibraryPath } from "../../dist/ts/ffi-bun.js";
 
 if (testPaths.cabiBuilt()) setLibraryPath(testPaths.cabi);
 

@@ -5,11 +5,11 @@ import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { runAll } from "./shared/assertions.mjs";
-import * as testPaths from "./shared/test-paths.mjs";
+import { runAll } from "../shared/assertions.mjs";
+import * as testPaths from "../shared/test-paths.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const repo = resolve(here, "..");
+const repo = resolve(here, "..", "..");
 
 const wasmJsPath = resolve(repo, "dist/wasm/web/ktav.js");
 const wasmBinPath = resolve(repo, "dist/wasm/web/ktav_bg.wasm");
@@ -24,7 +24,7 @@ await mod.default({ module_or_path: readFileSync(wasmBinPath) });
 // Raw wasm-bindgen errors carry the envelope JSON in `message`; the suite asserts
 // the public typed-error contract, so the runner normalizes at its boundary exactly
 // like the TS facade does.
-import { toKtavError } from "../dist/ts/api.js";
+import { toKtavError } from "../../dist/ts/internal/api.js";
 const withKtavErrors = (fn) => (...args) => {
     try { return fn(...args); }
     catch (e) { throw toKtavError(e); }

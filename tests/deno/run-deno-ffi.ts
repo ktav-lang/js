@@ -2,15 +2,15 @@
 // `Deno.dlopen` and exercises the same parse / dump / bigint / error
 // paths covered by the N-API and WASM suites.
 //
-// Run: deno run --allow-ffi --allow-env --allow-read tests/run-deno-ffi.ts
+// Run: deno run --allow-ffi --allow-env --allow-read tests/deno/run-deno-ffi.ts
 
 // @ts-nocheck — TypeScript here is for human eyes; Deno runs the .ts
 // file directly without a checker, and the import path resolves to
 // the compiled `dist/ts/ffi-deno.js` since deno honours `.js`
 // suffixes via the package exports map only when imported by name.
 
-import * as testPaths from "./shared/test-paths.mjs";
-import { loads, loadsStrict, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource, setLibraryPath } from "../dist/ts/ffi-deno.js";
+import * as testPaths from "../shared/test-paths.mjs";
+import { loads, loadsStrict, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource, setLibraryPath } from "../../dist/ts/ffi-deno.js";
 
 if (testPaths.cabiBuilt()) setLibraryPath(testPaths.cabi);
 

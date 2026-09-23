@@ -6,10 +6,10 @@
 import { createRequire } from "node:module";
 import { platform, arch } from "node:process";
 
-import { ktavMessageError, toKtavError } from "./api.js";
-import type { KtavInput, KtavValue } from "./api.js";
-export type { KtavArray, KtavErrorEnvelope, KtavInput, KtavObject, KtavValue, Ktav } from "./api.js";
-export { KtavError, ktavMessageError, toKtavError } from "./api.js";
+import { ktavMessageError, toKtavError } from "./internal/api.js";
+import type { KtavInput, KtavValue } from "./internal/api.js";
+export type { KtavArray, KtavErrorEnvelope, KtavInput, KtavObject, KtavValue, Ktav } from "./internal/api.js";
+export { KtavError, ktavMessageError, toKtavError } from "./internal/api.js";
 
 // Locate the platform-specific `.node` binary. At publish time these
 // live in `optionalDependencies` subpackages (@ktav-lang/ktav-<triple>)

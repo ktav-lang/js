@@ -9,10 +9,10 @@ import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, resolve, dirname, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import * as testPaths from "./shared/test-paths.mjs";
+import * as testPaths from "../shared/test-paths.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const repo = resolve(here, "..");
+const repo = resolve(here, "..", "..");
 
 const mime = {
     ".html": "text/html; charset=utf-8",
@@ -75,9 +75,10 @@ const manifest = spec
         invalid: walkKtavFiles(`${spec}/invalid`).map(relFromRepo),
         unrepresentable: listJsonFiles(`${spec}/unrepresentable`).map(relFromRepo),
         parseableUnrepresentable: walkKtavFiles(`${spec}/parseable-unrepresentable`).map(relFromRepo),
+        strictLossy: walkKtavFiles(`${spec}/strict-lossy`).map(relFromRepo),
         canonical,
     }
-    : { specDir: null, valid: [], invalid: [], unrepresentable: [], parseableUnrepresentable: [], canonical: {} };
+    : { specDir: null, valid: [], invalid: [], unrepresentable: [], parseableUnrepresentable: [], strictLossy: [], canonical: {} };
 
 const server = createServer((req, res) => {
     let urlPath = decodeURIComponent(req.url.split("?")[0]);
@@ -101,7 +102,7 @@ const server = createServer((req, res) => {
 
 await new Promise((ok) => server.listen(0, "127.0.0.1", ok));
 const port = server.address().port;
-const url = `http://127.0.0.1:${port}/tests/browser-runner.html`;
+const url = `http://127.0.0.1:${port}/tests/browser/browser-runner.html`;
 
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage();

@@ -13,8 +13,8 @@ const MESSAGE =
 
 export type {
     KtavArray, KtavErrorEnvelope, KtavInput, KtavObject, KtavValue, Ktav,
-} from "./api.js";
-export { KtavError, toKtavError } from "./api.js";
+} from "./internal/api.js";
+export { KtavError, toKtavError } from "./internal/api.js";
 
 export function loads(_src: string): never {
     throw new Error(MESSAGE);
