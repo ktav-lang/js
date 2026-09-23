@@ -306,6 +306,13 @@ jobs:
           echo "--- after layout ---"
           find npm -maxdepth 2 -type f -name '*ktav_cabi*' | sort
 
+      # npm tries OIDC trusted publishing first and falls back to
+      # NPM_TOKEN when no trusted publisher is configured (e.g. the
+      # very first publish). npmjs.com side — each package's Settings
+      # → Trusted Publisher → GitHub Actions, repo `ktav-lang/js`,
+      # workflow `release.yml`, environment `npm`. Trusted Publishing
+      # is per-package, so this needs setting up on all nine packages
+      # (`ktav` + the eight platform subpackages) individually.
       - name: Publish platform subpackages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -316,7 +323,7 @@ jobs:
             # happens when a previous run got partway through the
             # matrix then hit a separate error. Every other non-zero
             # exit propagates.
-            if ! out=$(npm publish --access public --tag latest "$dir" 2>&1); then
+            if ! out=$(npm publish --access public --tag latest --provenance "$dir" 2>&1); then
               echo "$out"
               if echo "$out" | grep -qE "EPUBLISHCONFLICT|previously published|cannot publish over"; then
                 echo "[publish] $dir already on registry — skipping"
@@ -330,7 +337,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          if ! out=$(npm publish --access public --tag latest 2>&1); then
+          if ! out=$(npm publish --access public --tag latest --provenance 2>&1); then
             echo "$out"
             if echo "$out" | grep -qE "EPUBLISHCONFLICT|previously published|cannot publish over"; then
               echo "[publish] main package already on registry — skipping"
