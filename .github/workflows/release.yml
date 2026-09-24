@@ -253,6 +253,7 @@ jobs:
       name: npm
       url: https://www.npmjs.com/package/@ktav-lang/ktav
     permissions:
+      contents: read
       id-token: write  # npm OIDC (provenance)
     steps:
       - uses: actions/checkout@v6
@@ -260,9 +261,21 @@ jobs:
           submodules: recursive
       - uses: actions/setup-node@v6
         with:
-          node-version: "22"
+          node-version: "24"
           cache: npm
           registry-url: "https://registry.npmjs.org"
+
+      - name: Require npm with Trusted Publishing support
+        shell: bash
+        run: |
+          version=$(npm --version)
+          echo "npm $version"
+          node -e '
+            const [major, minor, patch] = process.argv[1].split(".").map(Number);
+            if (major < 11 || (major === 11 && (minor < 5 || (minor === 5 && patch < 1)))) {
+              throw new Error(`npm ${process.argv[1]} does not support Trusted Publishing (requires >=11.5.1)`);
+            }
+          ' "$version"
 
       - name: Download native artifacts
         uses: actions/download-artifact@v8
@@ -306,16 +319,9 @@ jobs:
           echo "--- after layout ---"
           find npm -maxdepth 2 -type f -name '*ktav_cabi*' | sort
 
-      # npm tries OIDC trusted publishing first and falls back to
-      # NPM_TOKEN when no trusted publisher is configured (e.g. the
-      # very first publish). npmjs.com side — each package's Settings
-      # → Trusted Publisher → GitHub Actions, repo `ktav-lang/js`,
-      # workflow `release.yml`, environment `npm`. Trusted Publishing
-      # is per-package, so this needs setting up on all nine packages
-      # (`ktav` + the eight platform subpackages) individually.
+      # Trusted Publishing is required for each of the nine packages:
+      # GitHub repo ktav-lang/js, workflow release.yml, environment npm.
       - name: Publish platform subpackages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           for dir in npm/*/; do
             echo "publishing $dir"
@@ -334,8 +340,6 @@ jobs:
           done
 
       - name: Publish main ktav
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           if ! out=$(npm publish --access public --tag latest --provenance 2>&1); then
             echo "$out"
