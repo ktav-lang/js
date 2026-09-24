@@ -39,5 +39,7 @@ export function cabiBuilt() {
 }
 
 export function specPresent() {
-    return existsSync(join(spec, "valid")) || existsSync(join(spec, "invalid"));
+    // This binding targets spec 0.8; a missing corpus is a test failure,
+    // not a reason to report a green runtime-only suite.
+    return true;
 }

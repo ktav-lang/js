@@ -1,41 +1,55 @@
 >>>>> lang=en
 ## Key escaping
 
-Since spec 0.6.4 a literal `.` or `:` inside a key segment is written
-with a backslash:
+Bare key segments can escape structural characters with a backslash.
+For keys that need spaces, quotes, or other characters that are awkward
+in bare form, quote an individual segment with `"..."`, `'...'`, or
+`` `...` ``. Quoted segments support escapes such as `\uXXXX` for a
+Unicode code point (spec 0.8.0, § 3.7.1):
 
 ```text
-a\.b: v        // key is the single segment "a.b" → { "a.b": "v" }
-a\:b: v        // key contains a colon            → { "a:b": "v" }
-x.y\.z: v      // split on the first dot only     → { "x": { "y.z": "v" } }
+"service name": web
+"a.b".child: v
+"caf\u00E9": yes
 ```
 
-A literal backslash in a key is `\\`.
+A literal `.` or `:` in a bare segment is escaped as `\.` or `\:`;
+a literal backslash is `\\`. A dot between segments remains the path
+separator.
 
 >>>>> lang=ru
 ## Экранирование в ключах
 
-Начиная со spec 0.6.4, литеральные `.` или `:` внутри сегмента ключа
-записываются с обратным слешем:
+В голых сегментах структурные символы можно экранировать обратной
+косой чертой. Если ключ содержит пробелы, кавычки или другие символы,
+неудобные для голой формы, заключите отдельный сегмент в `"..."`,
+`'...'` или `` `...` ``. В кавычках поддерживаются escape-последовательности,
+например `\uXXXX` для кодовой точки Unicode (spec 0.8.0, § 3.7.1):
 
 ```text
-a\.b: v        // key is the single segment "a.b" → { "a.b": "v" }
-a\:b: v        // key contains a colon            → { "a:b": "v" }
-x.y\.z: v      // split on the first dot only     → { "x": { "y.z": "v" } }
+"service name": web
+"a.b".child: v
+"caf\u00E9": yes
 ```
 
-Литеральный обратный слеш в ключе пишется как `\\`.
+Литеральные `.` и `:` в голом сегменте записываются как `\.` и `\:`;
+литеральный обратный слеш — как `\\`. Точка между сегментами остаётся
+разделителем пути.
 
 >>>>> lang=zh
 ## 键的转义
 
-自 spec 0.6.4 起，键段内的字面量 `.` 或 `:` 通过反斜杠书写：
+裸键段可以用反斜杠转义结构字符。对于含空格、引号或其他不适合
+裸写的字符的键，可将单个键段用 `"..."`、`'...'` 或 `` `...` ``
+括起。带引号的键段支持 escape，例如用 `\uXXXX` 表示 Unicode
+码点（spec 0.8.0，§ 3.7.1）：
 
 ```text
-a\.b: v        // key is the single segment "a.b" → { "a.b": "v" }
-a\:b: v        // key contains a colon            → { "a:b": "v" }
-x.y\.z: v      // split on the first dot only     → { "x": { "y.z": "v" } }
+"service name": web
+"a.b".child: v
+"caf\u00E9": yes
 ```
 
-键中的字面量反斜杠写作 `\\`。
+裸键段中的字面量 `.` 或 `:` 分别写作 `\.` 或 `\:`；字面量反斜杠
+写作 `\\`。段间的点仍是路径分隔符。
 

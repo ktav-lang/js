@@ -22,6 +22,13 @@
     // fetch every fixture before kicking the suite off.
     const cache = new Map();
     const byteCache = new Map();
+    if (manifest.specDir) {
+        const path = manifest.specDir + "/manifest.json";
+        cache.set(path, await fetch("/" + path).then(r => {
+            if (!r.ok) throw new Error("failed to fetch corpus manifest: " + path);
+            return r.text();
+        }));
+    }
     const allFiles = [...manifest.valid, ...manifest.invalid, ...manifest.parseableUnrepresentable, ...manifest.strictLossy];
     for (const f of allFiles) {
         cache.set(f, await fetch("/" + f.replace(/^\/+/, "")).then(r => r.text()));
@@ -56,7 +63,7 @@
 
     function walkKtavFiles(dir) {
         // Manifest already carries per-subdir lists; just pick by prefix.
-        if (dir.endsWith("/valid")) return manifest.valid;
+        if (dir.endsWith("/valid")) return [...manifest.valid, ...(manifest.canonicalFiles || [])];
         if (dir.endsWith("/invalid")) return manifest.invalid;
         if (dir.endsWith("/parseable-unrepresentable")) return manifest.parseableUnrepresentable;
         if (dir.endsWith("/strict-lossy")) return manifest.strictLossy;
@@ -64,8 +71,12 @@
     }
 
     function listJsonFiles(dir) {
-        if (dir.endsWith("/unrepresentable")) return manifest.unrepresentable;
-        return [];
+        const category = dir.slice(dir.lastIndexOf("/") + 1);
+        return manifest.fixtureJson?.[category] || [];
+    }
+
+    function listDirectories(dir) {
+        return manifest.categoryDirectories || [];
     }
 
     const log = document.getElementById("log");
@@ -88,6 +99,7 @@
         },
         walkKtavFiles,
         listJsonFiles,
+        listDirectories,
         specDir: manifest.specDir,
         label: "browser",
         log: (m) => { log.textContent += m + "\n"; },

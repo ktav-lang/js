@@ -1,8 +1,7 @@
 #!/usr/bin/env node
-// Rebuilds this repository's README/CHANGELOG/CONTRIBUTING/SECURITY and
-// their docs/ru + docs/zh translations from root-docs/, using
-// @ktav-lang/polydoc. Run with --check for a CI-friendly, read-only
-// verification instead of regenerating the files.
+// Rebuilds repository docs, examples/README*, and platform README* files
+// from root-docs/ using @ktav-lang/polydoc. Run with --check for a
+// CI-friendly, read-only verification instead of regenerating the files.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,6 +10,16 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { configure, buildRootDocs } from '@ktav-lang/polydoc';
 
 const LANGS = ['en', 'ru', 'zh'];
+const PLATFORM_TARGETS = {
+  'darwin-arm64': 'aarch64-apple-darwin',
+  'darwin-x64': 'x86_64-apple-darwin',
+  'linux-arm64-gnu': 'aarch64-unknown-linux-gnu',
+  'linux-arm64-musl': 'aarch64-unknown-linux-musl',
+  'linux-x64-gnu': 'x86_64-unknown-linux-gnu',
+  'linux-x64-musl': 'x86_64-unknown-linux-musl',
+  'win32-arm64-msvc': 'aarch64-pc-windows-msvc',
+  'win32-x64-msvc': 'x86_64-pc-windows-msvc',
+};
 
 // polydoc's writeRootDocs/checkRootDocs write and verify every root
 // document at the repository root (<DOC>.md, <DOC>.<lang>.md). This
@@ -41,11 +50,23 @@ const OUTPUT_PATHS = {
     ru: 'docs/ru/SECURITY.ru.md',
     zh: 'docs/zh/SECURITY.zh.md',
   },
+  'EXAMPLES-README': {
+    en: 'examples/README.md',
+    ru: 'examples/README.ru.md',
+    zh: 'examples/README.zh.md',
+  },
+  'PLATFORM-README': Object.fromEntries(
+    ['en', 'ru', 'zh'].map((lang) => [lang, Object.keys(PLATFORM_TARGETS)
+      .map((rid) => `npm/${rid}/README${lang === 'en' ? '' : `.${lang}`}.md`)]),
+  ),
 };
 
 configure({
   langs: LANGS,
-  rootDocuments: ['README', 'CHANGELOG', 'CONTRIBUTING', 'SECURITY'],
+  rootDocuments: [
+    'README', 'CHANGELOG', 'CONTRIBUTING', 'SECURITY',
+    'EXAMPLES-README', 'PLATFORM-README',
+  ],
 });
 
 // Per-unit validation proves every meaning has every language. It does
@@ -93,16 +114,33 @@ function structuralProblems(label, perLang) {
   return problems;
 }
 
-function outputPath(root, doc, lang) {
-  return path.join(root, OUTPUT_PATHS[doc][lang]);
+function outputPaths(root, doc, lang) {
+  const mapped = OUTPUT_PATHS[doc][lang];
+  return (Array.isArray(mapped) ? mapped : [mapped]).map((rel) => ({
+    rel,
+    absolute: path.join(root, rel),
+  }));
+}
+
+function outputBuffer(doc, rel, body) {
+  if (doc !== 'PLATFORM-README') return body;
+  const rid = rel.split('/')[1];
+  const target = PLATFORM_TARGETS[rid];
+  if (!target) throw new Error(`unknown platform README target: ${rel}`);
+  const rendered = body.toString('utf8')
+    .replaceAll('{{PACKAGE_NAME}}', `@ktav-lang/js-${rid}`)
+    .replaceAll('{{TARGET_TRIPLE}}', target);
+  if (/\{\{[A-Z_]+\}\}/u.test(rendered)) throw new Error(`unexpanded platform README token: ${rel}`);
+  return Buffer.from(rendered, 'utf8');
 }
 
 function writeDocs(root, docs) {
   for (const [doc, perLang] of docs) {
     for (const lang of LANGS) {
-      const p = outputPath(root, doc, lang);
-      fs.mkdirSync(path.dirname(p), { recursive: true });
-      fs.writeFileSync(p, perLang.get(lang));
+      for (const { rel, absolute } of outputPaths(root, doc, lang)) {
+        fs.mkdirSync(path.dirname(absolute), { recursive: true });
+        fs.writeFileSync(absolute, outputBuffer(doc, rel, perLang.get(lang)));
+      }
     }
   }
 }
@@ -111,24 +149,25 @@ function checkDocs(root, docs) {
   const problems = [];
   for (const [doc, perLang] of docs) {
     for (const lang of LANGS) {
-      const rel = OUTPUT_PATHS[doc][lang];
-      const expected = perLang.get(lang);
-      let actual;
-      try {
-        actual = fs.readFileSync(outputPath(root, doc, lang));
-      } catch (e) {
-        problems.push(`${rel} is missing or unreadable (${e.message}); it is generated from ` +
-          `root-docs/${doc}/`);
-        continue;
+      for (const { rel, absolute } of outputPaths(root, doc, lang)) {
+        const expected = outputBuffer(doc, rel, perLang.get(lang));
+        let actual;
+        try {
+          actual = fs.readFileSync(absolute);
+        } catch (e) {
+          problems.push(`${rel} is missing or unreadable (${e.message}); it is generated from ` +
+            `root-docs/${doc}/`);
+          continue;
+        }
+        if (actual.equals(expected)) continue;
+        let off = 0;
+        const min = Math.min(actual.length, expected.length);
+        while (off < min && actual[off] === expected[off]) off++;
+        const line = expected.subarray(0, off).toString('utf8').split('\n').length;
+        problems.push(
+          `${rel} differs from what root-docs/${doc}/ generates, first at byte ${off} `+
+          `(line ${line}); edit the unit source, never the generated file`);
       }
-      if (actual.equals(expected)) continue;
-      let off = 0;
-      const min = Math.min(actual.length, expected.length);
-      while (off < min && actual[off] === expected[off]) off++;
-      const line = expected.subarray(0, off).toString('utf8').split('\n').length;
-      problems.push(
-        `${rel} differs from what root-docs/${doc}/ generates, first at byte ${off} ` +
-        `(line ${line}); edit the unit source, never the generated file`);
     }
   }
   return problems;
@@ -137,8 +176,7 @@ function checkDocs(root, docs) {
 function usage() {
   process.stderr.write(
     'usage: node scripts/build-docs.mjs [--check]\n' +
-    '  (no args)  regenerate README.md/.ru.md/.zh.md, CHANGELOG.md/.ru.md/.zh.md,\n' +
-    '             docs/CONTRIBUTING.md, docs/SECURITY.md and their translations\n' +
+    '  (no args)  regenerate root docs, examples/README*, and npm/*/README*\n' +
     '  --check    verify the generated files match root-docs/ without writing\n'
   );
 }

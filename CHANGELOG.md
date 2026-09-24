@@ -11,7 +11,7 @@ This changelog tracks **package releases**, not changes to the Ktav
 format itself — for the latter see
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
-## Unreleased
+## 0.8.0
 
 ### Added
 
@@ -44,12 +44,11 @@ format itself — for the latter see
   fixture).
 - Added spec-0.7 smoke tests: quoted keys (§ 5.3.3) and `\uXXXX` escapes
   (§ 3.7.1), including lone-surrogate rejection and U+0000 key round-trips.
-- Updated the Rust core to ktav 0.7 (spec 0.7.0): workspace dependency bumped to `ktav = "0.7"`, `[package.metadata.ktav] spec-version` set to `"0.7.0"` in all three binding crates, and workspace `rust-version` raised from 1.70 to 1.71 (the ktav 0.7 MSRV).
-- Rust core updated to ktav 0.7.1 (workspace `ktav = "0.7.1"`): adds `format_str` and the structured error envelope. The dependency floor rises to 0.7.1 precisely because `format_str` and `ErrorEnvelope` do not exist in any earlier release.
 - Every error thrown by the bindings is now a typed `KtavError` carrying
-  the nine-field `ktav::ErrorEnvelope` fields (`error`, `reason`, `line`,
+  all ten `ktav::ErrorEnvelope` fields (`error`, `reason`, `line`,
   `line_text`, `span` — UTF-8 byte offsets, `path` — array of exact key
-  segments, `body`, `canonical`, `spec_section`); `message` stays
+  segments, `body`, `canonical`, `spec_section`, `message`);
+  `message` stays
   human-readable and never contains raw JSON. This is a breaking change
   to the text the binding surfaces on failure — callers matching on
   message strings will notice (intended; the envelope has never shipped

@@ -251,7 +251,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v') && inputs.dry-run != 'true'
     environment:
       name: npm
-      url: https://www.npmjs.com/package/ktav
+      url: https://www.npmjs.com/package/@ktav-lang/ktav
     permissions:
       id-token: write  # npm OIDC (provenance)
     steps:

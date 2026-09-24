@@ -6,7 +6,7 @@
 [![Playground](https://img.shields.io/badge/playground-try%20online-7c3aed?style=flat-square&logo=rocket&logoColor=white)](https://ktav-lang.github.io/)
 
 > Universal JS/TS bindings for [Ktav](https://github.com/ktav-lang/spec) —
-> a plain configuration format. JSON-shape, no quotes, no commas, dotted
+> a plain configuration format. JSON-shape, no required quotes, no commas, dotted
 > keys. Powered by Rust under the hood, shipped as native N-API for Node
 > and Bun, WebAssembly for Deno, browsers, and bundlers.
 
@@ -228,14 +228,14 @@ structural `KtavValue` type.
 ## Errors
 
 Every error thrown by the bindings is a typed `KtavError` carrying the
-nine other structured fields: `error` (class, e.g. `"UnclosedCompound"`),
-`reason` (stable writer-time code), `line`, `line_text`, `span`
-(`{start, end}` — **byte** offsets into the UTF-8 source, not UTF-16
-indices), `path` (array of exact decoded key segments, never a joined
-string), `body`, `canonical`, and `spec_section` — plus, since ktav
-0.8.0, `message`: the envelope's own tenth field, taken verbatim, never
-reassembled from the other nine. It never contains raw JSON. Fields a
-particular error doesn't carry are `null`.
+ten fields of `ktav::ErrorEnvelope`: `error` (class, e.g.
+`"UnclosedCompound"`), `reason` (stable writer-time code), `line`,
+`line_text`, `span` (`{start, end}` — **byte** offsets into the UTF-8
+source, not UTF-16 indices), `path` (array of exact decoded key
+segments, never a joined string), `body`, `canonical`, `spec_section`,
+and `message`. The message is taken verbatim, never reassembled from
+the other fields, and never contains raw JSON. Fields a particular
+error doesn't carry are `null`.
 
 ```ts
 import { loads } from "@ktav-lang/ktav";
@@ -275,16 +275,21 @@ rejected — Ktav does not represent them.
 
 ## Key escaping
 
-Since spec 0.6.4 a literal `.` or `:` inside a key segment is written
-with a backslash:
+Bare key segments can escape structural characters with a backslash.
+For keys that need spaces, quotes, or other characters that are awkward
+in bare form, quote an individual segment with `"..."`, `'...'`, or
+`` `...` ``. Quoted segments support escapes such as `\uXXXX` for a
+Unicode code point (spec 0.8.0, § 3.7.1):
 
 ```text
-a\.b: v        // key is the single segment "a.b" → { "a.b": "v" }
-a\:b: v        // key contains a colon            → { "a:b": "v" }
-x.y\.z: v      // split on the first dot only     → { "x": { "y.z": "v" } }
+"service name": web
+"a.b".child: v
+"caf\u00E9": yes
 ```
 
-A literal backslash in a key is `\\`.
+A literal `.` or `:` in a bare segment is escaped as `\.` or `\:`;
+a literal backslash is `\\`. A dot between segments remains the path
+separator.
 
 ## Single-file browser build
 

@@ -32,6 +32,10 @@ function listJsonFiles(dir) {
     return out;
 }
 
+function listDirectories(dir) {
+    return readdirSync(dir, { withFileTypes: true }).filter(entry => entry.isDirectory()).map(entry => join(dir, entry.name).replace(/\\/g, "/"));
+}
+
 const { passed, failed, total } = runAll({
     loads,
     loadsStrict,
@@ -43,6 +47,7 @@ const { passed, failed, total } = runAll({
     readBytes: (p) => new Uint8Array(readFileSync(p)),
     walkKtavFiles,
     listJsonFiles,
+    listDirectories,
     specDir: testPaths.specPresent() ? testPaths.spec.replace(/\\/g, "/") : null,
     label: "bun",
     log: (m) => console.log(m),

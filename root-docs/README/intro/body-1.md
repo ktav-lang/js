@@ -7,7 +7,7 @@
 [![Playground](https://img.shields.io/badge/playground-try%20online-7c3aed?style=flat-square&logo=rocket&logoColor=white)](https://ktav-lang.github.io/)
 
 > Universal JS/TS bindings for [Ktav](https://github.com/ktav-lang/spec) —
-> a plain configuration format. JSON-shape, no quotes, no commas, dotted
+> a plain configuration format. JSON-shape, no required quotes, no commas, dotted
 > keys. Powered by Rust under the hood, shipped as native N-API for Node
 > and Bun, WebAssembly for Deno, browsers, and bundlers.
 
@@ -31,8 +31,9 @@ document.
 [![Playground](https://img.shields.io/badge/playground-try%20online-7c3aed?style=flat-square&logo=rocket&logoColor=white)](https://ktav-lang.github.io/)
 
 > Универсальные JS/TS-биндинги для [Ktav](https://github.com/ktav-lang/spec) —
-> простого формата конфигураций. Форма как у JSON, без кавычек, без запятых,
-> вложенность — через точки в ключах. Под капотом Rust; для Node и Bun
+> простого формата конфигураций. Форма как у JSON; обычные ключи и значения
+> не требуют кавычек. Запятые не нужны, вложенность задают точки в ключах.
+> Под капотом Rust; для Node и Bun
 > поставляется нативный N-API, для Deno, браузеров и бандлеров — WebAssembly.
 
 **Languages:** [English](../../README.md) · **Русский** · [简体中文](../zh/README.zh.md)
@@ -54,7 +55,7 @@ document.
 [![Playground](https://img.shields.io/badge/playground-try%20online-7c3aed?style=flat-square&logo=rocket&logoColor=white)](https://ktav-lang.github.io/)
 
 > [Ktav](https://github.com/ktav-lang/spec) 的通用 JS/TS 绑定 —— 一种朴素的
-> 配置格式。形状与 JSON 相同，无引号，无逗号，嵌套键以点号串联。底层由
+> 配置格式。形状与 JSON 相同，常规键和值无需引号，无逗号，嵌套键以点号串联。底层由
 > Rust 驱动；面向 Node 与 Bun 以原生 N-API 发布，面向 Deno、浏览器与
 > 打包器以 WebAssembly 发布。
 

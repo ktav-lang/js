@@ -1,5 +1,5 @@
 >>>>> lang=en
-## Unreleased
+## 0.8.0
 
 ### Added
 
@@ -22,7 +22,7 @@
   fixed-point tests, and asserts the structured error envelope fields.
 
 >>>>> lang=ru
-## Не выпущено
+## 0.8.0
 
 ### Добавлено
 
@@ -47,7 +47,7 @@
   оболочки ошибок.
 
 >>>>> lang=zh
-## 未发布
+## 0.8.0
 
 ### 新增
 

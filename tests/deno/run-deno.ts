@@ -45,6 +45,10 @@ function listJsonFiles(dir: string): string[] {
     return out;
 }
 
+function listDirectories(dir: string): string[] {
+    return [...Deno.readDirSync(dir)].filter(entry => entry.isDirectory).map(entry => `${dir}/${entry.name}`);
+}
+
 const { passed, failed, total } = runAll({
     loads,
     loadsStrict,
@@ -56,6 +60,7 @@ const { passed, failed, total } = runAll({
     readBytes: (p: string) => Deno.readFileSync(p),
     walkKtavFiles,
     listJsonFiles,
+    listDirectories,
     specDir: testPaths.specPresent() ? testPaths.spec.replace(/\\/g, "/") : null,
     label: "deno",
     log: (m: string) => console.log(m),

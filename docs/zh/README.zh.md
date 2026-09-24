@@ -6,7 +6,7 @@
 [![Playground](https://img.shields.io/badge/playground-try%20online-7c3aed?style=flat-square&logo=rocket&logoColor=white)](https://ktav-lang.github.io/)
 
 > [Ktav](https://github.com/ktav-lang/spec) 的通用 JS/TS 绑定 —— 一种朴素的
-> 配置格式。形状与 JSON 相同，无引号，无逗号，嵌套键以点号串联。底层由
+> 配置格式。形状与 JSON 相同，常规键和值无需引号，无逗号，嵌套键以点号串联。底层由
 > Rust 驱动；面向 Node 与 Bun 以原生 N-API 发布，面向 Deno、浏览器与
 > 打包器以 WebAssembly 发布。
 
@@ -214,13 +214,13 @@ integer、float、boolean、`null` —— 通过原始标记（`::`）压平为�
 
 ## 错误
 
-绑定抛出的每一个错误都是类型化的 `KtavError`，携带另外九个结构化字段：
+绑定抛出的每一个错误都是类型化的 `KtavError`，携带
+`ktav::ErrorEnvelope` 的十个字段：
 `error`（类别，如 `"UnclosedCompound"`）、`reason`（稳定的 writer 阶段
 错误码）、`line`、`line_text`、`span`（`{start, end}` —— UTF-8 源文本的
 **字节**偏移量，而非 UTF-16 索引）、`path`（由精确解码的键段组成的数组，
-绝不是拼接后的字符串）、`body`、`canonical` 与 `spec_section`——此外，
-自 ktav 0.8.0 起还有 `message`：信封自身的第十个字段，逐字取用，绝不由
-其余九个字段拼装而成。它绝不包含原始 JSON。某个具体错误不具备的字段
+绝不是拼接后的字符串）、`body`、`canonical`、`spec_section` 和 `message`。
+消息逐字取用，绝不由其他字段拼装，也绝不包含原始 JSON。某个具体错误不具备的字段
 为 `null`。
 
 ```ts
@@ -259,15 +259,19 @@ Ktav 按**词法形式**为数字定型 —— 裸 `port: 8080` 是 `number`，
 
 ## 键的转义
 
-自 spec 0.6.4 起，键段内的字面量 `.` 或 `:` 通过反斜杠书写：
+裸键段可以用反斜杠转义结构字符。对于含空格、引号或其他不适合
+裸写的字符的键，可将单个键段用 `"..."`、`'...'` 或 `` `...` ``
+括起。带引号的键段支持 escape，例如用 `\uXXXX` 表示 Unicode
+码点（spec 0.8.0，§ 3.7.1）：
 
 ```text
-a\.b: v        // key is the single segment "a.b" → { "a.b": "v" }
-a\:b: v        // key contains a colon            → { "a:b": "v" }
-x.y\.z: v      // split on the first dot only     → { "x": { "y.z": "v" } }
+"service name": web
+"a.b".child: v
+"caf\u00E9": yes
 ```
 
-键中的字面量反斜杠写作 `\\`。
+裸键段中的字面量 `.` 或 `:` 分别写作 `\.` 或 `\:`；字面量反斜杠
+写作 `\\`。段间的点仍是路径分隔符。
 
 ## 单文件浏览器构建
 

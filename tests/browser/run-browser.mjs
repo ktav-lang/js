@@ -48,6 +48,10 @@ function listJsonFiles(dir) {
     return out;
 }
 
+function listDirectories(dir) {
+    return readdirSync(dir, { withFileTypes: true }).filter(entry => entry.isDirectory()).map(entry => join(dir, entry.name).replace(/\\/g, "/"));
+}
+
 const spec = testPaths.specPresent() ? testPaths.spec.replace(/\\/g, "/") : null;
 // Everything in the manifest is repo-relative — the runner page
 // fetches these via `/` + path, the static server resolves them back
@@ -69,16 +73,23 @@ for (const f of walkKtavFiles(`${spec}/valid`).filter(x => !x.endsWith(".canonic
 const manifest = spec
     ? {
         specDir: relFromRepo(spec),
+        categoryDirectories: listDirectories(spec).map(relFromRepo),
         valid: walkKtavFiles(`${spec}/valid`)
             .filter(f => !f.endsWith(".canonical.ktav"))
+            .map(relFromRepo),
+        canonicalFiles: walkKtavFiles(`${spec}/valid`)
+            .filter(f => f.endsWith(".canonical.ktav"))
             .map(relFromRepo),
         invalid: walkKtavFiles(`${spec}/invalid`).map(relFromRepo),
         unrepresentable: listJsonFiles(`${spec}/unrepresentable`).map(relFromRepo),
         parseableUnrepresentable: walkKtavFiles(`${spec}/parseable-unrepresentable`).map(relFromRepo),
         strictLossy: walkKtavFiles(`${spec}/strict-lossy`).map(relFromRepo),
+        fixtureJson: Object.fromEntries(["valid", "invalid", "unrepresentable", "parseable-unrepresentable", "strict-lossy"].map(category => [
+            category, listJsonFiles(`${spec}/${category}`).map(relFromRepo),
+        ])),
         canonical,
     }
-    : { specDir: null, valid: [], invalid: [], unrepresentable: [], parseableUnrepresentable: [], strictLossy: [], canonical: {} };
+    : { specDir: null, categoryDirectories: [], valid: [], canonicalFiles: [], invalid: [], unrepresentable: [], parseableUnrepresentable: [], strictLossy: [], fixtureJson: {}, canonical: {} };
 
 const server = createServer((req, res) => {
     let urlPath = decodeURIComponent(req.url.split("?")[0]);

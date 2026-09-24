@@ -7,9 +7,13 @@
   "main": "ktav.linux-arm64-musl.node",
   "files": [
     "ktav.linux-arm64-musl.node",
-    "libktav_cabi.so"
+    "libktav_cabi.so",
+    "LICENSE-MIT",
+    "LICENSE-APACHE",
+    "README.ru.md",
+    "README.zh.md"
   ],
-  "description": "Universal JS/TS bindings for Ktav — a plain configuration format with three rules, zero indentation, and zero quoting. WASM-backed, ships for Node, Deno, Bun, and browsers from a single package.",
+  "description": "Universal JS/TS bindings for Ktav — a plain configuration format with three rules, zero indentation, and no required quotes. WASM-backed, ships for Node, Deno, Bun, and browsers from a single package.",
   "keywords": [
     "ktav",
     "config",
@@ -21,7 +25,7 @@
   ],
   "author": "Marat K <phpcraftdream@gmail.com>",
   "homepage": "https://github.com/ktav-lang/js",
-  "license": "MIT",
+  "license": "MIT OR Apache-2.0",
   "engines": {
     "node": ">=18"
   },

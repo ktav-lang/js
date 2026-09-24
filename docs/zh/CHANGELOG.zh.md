@@ -10,7 +10,7 @@ MINOR 版本升级视为破坏性。
 本 changelog 跟踪**包发布**，不涉及 Ktav 格式本身的变更 —— 后者见
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md)。
 
-## 未发布
+## 0.8.0
 
 ### 新增
 
@@ -39,18 +39,10 @@ MINOR 版本升级视为破坏性。
   解码校验（原始字节即 fixture 本身）。
 - 新增 spec 0.7 冒烟测试：带引号的键（§ 5.3.3）和 `\uXXXX` 转义
   （§ 3.7.1），包括 lone-surrogate 拒绝和 U+0000 键 round-trip。
-- Rust core 更新至 ktav 0.7（spec 0.7.0）：workspace 依赖提升为
-  `ktav = "0.7"`，三个绑定 crate 的
-  `[package.metadata.ktav] spec-version` 均设为 `"0.7.0"`，workspace
-  `rust-version` 从 1.70 提升至 1.71（ktav 0.7 的 MSRV）。
-- Rust core 更新至 ktav 0.7.1（workspace `ktav = "0.7.1"`）：新增
-  `format_str` 和结构化错误 envelope。依赖下限之所以提升至 0.7.1，
-  正是因为 `format_str` 与 `ErrorEnvelope` 在任何更早的发布版本中
-  都不存在。
-- 绑定抛出的每个错误现在都是携带 `ktav::ErrorEnvelope` 九个字段的
+- 绑定抛出的每个错误现在都是携带 `ktav::ErrorEnvelope` 全部十个字段的
   类型化 `KtavError`（`error`、`reason`、`line`、`line_text`、`span`
   —— UTF-8 字节偏移，`path` —— 精确键段数组，`body`、`canonical`、
-  `spec_section`）；`message` 保持人类可读，且绝不包含原始 JSON。
+  `spec_section`、`message`）；消息保持人类可读，且绝不包含原始 JSON。
   这是对绑定在失败时呈现的文本的破坏性变更 —— 依赖消息字符串进行匹配的
   调用方会注意到（有意为之；envelope 从未在任何绑定中发布过）。
 
