@@ -9,6 +9,7 @@ if (!requestUrl || !requestToken) {
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const packages = [pkg.name, ...Object.keys(pkg.optionalDependencies ?? {})];
 if (packages.length !== 9) throw new Error(`expected nine npm packages, found ${packages.length}`);
+const failures = [];
 
 for (const name of packages) {
   const url = new URL(requestUrl);
@@ -34,7 +35,13 @@ for (const name of packages) {
   const body = await response.json().catch(() => ({}));
   if (response.status !== 201 || typeof body.token !== 'string') {
     const reason = String(body?.message ?? body?.error ?? response.statusText).slice(0, 300);
-    throw new Error(`${name}: npm OIDC exchange failed (HTTP ${response.status}): ${reason}`);
+    console.error(`${name}: npm OIDC exchange failed (HTTP ${response.status}): ${reason}`);
+    failures.push(name);
+    continue;
   }
   console.log(`${name}: npm OIDC exchange OK`);
+}
+
+if (failures.length) {
+  throw new Error(`npm OIDC exchange failed for ${failures.length} package(s): ${failures.join(', ')}`);
 }
