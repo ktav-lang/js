@@ -22,6 +22,21 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
+  auth-preflight:
+    name: Verify npm Trusted Publishers
+    if: startsWith(github.ref, 'refs/tags/v') && inputs.dry-run != 'true'
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - run: node scripts/check-npm-trust.mjs
+
   # ------------------------------------------------------------------
   # Build .node binaries across the napi-rs target matrix.
   # Each runner: checkout -> Rust + Node -> napi build -> upload
@@ -29,6 +44,8 @@ jobs:
   # ------------------------------------------------------------------
   build-native:
     name: .node / ${{ matrix.settings.target }}
+    needs: auth-preflight
+    if: ${{ always() && (needs.auth-preflight.result == 'success' || needs.auth-preflight.result == 'skipped') }}
     runs-on: ${{ matrix.settings.os }}
     strategy:
       fail-fast: false
@@ -123,6 +140,8 @@ jobs:
   # ------------------------------------------------------------------
   build-cabi:
     name: cabi / ${{ matrix.settings.rid }}
+    needs: auth-preflight
+    if: ${{ always() && (needs.auth-preflight.result == 'success' || needs.auth-preflight.result == 'skipped') }}
     runs-on: ${{ matrix.settings.os }}
     strategy:
       fail-fast: false
@@ -219,6 +238,8 @@ jobs:
   # ------------------------------------------------------------------
   build-wasm:
     name: wasm targets
+    needs: auth-preflight
+    if: ${{ always() && (needs.auth-preflight.result == 'success' || needs.auth-preflight.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
