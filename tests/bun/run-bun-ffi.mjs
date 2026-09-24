@@ -163,7 +163,7 @@ await check("0.7.1: parse error carries structured envelope", async () => {
     if (err.spec_section === undefined) throw new Error("missing spec_section field");
 });
 
-await runFfiCorpus({ loads, loadsStrict, dumps, check, label: "bun-ffi" });
+await runFfiCorpus({ loads, loadsStrict, dumps, canonicalFromSource, check, label: "bun-ffi" });
 
 console.log(`\n[bun-ffi] ${passed}/${passed + failed} passed`);
 process.exit(failed > 0 ? 1 : 0);

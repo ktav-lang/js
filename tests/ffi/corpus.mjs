@@ -122,13 +122,22 @@ function convertUnrepresentable(value) {
 
 function text(path) { return readFileSync(path, "utf8"); }
 
-export async function runFfiCorpus({ loads, loadsStrict, dumps, check, label }) {
+export async function runFfiCorpus({ loads, loadsStrict, dumps, canonicalFromSource, check, label }) {
     let corpus;
     await check("spec 0.8: exact corpus inventory", async () => { corpus = inventory(); });
     if (!corpus) return;
 
-    for (const { stem, files: [input, oraclePath] } of corpus.valid) {
+    for (const { stem, files: [input, oraclePath, canonicalPath] } of corpus.valid) {
         await check(`spec valid: ${stem}`, async () => equal(await loads(text(input)), parseOracle(text(oraclePath)), stem));
+        await check(`spec canonical: ${stem}`, async () => {
+            const actual = new TextEncoder().encode(await canonicalFromSource(text(input)));
+            const expected = readFileSync(canonicalPath);
+            let offset = 0;
+            while (offset < actual.length && offset < expected.length && actual[offset] === expected[offset]) offset++;
+            if (offset !== actual.length || offset !== expected.length) {
+                throw new Error(`${stem}: canonical bytes differ at ${offset} (expected ${expected.length}, got ${actual.length})`);
+            }
+        });
     }
 
     for (const { stem, files: [input, oraclePath] } of corpus.invalid) {
