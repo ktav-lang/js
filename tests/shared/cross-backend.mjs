@@ -132,5 +132,52 @@ export function runCrossBackend({ backends, readTextFile, readBytes, walkKtavFil
         });
     }
 
+    // Focused kind-erasure contract pins (see run-perf-checks.mjs negative-float
+    // block for the derivation). Per backend:
+    //  - loads preserves the parsed negative-zero KIND; dumps of that generic
+    //    Number is "k: 0" (jsToV/js_to_value Number→Integer erasure);
+    //  - -1e16 round-trips dumps→loads to the EXACT BigInt value (out-of-2^53
+    //    integer read path) — numeric value must not round;
+    //  - canonicalFromSource preserves Float spelling/kind byte-exactly.
+    // No typed-Float wrapper exists on the public surface (ts/internal/api.ts
+    // KtavInput = Record<string, unknown> | unknown[]); the `$float` object is
+    // a JSON-oracle encoding in tests/shared/assertions.mjs / tests/ffi, not an
+    // input API — so these pins go through the generic-Number mapping only.
+    // All backends share the same verified mapping (crates/napi/src/lib.rs
+    // js_to_value Number branch lines 249–262 + integer_to_js lines 203–212;
+    // crates/wasm/src/lib.rs js_to_value Number branch lines 208–221 +
+    // value_to_js Integer branch lines 133–147; ts/pure/values.ts integerToJs
+    // lines 72–84 + ts/pure/ktavvalue.ts numberToV lines 145–147), so every
+    // expectation is asserted for every label.
+    for (const label of labels) {
+        const b = backends[label];
+        test(`cross kind-erasure: [${label}] -0 parsed kind preserved`, () => {
+            const parsed = b.loads("k: -0.0\n");
+            if (!Object.is(parsed.k, -0)) {
+                throw new Error(`[${label}] loads("k: -0.0\\n") did not preserve -0, got ${String(parsed.k)}`);
+            }
+        });
+        test(`cross kind-erasure: [${label}] dumps of parsed -0 is "k: 0"`, () => {
+            const parsed = b.loads("k: -0.0\n");
+            if (b.dumps(parsed) !== "k: 0\n") {
+                throw new Error(`[${label}] dumps of parsed -0 = ${JSON.stringify(b.dumps(parsed))}, want "k: 0\\n"`);
+            }
+        });
+        test(`cross kind-erasure: [${label}] -1e16 round-trips to exact BigInt`, () => {
+            const rt = b.loads(b.dumps(b.loads("k: -1e16\n")));
+            if (!(typeof rt.k === "bigint" && rt.k === -10000000000000000n)) {
+                throw new Error(`[${label}] -1e16 round trip: got ${typeof rt.k} ${String(rt.k)}, want exact bigint -10000000000000000n`);
+            }
+        });
+        test(`cross kind-erasure: [${label}] canonicalFromSource preserves Float bytes`, () => {
+            if (b.canonicalFromSource("k: -0.0\n") !== "k: -0.0\n") {
+                throw new Error(`[${label}] canonicalFromSource("k: -0.0\\n") != "k: -0.0\\n"`);
+            }
+            if (b.canonicalFromSource("k: -1e16\n") !== "k: -1e16\n") {
+                throw new Error(`[${label}] canonicalFromSource("k: -1e16\\n") != "k: -1e16\\n"`);
+            }
+        });
+    }
+
     return { passed, failed, total: passed + failed };
 }

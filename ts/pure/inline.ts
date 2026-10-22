@@ -319,10 +319,19 @@ function runMachine(
             st.raw = false;
             st.depth -= 1;
             if (st.depth === 0) {
-                // The stop byte is a kind-mismatched closer for EVERY
-                // outstanding frame (frames have entryDepth ≥ 2, so a
-                // kind-matched closer for one could never reach depth
-                // 0) — cache each as dead (§6.11) before returning.
+                // Invariant justifying the drain: each outstanding
+                // frame's own standalone scan stops at its FIRST
+                // own-counter-to-zero byte, which lies at or before the
+                // body's stop byte; at that byte the standalone scan
+                // stops on a kind-mismatched (crossed) closer →
+                // NotFound → §6.11 — so every outstanding frame is
+                // cached as dead before returning. (The body's stop
+                // byte itself may kind-MATCH some frames — e.g.
+                // `{a:{b:[1} ]}`: the final `}` matches the outstanding
+                // `{` — but each such frame's own scan already stopped
+                // earlier at the crossed byte.) And since the shared
+                // pass validates escapes byte-ordered and reached this
+                // point, no earlier bad escape exists.
                 drainAsDead(st);
                 st.stop = { t: "closer", idx: st.i, byte: b };
                 return;

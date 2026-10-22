@@ -426,48 +426,87 @@ const PERF_TOKEN_MS = 5_000;
     // UnterminatedInlineCompound.
     expectError("bad escape before closer", "k: {a: \\q\n", "BadEscapeSequence");
 
-    // No-revival regression (cached-false path, killed-then-popped
-    // frame): in `v: {a: [{b: 1]}, c: 2}` the `]` crosses the inner
-    // `{` frame at its stop depth — both closer kinds decrement the
-    // shared depth (§5.8.5, mirrored from scanner.rs), kind mismatch
-    // kills the frame but does NOT pop it. The later `}` kind-matches
-    // that killed frame and pops it, recording `false` (the
-    // valid=false gate: the frame's own standalone scan said NotFound
-    // at the crossed `]`). The outer object still closes normally at
-    // its own final `}`, so the defect surfaces when parsing the
-    // array item `{b: 1]}`: its standalone structural scan finds no
-    // same-line `}` (the `]` crosses at its depth zero) and meets no
-    // invalid escape first — §6.11 UnterminatedInlineCompound (§5.8.5
-    // + §6.11; the same verdict as the Rust
-    // find_matching_close → scan_inline_closer → NotFound composition
-    // in compound.rs, not Malformed: §6.12 only governs defects inside
-    // an already-closed compound). A stale cache could wrongly let a
-    // later `}` "revive" the killed frame; the recorded `false` and
-    // the drained stack both prevent that.
-    expectError("no revival after crossed closer", "v: {a: [{b: 1]}, c: 2}\n", "UnterminatedInlineCompound");
+    // No-revival regression, case 1 — PARENT-level negative cache (a
+    // drained ARRAY frame): in `v: {a: [{b: 1]}, c: 2}` the `]` crosses
+    // the inner `{` frame at its stop depth — both closer kinds
+    // decrement the shared depth (§5.8.5, mirrored from scanner.rs),
+    // kind mismatch kills the frame but does NOT pop it. The later `}`
+    // kind-matches that killed frame and pops it, recording `false`
+    // (the valid=false gate: the frame's own standalone scan said
+    // NotFound at the crossed `]`). The outer object still closes
+    // normally at its own final `}`, so the defect surfaces when
+    // parsing the ARRAY ITEM `{b: 1]}` — after the array frame's own
+    // drained outcome — via its cached `false` lookup: §6.11
+    // UnterminatedInlineCompound (§5.8.5 + §6.11; the same verdict as
+    // the Rust find_matching_close → scan_inline_closer → NotFound
+    // composition in compound.rs, not Malformed: §6.12 only governs
+    // defects inside an already-closed compound). A stale cache could
+    // wrongly let a later `}` "revive" the killed frame; the recorded
+    // `false` and the drained stack both prevent that.
+    expectError("no revival after crossed closer (parent array)", "v: {a: [{b: 1]}, c: 2}\n", "UnterminatedInlineCompound");
+
+    // No-revival regression, case 2 — targets the KILLED-THEN-POPPED
+    // child frame DIRECTLY: `v: {a: {b: 1], c: {d: 2}}`. Machine trace
+    // of the exact fixture: the outer body `{` seeds depth 1; the
+    // value of `a` opens frame A (`{`) at entryDepth 2 (a DIRECT child
+    // of the outer object); the `]` decrements 2→1, hits A's stop
+    // depth (entryDepth − 1) with a kind mismatch → kills A without
+    // popping; the following `,` sits at depth 1 with A still on the
+    // stack, so it is recorded on A's frame (NOT a top-level split) —
+    // and its object scope re-arms key context for `c`; `c`'s value
+    // `{d: 2}` opens frame C at entryDepth 2, whose `}` pops C with a
+    // valid span (depth 1 == entryDepth − 1); the FINAL `}` then
+    // returns depth 1→0 as the body's own kind-matched closer at the
+    // LAST byte, so the outer object is closed and classified
+    // normally, and the depth-0 drain caches the killed A as `false`;
+    // parsing pair `a` — its value range is `{b: 1], c: {d: 2}}` —
+    // looks up A's span → cached `false` → UnterminatedInlineCompound
+    // thrown at the killed frame's OWN span (no drained-parent
+    // shortcut — this is the point of the case). Rust reference:
+    // compound.rs — the item's standalone structural scan of
+    // `{b: 1], c: {d: 2}}` for a `}`: `{`→1, `]`→0 kind-mismatch stop
+    // → NotFound → UnterminatedInlineCompound; NOT Malformed (§6.12
+    // covers only already-closed compounds — no matching closer was
+    // ever found). (An earlier draft used `v: {a: {b: 1]}, c: 2}`:
+    // WRONG — the `}` right after the crossed `]` returns depth 1→0,
+    // and the depth-0 check runs BEFORE any pop logic, so the body
+    // scan stops at that first `}` without ever popping A; that `}` is
+    // not the body's last byte, so classification raises
+    // MalformedInlineCompound (closer-not-at-end) instead.)
+    expectError("no revival after crossed closer (direct child)", "v: {a: {b: 1], c: {d: 2}}\n", "UnterminatedInlineCompound");
 
     // Bounded-work regression in the spirit of the PERF_TOKEN_MS
-    // ceilings: a 400-level deep prefix of compound openers, every
-    // level closed by the WRONG closer (`]` against a `{` frame) and
-    // NO final valid closers — every level's frame is killed and every
-    // level's outcome is cached as dead (kind-mismatched kills inline,
-    // the rest drained at the depth-0 stop), so the parse resolves by
-    // map lookups. This exercises cached-invalid outcomes at many
-    // nesting levels, NOT wall-clock performance; the timing ceiling
-    // only guards against a runaway rescan. Machine trace of the
-    // exact fixture: the value `{a: {a: … 1]]]…}` seeds at depth 1;
-    // 400 `{` frames push depth to 401; each of the 400 `]` closers
-    // decrements once and kind-mismatches the top `{` frame (killing
-    // it, never popping); the final `}` returns depth to 0 and IS the
-    // body's own closer, so the outer object parses normally and the
-    // error surfaces at the first nested value — a cached `false` →
-    // §6.11 UnterminatedInlineCompound, deterministically.
+    // ceilings: a 400-opener fixture (the OUTERMOST `{` of the value is
+    // the body itself and seeds depth 1, NOT a frame) with 399 nested
+    // compound frames, every nested level closed by the WRONG closer
+    // (`]` against a `{` frame) and the body closed by its own `}` —
+    // every nested frame is killed (kind-mismatched kills inline) and
+    // drained as dead at the body's kind-matched depth-0 stop, so the
+    // parse resolves by map lookups. This exercises cached-invalid
+    // outcomes at many nesting levels, NOT wall-clock performance; the
+    // timing ceiling only guards against a runaway rescan. Machine
+    // trace of the exact fixture `v: {a: …{a: 1]…]…}`: the body `{`
+    // seeds depth 1; 399 nested `{` frames push depth to 400; each of
+    // the 399 `]` closers decrements once and kind-mismatches the top
+    // `{` frame (killing it, never popping), leaving depth 1 with all
+    // 399 frames killed on the stack; the final `}` decrements 1→0 and
+    // IS the body's own closer, so the outer object parses normally,
+    // the drain caches every killed frame `false`, and the error
+    // surfaces at the FIRST nested value lookup — a cached `false` →
+    // §6.11 UnterminatedInlineCompound, deterministically. (399
+    // closers, not 400: a 400th `]` would itself reach depth 0 with
+    // the wrong byte, stopping the body scan early so the error came
+    // from top-level classification and no cached-false lookup was
+    // exercised at all.)
     {
         const levels = 400;
         let src = "v: ";
         for (let i = 0; i < levels; i++) src += "{a: ";
         src += "1";
-        for (let i = 0; i < levels; i++) src += "]";
+        // levels−1 closers: the outermost opener IS the body, so only
+        // levels−1 nested frames exist and only levels−1 wrong closers
+        // are needed to kill them all (see machine trace above).
+        for (let i = 0; i < levels - 1; i++) src += "]";
         src += "}\n";
         let deepErr = null;
         const t0 = Date.now();
@@ -496,11 +535,41 @@ const PERF_TOKEN_MS = 5_000;
 // fract()==0 && i64-range → Value::Integer via itoa(n as i64), so -0.0
 // as i64 is 0), mirrored exactly in ts/pure/ktavvalue.ts numberToV —
 // so dumps of a parsed -0 emits "k: 0".
+// Second documented erasure, same family — EXACT-INTEGER FLOAT → Integer
+// on the write path, BigInt on the read path: a generic JS Number that is
+// an exact integer in i64 range (like -1e16) is ALSO kind-erased to
+// Value::Integer (crates/napi/src/lib.rs js_to_value Number branch,
+// lines 249–262: fract()==0 && i64-range → Integer via itoa(n as i64);
+// mirrored in crates/wasm/src/lib.rs js_to_value lines 208–221 and
+// ts/pure/ktavvalue.ts numberToV lines 145–147). Reading that Integer
+// back, loads returns a Number only within ±(1 << 53) — otherwise a
+// BigInt (crates/napi/src/lib.rs integer_to_js lines 203–212;
+// crates/wasm/src/lib.rs value_to_js Integer branch lines 133–147;
+// ts/pure/values.ts integerToJs lines 72–84). So -1e16 round-trips
+// dumps→loads to BigInt(-10000000000000000n): the numeric VALUE must not
+// round (BigInt(a) is exact for exact integers), only the KIND differs —
+// the round trip below therefore demands the exact integer value back,
+// not an approximate one. canonicalFromSource preserves Float kind and
+// spelling BYTE-EXACTLY for every vector (asserted per vector above).
 // Corpus cross-check: spec/versions/0.8/tests/valid/numbers/float/
 // notation_boundaries.canonical.ktav and negative_zero.canonical.ktav
 // agree with every trace (kept as confirmation only — these tests carry
 // their own inline expectations).
 {
+    // BigInt-safe formatter: JSON.stringify throws on BigInt, which once
+    // masked the very failure a fail() message was reporting.
+    const show = (v) => typeof v === "bigint" ? v.toString() + "n (BigInt)" : JSON.stringify(v);
+    // Contract-aware EXACT round-trip comparison.
+    const sameAfterRoundTrip = (a, b) => {
+        if (typeof a === "number" && typeof b === "number") return Object.is(a, b);
+        // Generic-Number write path erases Float kind for exact integers;
+        // the read path returns BigInt when |v| > 2^53 (documented mapping):
+        // require the EXACT integer value back, not an approximate one.
+        if (typeof a === "number" && Number.isInteger(a) && typeof b === "bigint") {
+            return b === BigInt(a);
+        }
+        return false;
+    };
     // Each vector: parse a one-pair document, canonicalize the SAME
     // source, and check BOTH the parsed number and the exact canonical
     // bytes. `trace` documents the derivation for the vector.
@@ -509,7 +578,7 @@ const PERF_TOKEN_MS = 5_000;
         let parsed, err = null;
         try { parsed = loads(src); } catch (e) { err = e; }
         if (err || !numCheck(parsed ? parsed.k : undefined)) {
-            fail(`${name}: parsed-number expectation failed, got ${err ? err.error + ": " + err.message : JSON.stringify(parsed && parsed.k)}`);
+            fail(`${name}: parsed-number expectation failed, got ${err ? err.error + ": " + err.message : show(parsed && parsed.k)}`);
         } else ok(`${name}: parsed number OK`);
         let canonActual, cerr = null;
         try { canonActual = canonicalFromSource(src); } catch (e) { cerr = e; }
@@ -532,9 +601,9 @@ const PERF_TOKEN_MS = 5_000;
                 } else ok(`${name}: dumps maps generic Number -0 to "k: 0" (shared native/pure jsToV contract)`);
             } else {
                 const redumped = loads(dumps(parsed));
-                if (!Object.is(redumped.k, parsed.k)) {
-                    fail(`${name}: dumps round trip changed the value (${JSON.stringify(parsed.k)} -> ${JSON.stringify(redumped.k)})`);
-                } else ok(`${name}: dumps round trip preserves the value (Object.is)`);
+                if (!sameAfterRoundTrip(parsed.k, redumped.k)) {
+                    fail(`${name}: dumps round trip changed the value (${show(parsed.k)} -> ${show(redumped.k)})`);
+                } else ok(`${name}: dumps round trip preserves the value (exact, kind-aware)`);
             }
         }
         void trace; // derivation lives in the per-vector comment below
