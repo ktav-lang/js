@@ -39,48 +39,43 @@ npm install @ktav-lang/ktav
 
 原生二进制已为 Linux (x64/arm64, glibc + musl)、macOS (x64/arm64) 与
 Windows (x64/arm64) 预编译；npm 通过 `optionalDependencies` 安装与当前
-主机匹配的那一个。若无匹配项，加载器会及早抛出并给出清晰的诊断信息。
+主机匹配的那一个。这八个 optional `@ktav-lang/js-*` 包是本项目自有的
+平台二进制产物，并非第三方 runtime 依赖。若没有匹配项，默认原生
+加载器会及早抛出清晰的诊断信息。
+
+Node 使用方若明确只导入 `@ktav-lang/ktav/pure`，安装时可省略
+optional 包：
+
+```sh
+npm install --omit=optional @ktav-lang/ktav
+```
+
+根包没有第三方 runtime 依赖。构建、测试和文档工具仅用于开发。
+有关 `/pure` 导入方式和 runtime 要求，请参阅[纯 TypeScript 后端](#纯-typescript-后端)。
 
 ## 纯 TypeScript 后端
 
-`@ktav-lang/ktav/pure` 是用纯 TypeScript 编写的完整 Ktav 解析器和
-生成器。它与主包一起发布，但不需要原生二进制、WASM 或子进程 —— 可在
-Node、Bun、Deno 和浏览器中运行，也适用于原生插件不便或不可用的
-serverless 平台和打包器场景。
+`@ktav-lang/ktav/pure` 是面向 Node、Bun、Deno 和浏览器的完整解析器与生成器。它只使用包内 ESM 和 JS 全局对象（`TextEncoder`、`TextDecoder`、`JSON`、`BigInt`）。没有第三方 runtime 包、native、WASM、FFI、子进程、网络或 fallback。
 
-在以下情况选择 `ktav/pure`：
-
-- 无法（或不想）安装平台专属的原生二进制 —— CI 镜像、受限环境、
-  Alpine/musl 边缘情况；
-- 为浏览器或 serverless 运行时打包（Webpack、Vite、esbuild），希望
-  零原生/WASM 资源；
-- 需要在每个运行时上使用完全相同的 API。
+八个 optional `@ktav-lang/js-*` 包是默认入口使用的自有二进制；`/pure` 不会解析或加载它们。Build、test、文档工具属于开发工具。默认入口依运行时而异；请显式选择 `/pure`。Node 省略 optional 包：`npm install --omit=optional @ktav-lang/ktav`。
 
 ```ts
-// Node / Bun / Deno
 import { loads, dumps } from "@ktav-lang/ktav/pure";
 
 const cfg = loads(`service: web\nport: 8080\n`);
 console.log(dumps(cfg));
 ```
 
+浏览器无运行时网络时，应将预先打包的 ESM 产物和本地模块与应用一起提供；示例不加载 CDN：
+
 ```html
 <script type="module">
-  import { loads, dumps } from "https://esm.sh/@ktav-lang/ktav@0.8.1/pure";
+  import { loads, dumps } from "./assets/ktav-pure.js";
   document.body.textContent = dumps(loads("hello: world"));
 </script>
 ```
 
-API 表面与原生入口完全一致（外加用于直接解析 UTF-8 字节的
-`loadsBytes()`），数值行为与原生一致：±2^53 以内的整数是 `number`，
-更大的整数是 `BigInt` —— 没有静默舍入。一个固有限制：JS 的
-`number` 无法在 `dumps()`/`emitCanonical()` 之间承载 Ktav 的
-Integer/Float 区分，因此接受对象的发射器无法为含浮点数的文档保证
-字节级精确的 canonical 输出 —— 需要字节级精确的 canonical 文本时请
-使用 `canonicalFromSource()`。
-
-裸入口 `.` 仍以原生后端（N-API/WASM/FFI）为默认；`ktav/pure` 严格
-按需选择。
+API 包括 `loadsBytes()`、全部解析/生成操作和保留注释的 formatter。±2^53 内整数为 `number`，更大为 `BigInt`。对象发射不能保留 Integer/Float 种类；字节级 canonical 源文本请用 `canonicalFromSource()`。安装、构建或分发包文件可能需要网络；pure parser 和 writer 在运行时不使用网络。
 
 ## 快速开始
 

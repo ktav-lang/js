@@ -42,52 +42,46 @@ One package serves every target runtime:
 
 Native binaries are prebuilt for Linux (x64/arm64, glibc + musl),
 macOS (x64/arm64), and Windows (x64/arm64); npm installs the one that
-matches the current host through `optionalDependencies`. If nothing
-matches, the loader throws early with a clear diagnostic.
+matches the current host through `optionalDependencies`. These eight
+optional `@ktav-lang/js-*` packages are this project’s own platform
+binary artifacts, not third-party runtime dependencies. If nothing
+matches, the default native loader throws early with a clear diagnostic.
+
+For a Node consumer that explicitly imports only `@ktav-lang/ktav/pure`,
+installation can omit optional packages:
+
+```sh
+npm install --omit=optional @ktav-lang/ktav
+```
+
+The root package has no third-party runtime dependencies. Build, test,
+and documentation tools are development-only. See [Pure TypeScript
+backend](#pure-typescript-backend) for the `/pure` import and runtime
+requirements.
 
 ## Pure TypeScript backend
 
-`@ktav-lang/ktav/pure` is a complete Ktav parser and generator written
-in pure TypeScript. It ships in the same npm package but requires no
-native binary, no WASM, and no subprocess — it runs in Node, Bun,
-Deno, and browsers, and works with serverless platforms and bundlers
-where native add-ons are inconvenient or unavailable.
+`@ktav-lang/ktav/pure` is a complete Ktav parser and generator for Node, Bun, Deno, and browsers. It uses package ESM and JavaScript globals only (`TextEncoder`, `TextDecoder`, `JSON`, `BigInt`). No third-party runtime dependencies, native binaries, WASM, FFI, subprocess, network access, or fallback.
 
-Choose `ktav/pure` when:
-
-- you cannot (or prefer not to) install platform-specific native
-  binaries — CI images, restricted environments, Alpine/musl edge
-  cases;
-- you bundle for the browser or a serverless runtime with a bundler
-  (Webpack, Vite, esbuild) and want zero native/WASM assets;
-- you need the exact same API surface everywhere, on every runtime.
+The eight optional `@ktav-lang/js-*` packages are our native binaries for the default entry; `/pure` does not resolve or load them. Build, test, and documentation tools are development-only. The default entry remains backend-specific; select `/pure` explicitly. For Node, install without optional native packages: `npm install --omit=optional @ktav-lang/ktav`.
 
 ```ts
-// Node / Bun / Deno
 import { loads, dumps } from "@ktav-lang/ktav/pure";
 
 const cfg = loads(`service: web\nport: 8080\n`);
 console.log(dumps(cfg));
 ```
 
+For a browser without runtime network access, serve a prebundled ESM artifact and its local modules with the app; this example does not load a CDN:
+
 ```html
 <script type="module">
-  import { loads, dumps } from "https://esm.sh/@ktav-lang/ktav@0.8.1/pure";
+  import { loads, dumps } from "./assets/ktav-pure.js";
   document.body.textContent = dumps(loads("hello: world"));
 </script>
 ```
 
-The API surface is identical to the native entry point (plus
-`loadsBytes()` for parsing directly from UTF-8 bytes), and numeric
-behavior matches native: integers within ±2^53 arrive as `number`,
-larger ones as `BigInt` — there is no silent rounding. One inherent
-limit: a JS `number` cannot carry Ktav's Integer/Float distinction
-across `dumps()`/`emitCanonical()`, so object-taking emitters cannot
-guarantee byte-exact canonical output for float-bearing documents —
-use `canonicalFromSource()` when you need byte-exact canonical text.
-
-The bare `.` entry point keeps the native backends (N-API/WASM/FFI)
-as the default; `ktav/pure` is strictly opt-in.
+The API includes `loadsBytes()`, all parser/generator operations, and the comment-preserving formatter. Integers within ±2^53 arrive as `number`, larger ones as `BigInt`. JS `number` cannot preserve Ktav's Integer/Float distinction through object emission; use `canonicalFromSource()` for byte-exact canonical text from source. Installing, building, or distributing the package files may require network access; the pure parser and writer do not use the network at runtime.
 
 ## Quick start
 

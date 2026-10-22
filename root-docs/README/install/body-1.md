@@ -20,8 +20,22 @@ One package serves every target runtime:
 
 Native binaries are prebuilt for Linux (x64/arm64, glibc + musl),
 macOS (x64/arm64), and Windows (x64/arm64); npm installs the one that
-matches the current host through `optionalDependencies`. If nothing
-matches, the loader throws early with a clear diagnostic.
+matches the current host through `optionalDependencies`. These eight
+optional `@ktav-lang/js-*` packages are this project’s own platform
+binary artifacts, not third-party runtime dependencies. If nothing
+matches, the default native loader throws early with a clear diagnostic.
+
+For a Node consumer that explicitly imports only `@ktav-lang/ktav/pure`,
+installation can omit optional packages:
+
+```sh
+npm install --omit=optional @ktav-lang/ktav
+```
+
+The root package has no third-party runtime dependencies. Build, test,
+and documentation tools are development-only. See [Pure TypeScript
+backend](#pure-typescript-backend) for the `/pure` import and runtime
+requirements.
 
 >>>>> lang=ru
 ## Установка
@@ -44,9 +58,23 @@ npm install @ktav-lang/ktav
 | Webpack / Vite / Rollup / esbuild | WASM    | Цель `bundler`, `.wasm` резолвит бандлер              |
 
 Нативные бинарники предсобраны для Linux (x64/arm64, glibc + musl),
-macOS (x64/arm64) и Windows (x64/arm64); npm ставит тот, что подходит
-текущему хосту, через `optionalDependencies`. Если подходящего нет,
-загрузчик рано падает с понятной диагностикой.
+macOS (x64/arm64) и Windows (x64/arm64); npm устанавливает подходящий
+текущему хосту вариант через `optionalDependencies`. Эти восемь optional-
+пакетов `@ktav-lang/js-*` — собственные платформенные бинарные артефакты
+проекта, а не сторонние runtime-зависимости. Если подходящего бинарника
+нет, основной нативный загрузчик рано выдаёт понятную ошибку.
+
+Для Node-потребителя, который явно импортирует только
+`@ktav-lang/ktav/pure`, можно исключить optional-пакеты:
+
+```sh
+npm install --omit=optional @ktav-lang/ktav
+```
+
+У корневого пакета нет сторонних runtime-зависимостей. Инструменты
+сборки, тестирования и документации нужны только для разработки.
+См. [Чистый TypeScript-бэкенд](#чистый-typescript-бэкенд) для импорта
+`/pure` и требований к runtime.
 
 >>>>> lang=zh
 ## 安装
@@ -69,5 +97,17 @@ npm install @ktav-lang/ktav
 
 原生二进制已为 Linux (x64/arm64, glibc + musl)、macOS (x64/arm64) 与
 Windows (x64/arm64) 预编译；npm 通过 `optionalDependencies` 安装与当前
-主机匹配的那一个。若无匹配项，加载器会及早抛出并给出清晰的诊断信息。
+主机匹配的那一个。这八个 optional `@ktav-lang/js-*` 包是本项目自有的
+平台二进制产物，并非第三方 runtime 依赖。若没有匹配项，默认原生
+加载器会及早抛出清晰的诊断信息。
+
+Node 使用方若明确只导入 `@ktav-lang/ktav/pure`，安装时可省略
+optional 包：
+
+```sh
+npm install --omit=optional @ktav-lang/ktav
+```
+
+根包没有第三方 runtime 依赖。构建、测试和文档工具仅用于开发。
+有关 `/pure` 导入方式和 runtime 要求，请参阅[纯 TypeScript 后端](#纯-typescript-后端)。
 
