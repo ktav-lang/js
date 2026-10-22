@@ -69,6 +69,32 @@ MINOR 版本升级视为破坏性。
   设置/读取现在走基于 JsString 的 property API，而不是基于 CString
   的命名属性调用。
 
+## [0.8.1] — 2026-10-22
+
+与已发布的 Rust core `ktav` 0.8.1 及规范 0.8.1 同步，并引入纯
+TypeScript 后端。
+
+### 新增
+
+- 新入口 `@ktav-lang/ktav/pure`：完整双向的纯 TypeScript Ktav 解析器
+  与生成器 —— `loads()`、`loadsStrict()`、`dumps()`、
+  `stringifyForceStrings()`、`format()`、`emitCanonical()`、
+  `canonicalFromSource()` 和 `loadsBytes()`。它不需要原生二进制、WASM
+  或子进程，可在 Node、Bun、Deno 和浏览器中运行，并抛出完全相同的
+  十字段 `KtavError` envelope（UTF-8 字节偏移）。解析器是单遍线性
+  扫描器。
+- 裸入口 `.` 仍以原生后端（N-API/WASM/FFI）为默认；`./pure` 严格按需
+  选择。
+
+### 变更
+
+- 包、平台子包、workspace metadata 和 lockfile 版本统一为 `0.8.1`。
+- Rust 依赖为已发布的 `ktav` 0.8.1。
+- 规范 submodule 固定到已发布的 Ktav 0.8.1 提交（语料库 228
+  parseable / 90 invalid / 5 unrepresentable / 4
+  parseable-unrepresentable / 13 个 canonical fixture，含 9 个新的
+  `raw_bytes` fixture）。
+
 ## [0.6.4] — 2026-08-23
 
 与 Ktav 规范和 Rust core 0.6.4 同步。

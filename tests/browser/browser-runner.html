@@ -9,7 +9,7 @@
     console.log("[runner] fetching assertions.mjs");
     const { runAll } = await import("/tests/shared/assertions.mjs");
     console.log("[runner] fetching dist/ts/web.js");
-    const { loads, loadsStrict, dumps, stringifyForceStrings, format, canonicalFromSource, ready } = await import("/dist/ts/web.js");
+    const { loads, loadsStrict, loadsBytes, dumps, stringifyForceStrings, format, canonicalFromSource, ready } = await import("/dist/ts/web.js");
     console.log("[runner] imports resolved");
 
     await ready();
@@ -83,6 +83,7 @@
     const result = runAll({
         loads,
         loadsStrict,
+        loadsBytes,
         dumps,
         stringifyForceStrings,
         format,
@@ -105,7 +106,44 @@
         log: (m) => { log.textContent += m + "\n"; },
     });
     log.textContent += `\n[browser] ${result.passed}/${result.total} passed, ${result.failed} failed\n`;
-    globalThis.__ktavResult = result;
+
+    // PURE TypeScript entry in the same real browser: dist/ts/pure.js has
+    // no wasm/native dependency, so `test:browser` also proves the pure
+    // build works in a browser runtime (loads/dumps/canonicalFromSource/
+    // format smoke assertions, judged server-side via __ktavResult).
+    console.log("[runner] fetching dist/ts/pure.js");
+    const pure = await import("/dist/ts/pure.js");
+    let purePassed = 0, pureFailed = 0;
+    const pureCheck = (name, fn) => {
+        try { fn(); purePassed++; log.textContent += `✔ [pure] ${name}\n`; }
+        catch (e) { pureFailed++; log.textContent += `✖ [pure] ${name}: ${e.message || e}\n`; }
+    };
+    pureCheck("loads smoke", () => {
+        const doc = pure.loads("port: 8080\nhost: localhost\ntags: [\n    alpha\n    beta\n]\n");
+        if (doc.port !== 8080 || doc.host !== "localhost") throw new Error("scalar mismatch: " + JSON.stringify(doc));
+        if (JSON.stringify(doc.tags) !== JSON.stringify(["alpha", "beta"])) throw new Error("tags mismatch");
+    });
+    pureCheck("dumps/loads round trip", () => {
+        const back = pure.loads(pure.dumps(pure.loads("port: 8080\n")));
+        if (back.port !== 8080) throw new Error("port lost in round trip");
+    });
+    pureCheck("canonicalFromSource smoke", () => {
+        if (pure.canonicalFromSource("port: 8080\nhost: localhost\n") !== "port: 8080\nhost: localhost\n") {
+            throw new Error("canonical output mismatch");
+        }
+    });
+    pureCheck("format smoke", () => {
+        const formatted = pure.format("## c\n\n\n\nport: 8080\n");
+        if (!formatted.includes("## c") || /\n\n\n/.test(formatted)) throw new Error("format mismatch: " + JSON.stringify(formatted));
+    });
+
+    globalThis.__ktavResult = {
+        ...result,
+        passed: result.passed + purePassed,
+        failed: result.failed + pureFailed,
+        total: result.total + purePassed + pureFailed,
+    };
+    console.log(`[runner] pure: ${purePassed} passed, ${pureFailed} failed`);
 </script>
 </body>
 </html>

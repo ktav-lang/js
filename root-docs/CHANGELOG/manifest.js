@@ -4,6 +4,7 @@ export default [
   "unreleased-changed",
   "unreleased-changed-cabi",
   "unreleased-fixed",
+  "v0-8-1",
   "v0-6-4",
   "v0-6-1",
   "v0-6-0",

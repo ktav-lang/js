@@ -60,6 +60,24 @@ export function loadsStrict<T = KtavValue>(s: string): T {
     }
 }
 
+/**
+ * Raw-byte entry: parse a Uint8Array as UTF-8 Ktav text without any
+ * TextEncoder/TextDecoder re-encoding step. The 0.8.1 invalid_utf8/
+ * fixtures are only meaningful if the parser receives the exact bytes
+ * (spec 0.8 § 6.15). Throws KtavError with error === "InvalidUtf8" for
+ * invalid input, before any grammar diagnosis. `loadsBytes` comes from
+ * the wasm-bindgen glue (generated — the `.d.ts` only exists after
+ * `npm run build:wasm`), so like `loads` above it is called directly
+ * with no extra type declaration.
+ */
+export function loadsBytes<T = KtavValue>(bytes: Uint8Array): T {
+    try {
+        return wasm.loadsBytes(bytes) as T;
+    } catch (e) {
+        throw toKtavError(e);
+    }
+}
+
 export function dumps<T extends KtavInput = KtavInput>(obj: T): string {
     if (obj === null || typeof obj !== "object") {
         throw ktavMessageError("top-level Ktav document must be an object or array");

@@ -59,6 +59,7 @@ function listDirectories(dir) {
 const { passed, failed, total } = runAll({
     loads: withKtavErrors(mod.loads),
     loadsStrict: withKtavErrors(mod.loadsStrict),
+    loadsBytes: withKtavErrors(mod.loadsBytes),
     dumps: withKtavErrors(mod.dumps),
     stringifyForceStrings: withKtavErrors(mod.stringifyForceStrings),
     format: withKtavErrors(mod.format),

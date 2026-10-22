@@ -142,13 +142,18 @@ export async function runFfiCorpus({ loads, loadsStrict, dumps, canonicalFromSou
 
     for (const { stem, files: [input, oraclePath] } of corpus.invalid) {
         await check(`spec invalid: ${stem}`, async () => {
-            if (stem === "invalid_utf8/lone_continuation_byte") {
-                // The public FFI API accepts strings, not raw bytes; only verify strict UTF-8 rejection here.
-                const bytes = readFileSync(input);
-                let rejected = false;
-                try { new TextDecoder("utf-8", { fatal: true }).decode(bytes); } catch { rejected = true; }
-                if (!rejected) throw new Error("raw invalid UTF-8 unexpectedly decoded");
-                return;
+            if (stem.includes("invalid_utf8/")) {
+                // The C ABI core HAS a byte-level not_utf8_envelope
+                // contract (rust/src/cabi/envelope.rs), but this FFI
+                // binding exposes no raw-byte entry, and a TextDecoder-
+                // only check never proves the PARSER rejects the bytes.
+                // Fail loudly instead of faking a pass — no vacuous
+                // green for the raw-byte conformance claim.
+                throw new Error(
+                    "adapter required: loadsBytes (raw-byte conformance, spec 0.8.1 §6.15) — " +
+                    "this FFI binding exposes no raw-byte entry, so invalid_utf8/ fixtures " +
+                    "cannot be exercised honestly here",
+                );
             }
             const expected = JSON.parse(text(oraclePath)).expected_error;
             let error;

@@ -87,6 +87,34 @@ MINOR bump — ломающий.
   чтение ключей теперь идут через property-API на основе JsString
   вместо вызовов именованных свойств через CString.
 
+## [0.8.1] — 2026-10-22
+
+Синхронизация с опубликованным Rust core `ktav` 0.8.1 и спецификацией
+0.8.1, а также новый чисто-TypeScript бэкенд.
+
+### Добавлено
+
+- Новый вход `@ktav-lang/ktav/pure`: полный двунаправленный парсер и
+  генератор Ktav на чистом TypeScript — `loads()`, `loadsStrict()`,
+  `dumps()`, `stringifyForceStrings()`, `format()`, `emitCanonical()`,
+  `canonicalFromSource()` и `loadsBytes()`. Он не требует нативного
+  бинарника, WASM или подпроцесса, работает в Node, Bun, Deno и
+  браузерах и бросает ту же оболочку ошибок `KtavError` со всеми
+  десятью полями и UTF-8 смещениями в байтах. Парсер — однопроходный
+  линейный сканер.
+- Основной вход `.` сохраняет нативные бэкенды (N-API/WASM/FFI) по
+  умолчанию; `./pure` — строго опциональный выбор.
+
+### Изменено
+
+- Версии пакета, platform subpackages, workspace metadata и lockfile —
+  `0.8.1`.
+- Rust-зависимость — опубликованный `ktav` 0.8.1.
+- Submodule спецификации закреплён на опубликованном коммите Ktav
+  0.8.1 (корпус 228 parseable / 90 invalid / 5 unrepresentable /
+  4 parseable-unrepresentable / 13 canonical фикстур, из них 9 новых
+  фикстур `raw_bytes`).
+
 ## [0.6.4] — 2026-08-23
 
 Синхронизация со спецификацией Ktav и Rust core 0.6.4.

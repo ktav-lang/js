@@ -43,6 +43,7 @@ interface NativeBinding {
     format: (s: string) => string;
     emitCanonical: (obj: unknown) => string;
     canonicalFromSource: (s: string) => string;
+    loadsBytes: (bytes: Uint8Array) => unknown;
 }
 
 const require_ = createRequire(import.meta.url);
@@ -86,6 +87,21 @@ export function loads<T = KtavValue>(s: string): T {
 export function loadsStrict<T = KtavValue>(s: string): T {
     try {
         return native.loadsStrict(s) as T;
+    } catch (e) {
+        throw toKtavError(e);
+    }
+}
+
+/**
+ * Raw-byte entry: parse a Uint8Array as UTF-8 Ktav text without any
+ * TextEncoder/TextDecoder re-encoding step. The 0.8.1 invalid_utf8/
+ * fixtures are only meaningful if the parser receives the exact bytes
+ * (spec 0.8 § 6.15). Throws KtavError with error === "InvalidUtf8" for
+ * invalid input, before any grammar diagnosis.
+ */
+export function loadsBytes<T = KtavValue>(bytes: Uint8Array): T {
+    try {
+        return native.loadsBytes(bytes) as T;
     } catch (e) {
         throw toKtavError(e);
     }

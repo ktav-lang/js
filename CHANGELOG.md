@@ -80,6 +80,34 @@ format itself — for the latter see
 
 - N-API: object keys containing U+0000 — legal in spec 0.7 via the new `\uXXXX` escapes — no longer fail with `nul byte found in provided data`; key set/get now goes through the JsString-based property APIs instead of the CString-backed named-property calls.
 
+## [0.8.1] — 2026-10-22
+
+Synchronized with the published Rust core `ktav` 0.8.1 and spec 0.8.1,
+and introduces the pure-TypeScript backend.
+
+### Added
+
+- New `@ktav-lang/ktav/pure` entry point: a complete bidirectional
+  Ktav parser and generator written in pure TypeScript — `loads()`,
+  `loadsStrict()`, `dumps()`, `stringifyForceStrings()`, `format()`,
+  `emitCanonical()`, `canonicalFromSource()`, and `loadsBytes()`. It
+  requires no native binary, no WASM, and no subprocess, works in
+  Node, Bun, Deno, and browsers, and throws the identical ten-field
+  `KtavError` envelope with UTF-8 byte spans. The parser is a
+  single-pass linear scanner.
+- The bare `.` entry point keeps the native backends (N-API/WASM/FFI)
+  as the default; `./pure` is strictly opt-in.
+
+### Changed
+
+- Package, platform subpackages, workspace metadata, and lockfile are
+  `0.8.1`.
+- Rust dependency is published `ktav` 0.8.1.
+- Spec submodule is pinned to the published Ktav 0.8.1 commit
+  (corpus 228 parseable / 90 invalid / 5 unrepresentable /
+  4 parseable-unrepresentable / 13 canonical fixtures, with 9 new
+  `raw_bytes` fixtures).
+
 ## [0.6.4] — 2026-08-23
 
 Synchronized with Ktav spec and Rust core 0.6.4.

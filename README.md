@@ -45,6 +45,50 @@ macOS (x64/arm64), and Windows (x64/arm64); npm installs the one that
 matches the current host through `optionalDependencies`. If nothing
 matches, the loader throws early with a clear diagnostic.
 
+## Pure TypeScript backend
+
+`@ktav-lang/ktav/pure` is a complete Ktav parser and generator written
+in pure TypeScript. It ships in the same npm package but requires no
+native binary, no WASM, and no subprocess — it runs in Node, Bun,
+Deno, and browsers, and works with serverless platforms and bundlers
+where native add-ons are inconvenient or unavailable.
+
+Choose `ktav/pure` when:
+
+- you cannot (or prefer not to) install platform-specific native
+  binaries — CI images, restricted environments, Alpine/musl edge
+  cases;
+- you bundle for the browser or a serverless runtime with a bundler
+  (Webpack, Vite, esbuild) and want zero native/WASM assets;
+- you need the exact same API surface everywhere, on every runtime.
+
+```ts
+// Node / Bun / Deno
+import { loads, dumps } from "@ktav-lang/ktav/pure";
+
+const cfg = loads(`service: web\nport: 8080\n`);
+console.log(dumps(cfg));
+```
+
+```html
+<script type="module">
+  import { loads, dumps } from "https://esm.sh/@ktav-lang/ktav@0.8.1/pure";
+  document.body.textContent = dumps(loads("hello: world"));
+</script>
+```
+
+The API surface is identical to the native entry point (plus
+`loadsBytes()` for parsing directly from UTF-8 bytes), and numeric
+behavior matches native: integers within ±2^53 arrive as `number`,
+larger ones as `BigInt` — there is no silent rounding. One inherent
+limit: a JS `number` cannot carry Ktav's Integer/Float distinction
+across `dumps()`/`emitCanonical()`, so object-taking emitters cannot
+guarantee byte-exact canonical output for float-bearing documents —
+use `canonicalFromSource()` when you need byte-exact canonical text.
+
+The bare `.` entry point keeps the native backends (N-API/WASM/FFI)
+as the default; `ktav/pure` is strictly opt-in.
+
 ## Quick start
 
 ### Parse — typed reads off the parsed object

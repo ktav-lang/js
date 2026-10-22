@@ -1,6 +1,7 @@
 export default [
   "intro",
   "install",
+  "pure-backend",
   "quickstart-parse",
   "quickstart-render",
   "format",

@@ -41,6 +41,47 @@ npm install @ktav-lang/ktav
 Windows (x64/arm64) 预编译；npm 通过 `optionalDependencies` 安装与当前
 主机匹配的那一个。若无匹配项，加载器会及早抛出并给出清晰的诊断信息。
 
+## 纯 TypeScript 后端
+
+`@ktav-lang/ktav/pure` 是用纯 TypeScript 编写的完整 Ktav 解析器和
+生成器。它与主包一起发布，但不需要原生二进制、WASM 或子进程 —— 可在
+Node、Bun、Deno 和浏览器中运行，也适用于原生插件不便或不可用的
+serverless 平台和打包器场景。
+
+在以下情况选择 `ktav/pure`：
+
+- 无法（或不想）安装平台专属的原生二进制 —— CI 镜像、受限环境、
+  Alpine/musl 边缘情况；
+- 为浏览器或 serverless 运行时打包（Webpack、Vite、esbuild），希望
+  零原生/WASM 资源；
+- 需要在每个运行时上使用完全相同的 API。
+
+```ts
+// Node / Bun / Deno
+import { loads, dumps } from "@ktav-lang/ktav/pure";
+
+const cfg = loads(`service: web\nport: 8080\n`);
+console.log(dumps(cfg));
+```
+
+```html
+<script type="module">
+  import { loads, dumps } from "https://esm.sh/@ktav-lang/ktav@0.8.1/pure";
+  document.body.textContent = dumps(loads("hello: world"));
+</script>
+```
+
+API 表面与原生入口完全一致（外加用于直接解析 UTF-8 字节的
+`loadsBytes()`），数值行为与原生一致：±2^53 以内的整数是 `number`，
+更大的整数是 `BigInt` —— 没有静默舍入。一个固有限制：JS 的
+`number` 无法在 `dumps()`/`emitCanonical()` 之间承载 Ktav 的
+Integer/Float 区分，因此接受对象的发射器无法为含浮点数的文档保证
+字节级精确的 canonical 输出 —— 需要字节级精确的 canonical 文本时请
+使用 `canonicalFromSource()`。
+
+裸入口 `.` 仍以原生后端（N-API/WASM/FFI）为默认；`ktav/pure` 严格
+按需选择。
+
 ## 快速开始
 
 ### 解析 —— 从解析结果中按类型读取字段

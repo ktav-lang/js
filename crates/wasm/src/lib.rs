@@ -40,6 +40,70 @@ fn message_envelope(text: impl Into<String>) -> String {
     envelope_json(&ktav::Error::Message(text.into()), "")
 }
 
+/// The raw-`InvalidUtf8` envelope for the `loadsBytes` byte entry
+/// (spec 0.8 § 3.1/§ 6.15). Contract mirrored from
+/// `rust/src/cabi/envelope.rs::not_utf8_envelope` — the core exposes
+/// `ktav::parse(&str)` only, so the binding layer performs the UTF-8
+/// validation itself: class `InvalidUtf8` (never `Message`), with the
+/// § 6 location computed over the ORIGINAL bytes. The span covers the
+/// offending sequence (`Utf8Error::error_len`), or runs to end-of-input
+/// when the sequence is truncated at EOF (`error_len` is `None`); an
+/// illegal lead byte reported as one byte swallows the following
+/// continuation bytes so the span covers the ill-formed region whole.
+/// No valid source text exists, so `line_text` stays null while `line`
+/// and `span` are filled from the raw bytes.
+fn not_utf8_envelope(src: &[u8], err: std::str::Utf8Error) -> String {
+    let valid_up_to = err.valid_up_to();
+    let mut end = valid_up_to + err.error_len().unwrap_or(src.len() - valid_up_to);
+    if err.error_len() == Some(1) {
+        while src.get(end).is_some_and(|b| (0x80..=0xBF).contains(b)) {
+            end += 1;
+        }
+    }
+    let mut env =
+        ktav::ErrorEnvelope::from_error(&ktav::Error::InvalidUtf8 { valid_up_to }, "");
+    // `Span` is u32-based; a >4 GiB document is beyond what `Span` can
+    // address anywhere in this crate, so saturate (same trade-off as the
+    // cabi layer).
+    let start = u32::try_from(valid_up_to).unwrap_or(u32::MAX);
+    let end = u32::try_from(end).unwrap_or(u32::MAX);
+    env.line = Some(line_of_offset(src, valid_up_to));
+    env.span = Some(ktav::Span::new(start, end));
+    env.body = Some(format!("input is not valid UTF-8: {err}"));
+    env.to_json()
+}
+
+/// 1-based line number of raw byte offset `pos`, counting each LF, lone
+/// CR and CR LF pair as exactly one terminator (spec § 3.2). Mirrors
+/// `rust/src/cabi/envelope.rs::line_of_offset`; counted over the raw
+/// bytes, before BOM removal or trimming (§ 6.15).
+fn line_of_offset(bytes: &[u8], pos: usize) -> u32 {
+    let mut line: u32 = 1;
+    let mut i = 0;
+    let bound = pos.min(bytes.len());
+    while i < bound {
+        match bytes[i] {
+            b'\n' => {
+                line += 1;
+                i += 1;
+            }
+            b'\r' => {
+                if bytes.get(i + 1) == Some(&b'\n') {
+                    if i + 2 <= pos {
+                        line += 1;
+                    }
+                    i += 2;
+                } else {
+                    line += 1;
+                    i += 1;
+                }
+            }
+            _ => i += 1,
+        }
+    }
+    line
+}
+
 /// Parse a Ktav document and return the equivalent JavaScript value.
 #[wasm_bindgen(js_name = loads)]
 pub fn loads(s: &str) -> Result<JsValue, JsError> {
@@ -51,6 +115,21 @@ pub fn loads(s: &str) -> Result<JsValue, JsError> {
 #[wasm_bindgen(js_name = loadsStrict)]
 pub fn loads_strict(s: &str) -> Result<JsValue, JsError> {
     let value = ktav::parse_strict(s).map_err(|e| JsError::new(&envelope_json(&e, s)))?;
+    value_to_js(&value)
+}
+
+/// Parse a Ktav document from RAW BYTES (spec 0.8 § 6.15): the bytes
+/// are validated as UTF-8 at this boundary and invalid input fails
+/// through the same envelope-JSON error channel as every other entry
+/// here (class `InvalidUtf8`, byte span + 1-based line over the
+/// original bytes, BEFORE any grammar diagnosis). The core exposes
+/// `parse(&str)` only, so validation lives here (see
+/// `not_utf8_envelope`, which mirrors the cabi contract).
+#[wasm_bindgen(js_name = loadsBytes)]
+pub fn loads_bytes(bytes: &[u8]) -> Result<JsValue, JsError> {
+    let text = std::str::from_utf8(bytes)
+        .map_err(|e| JsError::new(&not_utf8_envelope(bytes, e)))?;
+    let value = ktav::parse(text).map_err(|e| JsError::new(&envelope_json(&e, text)))?;
     value_to_js(&value)
 }
 
