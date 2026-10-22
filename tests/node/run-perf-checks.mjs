@@ -888,10 +888,10 @@ const PERF_TOKEN_MS = 5_000;
         expectUnrepresentable("CR byte at depth 2000", () => dumps(v), wantPath);
     }
 
-    // Formatter cold walk (findOffenseP): `\r` is a valid §3.7 escape,
+    // Formatter cold walk: the inline quoted value decodes the §3.7 `\r` escape,
     // so the parser ACCEPTS the decoded CR and format()'s emitter
     // signals CRByte mid-emission; the offense path is ["k"].
-    expectUnrepresentable("formatter CR byte", () => format('k: "a\\rb"\n'), ["k"]);
+    expectUnrepresentable("formatter CR byte", () => format('{k: "a\\rb"}\n'), ["k"]);
 }
 
 const elapsed = Date.now() - started;

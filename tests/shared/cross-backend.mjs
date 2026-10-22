@@ -213,6 +213,9 @@ export function runCrossBackend({ backends, readTextFile, readBytes, walkKtavFil
         test(`cross diagnostic-path: [${label}] loadsStrict keeps KeyPathConflict over later bad escape`, () => {
             expectConflictPath("loadsStrict", b.loadsStrict);
         });
+        test(`cross diagnostic-path: [${label}] canonicalFromSource keeps KeyPathConflict over later bad escape`, () => {
+            expectConflictPath("canonicalFromSource", b.canonicalFromSource);
+        });
         test(`cross diagnostic-path: [${label}] format keeps KeyPathConflict over later bad escape`, () => {
             expectConflictPath("format", b.format);
         });
