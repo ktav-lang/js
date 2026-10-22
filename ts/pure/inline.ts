@@ -20,13 +20,31 @@
 //   (O(n)); that pass records, for EVERY gated compound opener, the
 //   byte index of its matching closer AND that compound's own
 //   top-level comma segments (`spans`, O(compounds) map memory).
-//   Nested compounds are NEVER re-scanned: their parse is a pure
-//   O(1) span lookup + segment consumption. Block-context frames are
-//   line-oriented and never re-scanned. There are NO duplicate
-//   same-level passes: closer-find, escape validation, comma
-//   splitting and span recording share one cursor. (The previous
-//   O(n · MAX_INLINE_DEPTH) bound is gone — nested bodies no longer
-//   recurse into `scanInlineBody`.)
+//   Every gated opener the single pass encounters ends with a
+//   RECORDED outcome — a span for a kind-matched pop, `false`
+//   otherwise (kind-mismatched pop, or drained at a stop: when the
+//   machine halts at its depth-zero closer or at `exhausted` /
+//   `eofAfterWsSkip`, every frame still on the stack is cached as
+//   `false`, since its standalone scan provably finds no same-kind
+//   matching closer and no bad escape — see `drainAsDead`). The two
+//   remaining stops deliberately record NOTHING: `badEscape` must
+//   keep its byte-ordered §6.13 priority (a cached Unterminated must
+//   not pre-empt it), and at `unterminatedQuote` bytes beyond the
+//   stop were never escape-validated, so a later BadEscapeSequence in
+//   the child's subrange must stay surfaceable. Nested compounds are
+//   therefore resolved by O(1) span lookup; the `parseInlineValueRaw`
+//   fallback `scanInlineBody` call is genuinely DEFENSIVE: it serves
+//   openers absent from the map entirely (openers encountered outside
+//   any recorded pass — e.g. a subrange parsed under a defensive
+//   fallback's own fresh scan — or the two non-recording stops
+//   above), and each such child is scanned at most ONCE. Block-
+//   context frames are line-oriented and never re-scanned. There are
+//   NO duplicate same-level passes: closer-find, escape validation,
+//   comma splitting and span recording share one cursor. (The
+//   previous O(n · MAX_INLINE_DEPTH) bound is gone — nested bodies no
+//   longer recurse into `scanInlineBody` in the normal path.) On
+//   MALFORMED input the bound is still linear: recorded outcomes are
+//   O(opens), and fallback scans never overlap the parent pass.
 // - MAX_INLINE_DEPTH = 128 bounds INLINE recursion only (compound.rs);
 //   the block (line-oriented) frame stack has NO depth limit in the
 //   Rust core.
@@ -79,11 +97,25 @@ interface Frame {
     segAt: number;
     /** This compound's own top-level (depth-1 of itself) segments. */
     segments: Array<[number, number]>;
+    /** Global depth right after this opener incremented it — the
+     *  Rust `open_at` entry depth; a span records only when the pop
+     *  returns the shared counter to `entryDepth - 1`. */
+    entryDepth: number;
+    /** Bounds-purity flag (Rust `open_at.1`): cleared by a crossed
+     *  closer at this frame's stop byte, so a dead frame never
+     *  records a span. */
+    valid: boolean;
 }
 
 /** Everything a nested parse needs about one gated compound: the
  *  matching closer's byte index and the compound's own top-level
- *  comma segments — both recorded by the parent body's single pass. */
+ *  comma segments — both recorded by the parent body's single pass.
+ *  `false` = dead (Rust pairs only carry pure pairs; here the parent
+ *  ALSO records the negative outcome): the machine's byte-ordered
+ *  pass over this child's subrange found NO same-kind matching
+ *  closer (a crossed closer killed the frame), and raised no bad
+ *  escape before stopping — exactly Rust's find→None→scan→NotFound
+ *  composition, minus the redundant re-walk. */
 export interface InlineSpan {
     closerIdx: number;
     segments: Array<[number, number]>;
@@ -100,8 +132,9 @@ interface MachineState {
     segAt: number;
     stack: Frame[];
     segments: Array<[number, number]>;
-    /** opener byte index → its closer + own segments. */
-    spans: Map<number, InlineSpan>;
+    /** opener byte index → its closer + own segments, or `false`
+     *  for a dead (crossed-closer-killed) compound. */
+    spans: Map<number, InlineSpan | false>;
     stop: Stop | null;
 }
 
@@ -126,6 +159,21 @@ const BODY_MODE: Mode = {
 };
 
 /**
+ * Cache the stop outcome for every frame still on the stack: the scan
+ * ended WITHOUT any of them reaching a kind-matched pop and without a
+ * bad escape in the bytes covered so far, so each outstanding frame's
+ * true standalone outcome is exactly the cached `false` (its own scan
+ * would stop on a kind-mismatched closer → NotFound → §6.11
+ * UnterminatedInlineCompound, no earlier bad escape possible because
+ * the shared pass validates escapes byte-ordered). Callers must NOT
+ * invoke this at the `badEscape` or `unterminatedQuote` stops (byte-
+ * ordered §6.13 priority / unvalidated bytes beyond the stop).
+ */
+function drainAsDead(st: MachineState): void {
+    for (const f of st.stack) st.spans.set(f.openIdx, false);
+}
+
+/**
  * The shared byte-at-a-time machine (scanner.rs `Scanner::run`),
  * seeded per shape by the callers below.
  */
@@ -147,6 +195,11 @@ function runMachine(
         if (st.inKey && st.segStart) {
             st.i = skipSegmentWs(bytes, st.i, hi);
             if (st.i >= hi) {
+                // Ws-skip only stops at `hi`, so every byte of the body
+                // was visited and escape-validated — caching the
+                // outstanding frames as dead cannot mask a later
+                // BadEscapeSequence.
+                drainAsDead(st);
                 st.stop = { t: "eofAfterWsSkip" };
                 return;
             }
@@ -238,6 +291,10 @@ function runMachine(
                 // Count in place (§5.8.5 value-start nesting); open a
                 // span record so the nested parse never re-scans.
                 st.depth += 1;
+                // Rust captures the entry depth AFTER the increment
+                // (`open_at.push((i, true, depth))` runs once `depth
+                // += 1` has already executed), so a pop at global
+                // depth `entryDepth - 1` is this span's own stop byte.
                 st.stack.push({
                     kind: b,
                     inKey: st.inKey,
@@ -246,6 +303,8 @@ function runMachine(
                     openIdx: st.i,
                     segAt: st.i + 1,
                     segments: [],
+                    entryDepth: st.depth,
+                    valid: true,
                 });
                 // After an array's `[` the next position is still a
                 // value position (its first item); after a nested `{`
@@ -260,19 +319,50 @@ function runMachine(
             st.raw = false;
             st.depth -= 1;
             if (st.depth === 0) {
+                // The stop byte is a kind-mismatched closer for EVERY
+                // outstanding frame (frames have entryDepth ≥ 2, so a
+                // kind-matched closer for one could never reach depth
+                // 0) — cache each as dead (§6.11) before returning.
+                drainAsDead(st);
                 st.stop = { t: "closer", idx: st.i, byte: b };
                 return;
             }
             const want = b === 0x5d ? 0x5b : 0x7b;
             const top = st.stack.length > 0 ? st.stack[st.stack.length - 1]! : null;
+            if (top !== null) {
+                // Bounds purity (scanner.rs RECORD_BOUNDS gates): the
+                // span's standalone scan stops at the FIRST closer
+                // returning its own counter to zero — global depth
+                // back to `entryDepth - 1`. Kind match here means the
+                // pop below records a pure pair. Crossed: the
+                // standalone said `NotFound` HERE, so the frame must
+                // never record, no matter how far the walk continues.
+                if (st.depth === top.entryDepth - 1) {
+                    if (top.kind !== want) top.valid = false;
+                } else if (st.depth < top.entryDepth - 1) {
+                    // Defense in depth: the walk somehow passed the
+                    // stop byte without stopping — treat as dead.
+                    top.valid = false;
+                }
+            }
             if (top !== null && top.kind === want) {
                 const f = st.stack.pop()!;
                 // The parent pass already knows this compound's closer
-                // and its own segments — record for the nested parse.
-                // (Mirrors scanInlineBody's own final-segment push, so
-                // a trailing comma surfaces as an empty last segment.)
+                // and its own segments — record for the nested parse,
+                // but ONLY when the frame is pure AND the pop landed
+                // exactly on the span's stop byte (Rust: `pure &&
+                // depth == entry - 1`); otherwise record DEAD so the
+                // nested parse raises UnterminatedInlineCompound
+                // without re-walking the subrange. (Final-segment push
+                // mirrors scanInlineBody's own, so a trailing comma
+                // surfaces as an empty last segment.)
                 f.segments.push([f.segAt, st.i]);
-                st.spans.set(f.openIdx, { closerIdx: st.i, segments: f.segments });
+                st.spans.set(
+                    f.openIdx,
+                    f.valid && st.depth === f.entryDepth - 1
+                        ? { closerIdx: st.i, segments: f.segments }
+                        : false,
+                );
                 if (mode.restoreInKeyOnMatch) st.inKey = f.inKey;
                 // Quote-aware machine: a kind-matched closer restores
                 // the saved segment-start state (RESTORE_SEG_ON_MATCH).
@@ -297,6 +387,9 @@ function runMachine(
         st.prev = b;
         st.i += 1;
     }
+    // The machine reached `hi`: every byte was escape-validated and no
+    // outstanding frame ever saw a kind-matched pop — cache them dead.
+    drainAsDead(st);
     st.stop = { t: "exhausted" };
 }
 
@@ -324,9 +417,10 @@ export interface InlineBodyScan {
      *  before deciding the closer question. */
     badEscape: ErrKindBadEscape | null;
     /** Gated compound opener byte index → its matching closer and
-     *  own top-level segments, all recorded by this single pass.
-     *  Nested parses consult this instead of re-scanning. */
-    spans: Map<number, InlineSpan>;
+     *  own top-level segments, all recorded by this single pass, or
+     *  `false` for a dead compound. Nested parses consult this
+     *  instead of re-scanning. */
+    spans: Map<number, InlineSpan | false>;
 }
 
 /** Scan a body that MUST start with `open`; quote-aware and
@@ -353,7 +447,7 @@ export function scanInlineBody(
         segAt: lo + 1,
         stack: [],
         segments: [],
-        spans: new Map(),
+        spans: new Map<number, InlineSpan | false>(),
         stop: null,
     };
     runMachine(bytes, lo, hi, open, close, open === 0x7b, BODY_MODE, st, ctx);
@@ -404,7 +498,7 @@ export function parseInlineObject(
     strict: boolean,
     depth: number,
     segments: Array<[number, number]>,
-    spans: Map<number, InlineSpan>,
+    spans: Map<number, InlineSpan | false>,
 ): V {
     if (depth >= MAX_INLINE_DEPTH) {
         malformed(ctx, "nesting depth exceeds limit (128)");
@@ -467,7 +561,7 @@ export function parseInlineArray(
     strict: boolean,
     depth: number,
     segments: Array<[number, number]>,
-    spans: Map<number, InlineSpan>,
+    spans: Map<number, InlineSpan | false>,
 ): V {
     if (depth >= MAX_INLINE_DEPTH) {
         malformed(ctx, "nesting depth exceeds limit (128)");
@@ -499,7 +593,7 @@ function parseInlineValue(
     ctx: ErrCtx,
     strict: boolean,
     depth: number,
-    spans: Map<number, InlineSpan>,
+    spans: Map<number, InlineSpan | false>,
 ): V {
     const [tlo, thi] = trimWs(bytes, lo, hi);
     if (tlo >= thi) return emptyStringV();
@@ -518,7 +612,7 @@ function parseInlineValueRaw(
     ctx: ErrCtx,
     strict: boolean,
     depth: number,
-    spans: Map<number, InlineSpan>,
+    spans: Map<number, InlineSpan | false>,
 ): V {
     const first = bytes[lo];
     if (first === 0x7b || first === 0x5b) {
@@ -530,7 +624,7 @@ function parseInlineValueRaw(
         // re-scan here (O(1) lookup; nested bodies are never scanned
         // again).
         const span = spans.get(lo);
-        if (span !== undefined) {
+        if (span) {
             // §6.12: the closer the parent found must end this value's
             // subrange; non-whitespace content after it is malformed.
             if (span.closerIdx !== hi - 1) malformedCloserNotAtEnd(ctx);
@@ -544,11 +638,30 @@ function parseInlineValueRaw(
                 ? parseInlineObject(bytes, lo, hi, ctx, strict, depth + 1, span.segments, spans)
                 : parseInlineArray(bytes, lo, hi, ctx, strict, depth + 1, span.segments, spans);
         }
-        // Defensive fallback: a compound-first value whose opener was
-        // NOT value-start-gated (raw/mid-scalar content). Unreachable
-        // today — a trimmed segment/value whose first byte is `{`/`[`
-        // always sits at a value position, hence gated — but kept so a
-        // classifier drift can never silently mis-parse. Behaves as
+        // Dead (Rust find→None→scan→NotFound): the machine's
+        // byte-ordered pass already walked this child's subrange,
+        // found NO same-kind matching closer (the crossed-closer gate
+        // marked the frame dead), and raised no bad escape before
+        // stopping — exactly §6.11 UnterminatedInlineCompound,
+        // without the redundant re-walk Rust's fallback performs.
+        if (span === false) {
+            throwKtav(
+                { k: "UnterminatedInlineCompound", line: ctx.line, span: ctx.span },
+                ctx.bytes,
+                null,
+            );
+        }
+        // Defensive fallback: the opener is ABSENT from the map. This
+        // is NOT unreachable — it serves openers encountered outside
+        // any recorded pass (e.g. a subrange parsed under this same
+        // fallback's own fresh scan) or the two non-recording stops
+        // (`badEscape`, `unterminatedQuote`); the normal path records
+        // an outcome for every gated opener, so e.g. `v: {a: [1}}`
+        // (the `[` drained as dead at the depth-0 `}` stop) takes the
+        // cached-`false` path above, NOT this one. Each unrecorded
+        // child is scanned at most ONCE by its own parent's parse —
+        // total work stays O(input + outcomes) on malformed as well
+        // as valid input; no overlapping repeated rescan. Behaves as
         // before: a local one-pass scan of this subrange.
         const scan = scanInlineBody(bytes, lo, hi, first, close, ctx);
         if (scan.badEscape !== null) throwKtav(scan.badEscape, ctx.bytes, null);

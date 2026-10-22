@@ -319,16 +319,17 @@ const PERF_TOKEN_MS = 5_000;
     if (twice !== once) fail(`formatter fixed point: ${JSON.stringify(once)} != ${JSON.stringify(twice)}`);
     else ok("formatter fixed point on a comments+blanks document");
 
-    // jsToV malformed-mapping errors — exact shared messages verified by
-    // READING BOTH implementations:
-    //   NaN:        ts/pure/ktavvalue.ts:142 and crates/napi/src/lib.rs:347
-    //               both emit exactly "NaN / Infinity is not representable in Ktav"
-    //   array hole: ts/pure/ktavvalue.ts:109 and crates/napi/src/lib.rs:378
-    //               both emit exactly "Array element missing"
-    //   unsupported: ts/pure/ktavvalue.ts:94 and crates/napi/src/lib.rs:401
-    //               both emit "Unsupported JavaScript value type for Ktav: <type>"
-    // "NonFiniteFloat" is the WRITER's reason code, a different path —
-    // never asserted here; the binding rejects at jsToV conversion.
+    // jsToV malformed-mapping errors — substring (deliberate subset)
+    // contract check, NOT exact-message equality. The asserted substrings
+    // ("not representable" / "Array element missing" / the "Unsupported
+    // JavaScript value type for Ktav" prefix) are a deliberate
+    // public-contract subset check: the envelope `message` is rendered
+    // text whose full wording is display-facing, so exact equality is
+    // intentionally not asserted. (Both implementations —
+    // ts/pure/ktavvalue.ts:142/109/94 and crates/napi/src/lib.rs:347/378/401
+    // — currently emit those substrings.) "NonFiniteFloat" is the
+    // WRITER's reason code, a different path — never asserted here; the
+    // binding rejects at jsToV conversion.
     let nfErr = null;
     try { dumps({ a: NaN }); } catch (e) { nfErr = e; }
     if (!nfErr || nfErr.name !== "KtavError" || !String(nfErr.message).includes("not representable")) {
@@ -394,14 +395,28 @@ const PERF_TOKEN_MS = 5_000;
     // the parent list; both sibling pairs must survive.
     expectValue("comma after child closer", "{a: [1, 2], b: 3}\n", { a: [1, 2], b: 3 });
 
-    // § 5.2 rule 8: the body starts `{`; the first unescaped `}` that
-    // returns delimiter depth to zero is NOT the last body byte (a
-    // second `}` follows), and the inner `[1` never receives a
-    // same-line `]` — a structural defect inside an already-closed
-    // compound → MalformedInlineCompound (§ 6.12), NOT
-    // UnterminatedInlineCompound (§ 6.11, reserved for compounds that
-    // never close at all).
-    expectError("malformed nested delimiter", "v: {a: [1}}\n", "MalformedInlineCompound");
+    // § 5.2 rule 8 vs § 6.11 derivation: the body starts `{` and its
+    // first depth-to-zero `}` IS its last byte, so the OUTER object is
+    // fine. The defect is in the CHILD `[1`: a quote-aware structural
+    // scan of `[1}` finds no same-line matching `]` — the only closer
+    // present is `}`, which (per § 5.8.5: an unescaped closer ALWAYS
+    // ends raw mode and is structural, and both closer kinds decrement
+    // the shared delimiter depth) crosses rather than matches — and it
+    // meets no invalid escape before the scan ends. § 6.11 therefore
+    // classifies the child as UnterminatedInlineCompound: "A `{` or `[`
+    // appearing in a value-position is an UnterminatedInlineCompound
+    // error when its quote-aware structural scan finds no matching
+    // `}`/`]` on the same line and encounters no invalid escape."
+    // § 6.12 does NOT convert a genuinely-unclosed child into
+    // Malformed: it governs defects inside an already-CLOSED compound
+    // (e.g. content after the matching closer), which is not the case
+    // here. This matches the corpus sibling fixture
+    // invalid/inline/raw_mode_does_not_absorb_mismatched_closer
+    // (`{a:: x]}` → UnterminatedInlineCompound: the nested raw scalar
+    // terminates at `]`, leaving the object unclosed). The earlier
+    // expectation `MalformedInlineCompound` was wrong; the parser was
+    // already right.
+    expectError("malformed nested delimiter", "v: {a: [1}}\n", "UnterminatedInlineCompound");
 
     // § 6.13 byte-ordered precedence (spec: "If an invalid escape is
     // encountered while scanning for that closer, the result is
@@ -410,6 +425,259 @@ const PERF_TOKEN_MS = 5_000;
     // missing closer, so BadEscapeSequence wins over
     // UnterminatedInlineCompound.
     expectError("bad escape before closer", "k: {a: \\q\n", "BadEscapeSequence");
+
+    // No-revival regression (cached-false path, killed-then-popped
+    // frame): in `v: {a: [{b: 1]}, c: 2}` the `]` crosses the inner
+    // `{` frame at its stop depth — both closer kinds decrement the
+    // shared depth (§5.8.5, mirrored from scanner.rs), kind mismatch
+    // kills the frame but does NOT pop it. The later `}` kind-matches
+    // that killed frame and pops it, recording `false` (the
+    // valid=false gate: the frame's own standalone scan said NotFound
+    // at the crossed `]`). The outer object still closes normally at
+    // its own final `}`, so the defect surfaces when parsing the
+    // array item `{b: 1]}`: its standalone structural scan finds no
+    // same-line `}` (the `]` crosses at its depth zero) and meets no
+    // invalid escape first — §6.11 UnterminatedInlineCompound (§5.8.5
+    // + §6.11; the same verdict as the Rust
+    // find_matching_close → scan_inline_closer → NotFound composition
+    // in compound.rs, not Malformed: §6.12 only governs defects inside
+    // an already-closed compound). A stale cache could wrongly let a
+    // later `}` "revive" the killed frame; the recorded `false` and
+    // the drained stack both prevent that.
+    expectError("no revival after crossed closer", "v: {a: [{b: 1]}, c: 2}\n", "UnterminatedInlineCompound");
+
+    // Bounded-work regression in the spirit of the PERF_TOKEN_MS
+    // ceilings: a 400-level deep prefix of compound openers, every
+    // level closed by the WRONG closer (`]` against a `{` frame) and
+    // NO final valid closers — every level's frame is killed and every
+    // level's outcome is cached as dead (kind-mismatched kills inline,
+    // the rest drained at the depth-0 stop), so the parse resolves by
+    // map lookups. This exercises cached-invalid outcomes at many
+    // nesting levels, NOT wall-clock performance; the timing ceiling
+    // only guards against a runaway rescan. Machine trace of the
+    // exact fixture: the value `{a: {a: … 1]]]…}` seeds at depth 1;
+    // 400 `{` frames push depth to 401; each of the 400 `]` closers
+    // decrements once and kind-mismatches the top `{` frame (killing
+    // it, never popping); the final `}` returns depth to 0 and IS the
+    // body's own closer, so the outer object parses normally and the
+    // error surfaces at the first nested value — a cached `false` →
+    // §6.11 UnterminatedInlineCompound, deterministically.
+    {
+        const levels = 400;
+        let src = "v: ";
+        for (let i = 0; i < levels; i++) src += "{a: ";
+        src += "1";
+        for (let i = 0; i < levels; i++) src += "]";
+        src += "}\n";
+        let deepErr = null;
+        const t0 = Date.now();
+        try { loads(src); } catch (e) { deepErr = e; }
+        const ms = Date.now() - t0;
+        if (!deepErr || deepErr.error !== "UnterminatedInlineCompound") {
+            fail(`deep crossed closers: expected error=UnterminatedInlineCompound, got ${deepErr ? deepErr.error + ": " + deepErr.message : "no throw"}`);
+        } else ok(`deep crossed closers (${levels} levels, all cached dead): error=UnterminatedInlineCompound`);
+        if (ms > PERF_TOKEN_MS) fail(`deep crossed closers: ${ms} ms exceeds ${PERF_TOKEN_MS} ms ceiling`);
+        else ok(`deep crossed closers completed within ceiling (${ms} ms)`);
+    }
+}
+
+// --- independent negative-float canonical threshold regressions ---------
+// Every expected canonical spelling below is derived INDEPENDENTLY from
+// spec §5.9.8 (scientific when |v| >= 1e7 or 0 < |v| < 1e-2, else the
+// ryu pretty decimal; always at least a `.0` mantissa; `-` exactly
+// once; negative zero preserved) by hand-tracing the shortest-digits
+// decomposition (value = 0.digits * 10^e10, shortest round-trip digit
+// string from Number#toString/ryu) and the exponent emission e10-1.
+// Contract distinction for -0 (three layers, honestly separated):
+// source-canonical text PRESERVES -0.0 (numbers.ts ryuFormat zero
+// branch returns "-0.0"); a typed Float keeps the negative-zero KIND;
+// but a generic JS Number input has its kind ERASED by the established
+// native mapping (crates/napi/src/lib.rs js_to_value, Number branch:
+// fract()==0 && i64-range → Value::Integer via itoa(n as i64), so -0.0
+// as i64 is 0), mirrored exactly in ts/pure/ktavvalue.ts numberToV —
+// so dumps of a parsed -0 emits "k: 0".
+// Corpus cross-check: spec/versions/0.8/tests/valid/numbers/float/
+// notation_boundaries.canonical.ktav and negative_zero.canonical.ktav
+// agree with every trace (kept as confirmation only — these tests carry
+// their own inline expectations).
+{
+    // Each vector: parse a one-pair document, canonicalize the SAME
+    // source, and check BOTH the parsed number and the exact canonical
+    // bytes. `trace` documents the derivation for the vector.
+    const vec = (name, lit, trace, numCheck, canon) => {
+        const src = `k: ${lit}\n`;
+        let parsed, err = null;
+        try { parsed = loads(src); } catch (e) { err = e; }
+        if (err || !numCheck(parsed ? parsed.k : undefined)) {
+            fail(`${name}: parsed-number expectation failed, got ${err ? err.error + ": " + err.message : JSON.stringify(parsed && parsed.k)}`);
+        } else ok(`${name}: parsed number OK`);
+        let canonActual, cerr = null;
+        try { canonActual = canonicalFromSource(src); } catch (e) { cerr = e; }
+        const wantCanon = `k: ${canon}\n`;
+        if (cerr || canonActual !== wantCanon) {
+            fail(`${name}: canonical mismatch — expected ${JSON.stringify(wantCanon)}, got ${cerr ? cerr.error + ": " + cerr.message : JSON.stringify(canonActual)}`);
+        } else ok(`${name}: canonical ${JSON.stringify(canon)}`);
+        // dumps round trip: reparse the canonical dump and compare the
+        // value (Object.is so -0 stays -0 through the round trip).
+        // SKIPPED for negative zero — the round trip is EXACTLY the
+        // documented kind erasure (see block header: js_to_value maps
+        // generic Number -0 to Integer "0"), so `Object.is` would
+        // deterministically fail; the -0 vector asserts the actual
+        // contract below instead.
+        if (!err && !cerr) {
+            if (Object.is(parsed.k, -0)) {
+                const dump = dumps(parsed);
+                if (dump !== "k: 0\n") {
+                    fail(`${name}: dumps of parsed -0 expected "k: 0\\n" (jsToV Number→Integer erasure), got ${JSON.stringify(dump)}`);
+                } else ok(`${name}: dumps maps generic Number -0 to "k: 0" (shared native/pure jsToV contract)`);
+            } else {
+                const redumped = loads(dumps(parsed));
+                if (!Object.is(redumped.k, parsed.k)) {
+                    fail(`${name}: dumps round trip changed the value (${JSON.stringify(parsed.k)} -> ${JSON.stringify(redumped.k)})`);
+                } else ok(`${name}: dumps round trip preserves the value (Object.is)`);
+            }
+        }
+        void trace; // derivation lives in the per-vector comment below
+    };
+
+    // -0.5: ryu "0.5" (fixed, |v| in [1e-2, 1e7)) → "-0.5".
+    vec("neg float -0.5", "-0.5",
+        "ryu: digits '5', e10 0 → '0.5'; window fixed",
+        (v) => v === -0.5, "-0.5");
+
+    // -1.0: ryu of 1 → digits '1', e10 1, k=0, kk=1 ≤ 16 → "1.0";
+    // window fixed → "-1.0" (mantissa `.0` minimum).
+    vec("neg float -1.0", "-1.0",
+        "ryu: digits '1', e10 1 → '1.0'; window fixed",
+        (v) => v === -1, "-1.0");
+
+    // -0.0: parseFloatValue Number("-0.0") === -0; ryu zero branch
+    // returns "-0.0"; canonicalFloat keeps ±0.0 as-is (v === 0).
+    // All three layers are asserted: canonicalFromSource preserves the
+    // -0.0 bytes (vec's canon check), loads preserves the parsed -0
+    // (vec's numCheck), and dumps maps the generic JS Number to Integer
+    // "0" — the kind erasure of the shared native/pure jsToV contract
+    // (crates/napi/src/lib.rs js_to_value Number branch: fract()==0 &&
+    // i64-range → Integer via itoa(n as i64); -0.0 as i64 = 0).
+    // Byte-exact -0.0 canonical text requires canonicalFromSource.
+    vec("neg float -0.0 (negative zero preserved)", "-0.0",
+        "ryu zero branch '-0.0'; canonicalFloat keeps ±0.0 as-is",
+        (v) => Object.is(v, -0), "-0.0");
+
+    // -1e16: String(1e16) = "10000000000000000" (no 'e'); digits stay
+    // the full 17-char string, e10 = 17. |v| >= 1e7 → scientific:
+    // mantissa = digits with trailing zeros stripped = "1";
+    // exponent = e10 - 1 = 16 → "-1e16". (Note: canonicalFloat emits
+    // e10-1, NOT e10; traced, not guessed.)
+    vec("neg float -1e16 (scientific, high side)", "-1e16",
+        "digits '10000000000000000' → mantissa '1', e10 17 → exp 16",
+        (v) => v === -1e16, "-1e16");
+
+    // -1e-6: String(1e-6) = "0.000001"; intPart "0" (len 1),
+    // rawDigits "0000001" → digits "1", stripped 6 → e10 = 1-6 = -5.
+    // |v| < 1e-2 → scientific: mantissa "1", exponent e10-1 = -6
+    // → "-1e-6". (NOT -1e-7: e10 is already the value's decimal
+    // exponent minus one — 0.1 * 10^-5 = 1e-6 — so the emitted
+    // exponent is -6.)
+    vec("neg float -1e-6 (scientific, low side)", "-1e-6",
+        "digits '1', e10 -5 → mantissa '1', exp -6 → '-1e-6'",
+        (v) => v === -1e-6, "-1e-6");
+
+    // -0.001: String(0.001) = "0.001"; intPart "0", rawDigits "0001"
+    // → digits "1", stripped 3 → e10 = 1-3 = -2; |v| < 1e-2 →
+    // scientific: mantissa "1", exponent e10-1 = -3 → "-1e-3".
+    // (Traced precisely: the prompt's provisional "-1e-4" was wrong;
+    // the corpus notation_boundaries.canonical.ktav confirms "-1e-3".)
+    vec("neg float -0.001 (scientific, low side)", "-0.001",
+        "digits '1', e10 -2 → mantissa '1', exp -3 → '-1e-3'",
+        (v) => v === -0.001, "-1e-3");
+
+    // -123.456: String(123.456) = "123.456"; digits "123456", e10 3;
+    // k = 3-6 = -3, kk 3 in (0,16] → ryu "123.456"; window fixed.
+    vec("neg float -123.456 (fixed window)", "-123.456",
+        "digits '123456', e10 3 → ryu '123.456'; window fixed",
+        (v) => v === -123.456, "-123.456");
+
+    // -5e-324 (negative subnormal): String(5e-324) = "5e-324" →
+    // digits "5", e10 -323; |v| < 1e-2 → scientific: mantissa "5",
+    // exponent e10-1 = -324 → "-5e-324" (sign exactly once).
+    vec("neg float -5e-324 (negative subnormal)", "-5e-324",
+        "String '5e-324' → digits '5', e10 -323 → exp -324",
+        (v) => v === -5e-324, "-5e-324");
+
+    // -9999999.0 (§5.9.8 low edge, fixed side): digits "9999999",
+    // e10 7, k = 0 → ryu "9999999.0"; |v| = 9999999 < 1e7 → FIXED.
+    // Corpus notation_boundaries.canonical.ktav: "large_below: 9999999.0".
+    vec("neg float -9999999.0 (fixed window upper edge)", "-9999999.0",
+        "digits '9999999', e10 7 → ryu '9999999.0'; < 1e7 → fixed",
+        (v) => v === -9999999, "-9999999.0");
+
+    // -10000000.0 (§5.9.8 scientific edge): |v| = 1e7 fails
+    // (abs >= 1e-2 && abs < 1e7) → scientific: String(1e7) =
+    // "10000000", digits "10000000", e10 8; mantissa strips trailing
+    // zeros → "1"; exponent e10-1 = 7 → "-1e7".
+    // Corpus: "large_boundary: 1e7".
+    vec("neg float -10000000.0 (scientific edge)", "-10000000.0",
+        "digits '10000000' → mantissa '1', e10 8 → exp 7 → '-1e7'",
+        (v) => v === -1e7, "-1e7");
+}
+
+// --- leaf U+FEFF range regressions (BOM vs content) ----------------------
+// Spec §3.1: exactly ONE U+FEFF at the very start of the document is a
+// structural byte-order mark and is skipped; §5.4 (raw) / §5.3.3
+// (quoted keys) / §5.6 (multiline) leaf decoding must preserve a
+// U+FEFF that is CONTENT verbatim. bytes.ts decoders use
+// ignoreBOM:true (BOM passes through decode, not stripped). Verified
+// against the corpus sibling valid/bom_boundary/first_item_leading_bom.*
+// (confirmation only; expectations are inline below). JSON.stringify
+// preserves U+FEFF as \uFEFF, so stringify comparisons are exact.
+{
+    const FEFF = "\uFEFF";
+    const expectJson = (name, actual, want) => {
+        if (JSON.stringify(actual) !== JSON.stringify(want)) {
+            fail(`${name}: expected ${JSON.stringify(want)}, got ${JSON.stringify(actual)}`);
+        } else ok(`${name}: ${JSON.stringify(want)}`);
+    };
+
+    // §5.4 raw array item: bytes after `:: ` are literal content — the
+    // U+FEFF is CONTENT and survives decodeRange verbatim.
+    expectJson("raw array item with content BOM",
+        loads(`:: ${FEFF}plain\n`), [`${FEFF}plain`]);
+
+    // §5.3.3 quoted key whose DECODED CONTENT STARTS with U+FEFF —
+    // the decoder-boundary case: a default TextDecoder with BOM
+    // stripping would eat a LEADING U+FEFF during decode, so the key
+    // must come back exactly FEFF + "ab" (bytes.ts decoders use
+    // ignoreBOM:true). Distinct from the document-BOM case — a
+    // leading document U+FEFF is stripped once before line handling,
+    // but inside the quotes it is key data in any position; the
+    // interior variant below is kept as a second assertion.
+    expectJson("quoted key with LEADING content BOM",
+        loads(`"${FEFF}ab": 1\n`), { [`${FEFF}ab`]: 1 });
+    expectJson("quoted key with interior content BOM",
+        loads(`"a${FEFF}b": 1\n`), { [`a${FEFF}b`]: 1 });
+
+    // Document-BOM control: one leading U+FEFF before the first pair
+    // is the structural BOM (§3.1) — stripped exactly once, key "k".
+    expectJson("document BOM stripped once (key control)",
+        loads(`${FEFF}k: v\n`), { k: "v" });
+
+    // §5.6 multiline stripped, BOM at line start: finishMultiline's
+    // dedent run is computed over §3.3 WHITESPACE only; U+FEFF is NOT
+    // whitespace, so the single-line fast path trims no leading bytes
+    // and the BOM char survives as the first body code point.
+    expectJson("multiline stripped preserves line-leading BOM",
+        loads(`k: (\n${FEFF}line\n)\n`), { k: `${FEFF}line` });
+
+    // §5.6 multiline verbatim: lines are joined raw — no trimming or
+    // dedent at all — so the BOM survives trivially.
+    expectJson("multiline verbatim preserves line-leading BOM",
+        loads(`k: ((\n${FEFF}line\n))\n`), { k: `${FEFF}line` });
+
+    // Both at once: document BOM stripped once (§3.1), content BOM in
+    // the raw item still intact — the two never interact.
+    expectJson("document BOM + content BOM together",
+        loads(`${FEFF}:: ${FEFF}plain\n`), [`${FEFF}plain`]);
 }
 
 const elapsed = Date.now() - started;
