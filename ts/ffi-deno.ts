@@ -79,6 +79,9 @@ const FFI_SYMBOLS = {
 
 let cachedLib: { symbols: Record<string, (...args: unknown[]) => unknown> } | null = null;
 
+// Rust требует ненулевой указатель даже при длине 0. Буфер живёт весь вызов.
+const EMPTY_SRC_PLACEHOLDER = new Uint8Array(1);
+
 async function getLib() {
     if (cachedLib) return cachedLib;
     const archMap: Record<string, string> = { x86_64: "x64", aarch64: "arm64" };
@@ -130,7 +133,9 @@ async function callNative(
     const outErr = new BigUint64Array(1);
     const outErrLen = new BigUint64Array(1);
 
-    const srcPtr = input.length === 0 ? null : Deno.UnsafePointer.of(input);
+    const srcPtr = input.length === 0
+        ? Deno.UnsafePointer.of(EMPTY_SRC_PLACEHOLDER)
+        : Deno.UnsafePointer.of(input);
 
     const rc = sym(
         srcPtr,
@@ -199,7 +204,10 @@ export async function loadsStrict<T = KtavValue>(src: string): Promise<T> {
  * invalid_utf8/ conformance fixtures.
  */
 export async function loadsBytes<T = KtavValue>(bytes: Uint8Array): Promise<T> {
-    const result = await callNative("loads", bytes);
+    // Копируем до await: Rust не заимствует изменяемый или shared-буфер вызывающего.
+    const owned = new Uint8Array(bytes.length);
+    owned.set(bytes);
+    const result = await callNative("loads", owned);
     return decode(result) as T;
 }
 

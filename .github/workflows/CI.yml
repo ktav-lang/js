@@ -188,6 +188,42 @@ jobs:
         run: cargo build --release -p ktav-cabi
       - run: npm run test:deno-ffi
 
+  # ------------------------------------------------------------------
+  # FFI empty-source invariant against the DEBUG cabi. Rust
+  # slice::from_raw_parts asserts a non-null, aligned source pointer
+  # even for length 0 only in debug builds (release hides the
+  # violation). The runners deliberately do NOT call setLibraryPath —
+  # KTAV_LIB_PATH (set below) drives resolution exclusively, and the
+  # resolver throws when the file is missing.
+  # ------------------------------------------------------------------
+  test-ffi-debug-cabi:
+    name: Tests — FFI debug C ABI empty input (bun+deno)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: oven-sh/setup-bun@v2
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: npm install
+      - run: npm run build:ts
+      - name: Build cabi (DEBUG — asserts non-null source slices)
+        run: cargo build -p ktav-cabi
+      - name: Fail closed if debug artifact missing
+        run: test -f target/debug/libktav_cabi.so
+      - name: Point KTAV_LIB_PATH at the debug artifact (no silent fallback)
+        run: echo "KTAV_LIB_PATH=$GITHUB_WORKSPACE/target/debug/libktav_cabi.so" >> "$GITHUB_ENV"
+      - run: npm run test:bun-ffi-empty
+      - run: npm run test:deno-ffi-empty
+
   test-browser:
     name: Tests — Browser (chromium) / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -317,7 +353,7 @@ jobs:
   test-summary:
     name: Test summary
     runs-on: ubuntu-latest
-    needs: [rust-lint, docs, ts-typecheck, test-node, test-node-pure, test-cross-backend, packaged-pure, perf-guard, test-bun, test-deno, test-browser]
+    needs: [rust-lint, docs, ts-typecheck, test-node, test-node-pure, test-cross-backend, packaged-pure, perf-guard, test-bun, test-deno, test-ffi-debug-cabi, test-browser]
     if: always()
     steps:
       - name: Fail if any upstream job failed

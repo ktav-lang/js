@@ -32,10 +32,19 @@ const cargoTarget = process.env.CARGO_TARGET_DIR
     ? resolve(process.env.CARGO_TARGET_DIR)
     : join(repo, "target");
 export const cabi = join(cargoTarget, "release", cabiName());
+// DEBUG cabi artefact — the debug build ASSERTS Rust's non-null,
+// aligned source-slice invariant even for length 0; the empty-ABI
+// runners resolve it via KTAV_LIB_PATH (never setLibraryPath, which
+// would shadow the env).
+export const cabiDebug = join(cargoTarget, "debug", cabiName());
 export const spec = join(repo, "spec", "versions", "0.8", "tests");
 
 export function cabiBuilt() {
     return existsSync(cabi);
+}
+
+export function cabiDebugBuilt() {
+    return existsSync(cabiDebug);
 }
 
 export function specPresent() {

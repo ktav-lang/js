@@ -34,6 +34,9 @@ interface FFILib {
 
 let cachedLib: FFILib | null = null;
 
+// Rust требует ненулевой указатель даже при длине 0. Буфер живёт весь вызов.
+const EMPTY_SRC_PLACEHOLDER = new Uint8Array(1);
+
 async function getLib(): Promise<FFILib> {
     if (cachedLib !== null) return cachedLib;
 
@@ -143,7 +146,7 @@ async function callNative(
     const outErrLen = new BigUint64Array(1);
 
     const rc = sym(
-        input.length === 0 ? null : input,
+        input.length === 0 ? EMPTY_SRC_PLACEHOLDER : input,
         BigInt(input.length),
         outBuf,
         outLen,
@@ -204,7 +207,10 @@ export async function loadsStrict<T = KtavValue>(src: string): Promise<T> {
  * invalid_utf8/ conformance fixtures.
  */
 export async function loadsBytes<T = KtavValue>(bytes: Uint8Array): Promise<T> {
-    const result = await callNative("loads", bytes);
+    // Копируем до await: Rust не заимствует изменяемый или shared-буфер вызывающего.
+    const owned = new Uint8Array(bytes.length);
+    owned.set(bytes);
+    const result = await callNative("loads", owned);
     return decode(result) as T;
 }
 
