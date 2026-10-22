@@ -523,16 +523,19 @@ function trimEndInline(s: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Indentation (helpers.rs push_indent) — cached per level
+// Indentation (helpers.rs push_indent) — cached for common depths
 // ---------------------------------------------------------------------------
 
+/** Retain only common indent depths, never the full ladder of a deep document. */
+const INDENT_CACHE_MAX = 64;
 const INDENT_CACHE: string[] = [""];
 
 function indentFor(level: number): string {
-    for (let i = INDENT_CACHE.length; i <= level; i++) {
+    for (let i = INDENT_CACHE.length; i <= level && i <= INDENT_CACHE_MAX; i++) {
         INDENT_CACHE[i] = INDENT_CACHE[i - 1] + "    ";
     }
-    return INDENT_CACHE[level]!;
+    if (level <= INDENT_CACHE_MAX) return INDENT_CACHE[level]!;
+    return "    ".repeat(level);
 }
 
 // ---------------------------------------------------------------------------
@@ -540,22 +543,39 @@ function indentFor(level: number): string {
 // ---------------------------------------------------------------------------
 
 /** First §5.9.0 offense in document order, or null (cold path).
- *  EXPLICIT STACK — frames carry their own path (DFS pre-order, so
- *  the first hit in pop order is the first offense in document order,
- *  matching the recursive original). */
-function findOffense(value: V, forceStrings: boolean, path: string[]): string[] | null {
-    type Frame = { v: V; path: string[]; key: string | null };
-    const stack: Frame[] = [{ v: value, path, key: null }];
+ *  EXPLICIT STACK — frames carry a PARENT-LINKED path node instead of
+ *  a full path array (one concat per entry is quadratic allocation on
+ *  deep chains); the key array is materialized only when an offense is
+ *  returned. DFS pre-order, so the first hit in pop order is the first
+ *  offense in document order, matching the recursive original. Array
+ *  frames add NO path element (representable.rs `check_node` recurses
+ *  into arrays without touching the path); the root frame carries no
+ *  key, so an offense on the ROOT value itself materializes to []. */
+export type PathNode = { parent: PathNode | null; key: string };
+
+/** Materialize a parent-linked chain, root-most key first; a null
+ *  node (offense at the root value) yields []. One array allocation
+ *  plus one in-place reversal. */
+export function materializePath(node: PathNode | null): string[] {
+    const out: string[] = [];
+    for (let n = node; n !== null; n = n.parent) out.push(n.key);
+    out.reverse();
+    return out;
+}
+
+function findOffense(value: V, forceStrings: boolean): string[] | null {
+    type Frame = { v: V; node: PathNode | null; key: string | null };
+    const stack: Frame[] = [{ v: value, node: null, key: null }];
     while (stack.length > 0) {
         const fr = stack.pop()!;
-        if (fr.key !== null && fr.key.length === 0) return fr.path;
+        if (fr.key !== null && fr.key.length === 0) return materializePath(fr.node);
         switch (fr.v.t) {
             case "object": {
                 const entries = Array.from(fr.v.v.entries());
                 for (let i = entries.length - 1; i >= 0; i--) {
                     stack.push({
                         v: entries[i]![1],
-                        path: fr.path.concat(entries[i]![0]),
+                        node: { parent: fr.node, key: entries[i]![0] },
                         key: entries[i]![0],
                     });
                 }
@@ -563,17 +583,17 @@ function findOffense(value: V, forceStrings: boolean, path: string[]): string[] 
             }
             case "array": {
                 for (let i = fr.v.v.length - 1; i >= 0; i--) {
-                    stack.push({ v: fr.v.v[i]!, path: fr.path, key: null });
+                    stack.push({ v: fr.v.v[i]!, node: fr.node, key: null });
                 }
                 break;
             }
             case "float":
-                if (!forceStrings && !Number.isFinite(Number(fr.v.v))) return fr.path;
+                if (!forceStrings && !Number.isFinite(Number(fr.v.v))) return materializePath(fr.node);
                 break;
             case "string":
-                if (fr.v.v.includes("\r")) return fr.path;
+                if (fr.v.v.includes("\r")) return materializePath(fr.node);
                 if (stringNeedsMultiline(fr.v.v)) {
-                    if (!chooseMultilineForm(fr.v.v, false).ok) return fr.path;
+                    if (!chooseMultilineForm(fr.v.v, false).ok) return materializePath(fr.node);
                 }
                 break;
             default:
@@ -585,7 +605,7 @@ function findOffense(value: V, forceStrings: boolean, path: string[]): string[] 
 
 /** Convert an emission signal into the path-carrying envelope error. */
 function attachPath(value: V, code: ReasonCodeName, forceStrings: boolean): never {
-    const path = findOffense(value, forceStrings, []);
+    const path = findOffense(value, forceStrings);
     unrepresentableAt(code, path ?? []);
 }
 

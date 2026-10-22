@@ -749,6 +749,151 @@ const PERF_TOKEN_MS = 5_000;
         loads(`${FEFF}:: ${FEFF}plain\n`), [`${FEFF}plain`]);
 }
 
+// --- dotted-key diagnostic-path regressions (pure parser) ----------------
+// Every expectation is derived from the Rust reference, hardcoded here as
+// an independent oracle: insert.rs `insert_dotted` walks segments IN
+// ORDER (trim → EmptyKey → checkKey InvalidKey → decodeKeySegment →
+// descend/leaf), so an EARLIER blocked segment wins before a LATER
+// segment's invalid escape is ever examined. envelope.rs `kind_path`
+// (lines ~310–333) builds the diagnostic path TOTALly — per-segment
+// decode failure falls back to the RAW spelling and never overwrites
+// the original category. Note on conflict direction: the wire envelope
+// (ts/internal/api.ts KtavErrorEnvelope) has NO `conflict` field — the
+// blocked/overwrite distinction lives only in the internal ErrKind, so
+// the blocked direction is pinned via the envelope's own `message`
+// rendering ("… blocks the path"), which the pure backend derives from
+// that same ErrKind (ts/pure/errors.ts renderMessage).
+{
+    const expectConflict = (name, src, wantPath) => {
+        const check = (opName, op) => {
+            let err = null;
+            try { op(src); } catch (e) { err = e; }
+            if (!err || err.error !== "KeyPathConflict") {
+                fail(`${name} (${opName}): expected error=KeyPathConflict, got ${err ? err.error + ": " + err.message : "no throw"}`);
+            } else if (err.error === "BadEscapeSequence") {
+                fail(`${name} (${opName}): BadEscapeSequence overwrote the original category`);
+            } else if (JSON.stringify(err.path) !== JSON.stringify(wantPath)) {
+                fail(`${name} (${opName}): expected path ${JSON.stringify(wantPath)}, got ${JSON.stringify(err.path)}`);
+            } else if (!String(err.message).includes("blocks the path")) {
+                fail(`${name} (${opName}): expected blocked-direction message, got ${JSON.stringify(err.message)}`);
+            } else ok(`${name} (${opName}): KeyPathConflict blocked, path ${JSON.stringify(err.path)}`);
+        };
+        check("loads", loads);
+        check("loadsStrict", loadsStrict);
+        check("canonicalFromSource", canonicalFromSource);
+        check("format", format);
+    };
+
+    // insert_dotted: segment 0 `a` decodes fine, descend hits the leaf
+    // Integer 1 → BlockedByValue; segment 1 `"\q"` (quoted) carries the
+    // invalid `\q` escape but is NEVER reached. kind_path falls back to
+    // the RAW segment spelling (quote, backslash, q, quote).
+    expectConflict("blocked before bad quoted escape", 'a: 1\na."\\q": 2\n', ["a", "\"\\q\""]);
+
+    // Bare-escape variant: same walk — segment 0 blocks first; the bad
+    // bare escape in segment 1 is never decoded. Raw segment is `\q`
+    // (backslash, q).
+    expectConflict("blocked before bad bare escape", "a: 1\na.\\q: 2\n", ["a", "\\q"]);
+
+    // Whitespace policy: kind_path splits the RAW path text and decodes
+    // each segment UNTRIMMED (keys.rs decode_key_segment borrows the
+    // bare path range as-is; quoted interiors are never trimmed either;
+    // ts/pure/lexer.ts decodeKeySegment matches — bare path goes to
+    // processEscapes untrimmed). The insertion walk itself trims per
+    // segment, so segment 0 `a ` still blocks.
+    expectConflict("untrimmed raw diagnostic segments", "a: 1\na . b: 2\n", ["a ", " b"]);
+
+    // Leaf-shape varieties of BlockedByValue (segment 0 is a scalar /
+    // array leaf, segment 1 a plain bare name — nothing exotic):
+    expectConflict("blocked through null leaf", "a: null\na.b: 2\n", ["a", "b"]);
+    expectConflict("blocked through array leaf", "a: [1]\na.b: 2\n", ["a", "b"]);
+    expectConflict("blocked through scalar leaf", "a: 1\na.b: 2\n", ["a", "b"]);
+
+    // Valid escape actually reached: decode_key_segment decodes `\.` to
+    // a literal dot (keys.rs ~443–445); insertion reaches and decodes
+    // segment normally — independent keys, both survive.
+    {
+        let parsed, err = null;
+        try { parsed = loads("k: v\nx\\.y: 1\n"); } catch (e) { err = e; }
+        const want = { k: "v", "x.y": 1 };
+        if (err || JSON.stringify(parsed) !== JSON.stringify(want)) {
+            fail(`escaped dot key: expected ${JSON.stringify(want)}, got ${err ? err.error + ": " + err.message : JSON.stringify(parsed)}`);
+        } else ok("escaped dot key decodes to literal dot");
+    }
+
+    // Control — normal reopen-merge dotted paths (§5.3.2) still work:
+    // the fallback must never fire when every decode succeeds.
+    {
+        let parsed, err = null;
+        try { parsed = loads("a.b: 1\na.c: 2\n"); } catch (e) { err = e; }
+        const want = { a: { b: 1, c: 2 } };
+        if (err || JSON.stringify(parsed) !== JSON.stringify(want)) {
+            fail(`reopen-merge control: expected ${JSON.stringify(want)}, got ${err ? err.error + ": " + err.message : JSON.stringify(parsed)}`);
+        } else ok("reopen-merge control parses normally");
+    }
+}
+
+// --- §5.9.0 unrepresentable-path regressions (pure writers) --------------
+// Expectations derived from the Rust cold path (representable.rs
+// `check_node` / `attach_path`): object keys push onto the path — the
+// EMPTY key included, since it is pushed before the emptiness check —
+// while ARRAY ITEMS push nothing (array indices are NOT path elements
+// in the Rust reference, and the TS walk matches). The materialized
+// path is root-most key first, empty for a root-level offense.
+// Rendering: unrepresentableAt appends ` at [` + per-segment
+// JSON-quoted segments joined with ", " + `]` for a non-empty path.
+// NOTE: a NaN leaf is NOT reachable via dumps — jsToV (numberToV)
+// rejects NaN/Infinity at input mapping with a plain "Message" error —
+// so the deep/nested writers-path witnesses use a CR-byte String leaf
+// (CRByte), which IS reachable. No timing assertions here; the deep
+// case only proves the explicit-stack cold walk completes and
+// materializes the full path.
+{
+    const expectUnrepresentable = (name, fn, wantPath) => {
+        const wantMsg = wantPath.length > 0
+            ? " at [" + wantPath.map((k) => JSON.stringify(k)).join(", ") + "]"
+            : "";
+        let err = null;
+        try { fn(); } catch (e) { err = e; }
+        if (!err || err.error !== "UnrepresentableAt") {
+            fail(`${name}: expected UnrepresentableAt, got ${err ? err.error + ": " + err.message : "no throw"}`);
+        } else if (JSON.stringify(err.path) !== JSON.stringify(wantPath)) {
+            fail(`${name}: expected path ${JSON.stringify(wantPath)}, got ${JSON.stringify(err.path)}`);
+        } else if (!String(err.message).includes(wantMsg)) {
+            fail(`${name}: expected message to contain ${JSON.stringify(wantMsg)}, got ${JSON.stringify(err.message)}`);
+        } else ok(`${name}: path ${JSON.stringify(wantPath)}`);
+    };
+
+    // CR leaf three levels down — path ["a", "b", "c"].
+    expectUnrepresentable("CR byte at depth 3", () => dumps({ a: { b: { c: "a\rb" } } }), ["a", "b", "c"]);
+
+    // Empty key inside nesting — the "" key IS the last path element
+    // (pushed before the emptiness check, as in check_node).
+    expectUnrepresentable("empty key inside nesting", () => dumps({ x: { "": 1 } }), ["x", ""]);
+
+    // CR byte under an array item's nested pair — array items add no
+    // path element, so the path stops at the object key ["k"] (matches
+    // representable.rs check_node, which recurses into arrays without
+    // touching the path).
+    expectUnrepresentable("CR byte under array item", () => dumps([{ k: "a\rb" }]), ["k"]);
+
+    // 2,000-level chain: the explicit-stack cold walk completes and
+    // materializes the FULL root-most-first path. Expected path built
+    // independently with the same loop shape (independent oracle).
+    {
+        let v = "a\rb";
+        for (let i = 0; i < 2000; i++) v = { [`key${i}`]: v };
+        const wantPath = [];
+        for (let i = 1999; i >= 0; i--) wantPath.push(`key${i}`);
+        expectUnrepresentable("CR byte at depth 2000", () => dumps(v), wantPath);
+    }
+
+    // Formatter cold walk (findOffenseP): `\r` is a valid §3.7 escape,
+    // so the parser ACCEPTS the decoded CR and format()'s emitter
+    // signals CRByte mid-emission; the offense path is ["k"].
+    expectUnrepresentable("formatter CR byte", () => format('k: "a\\rb"\n'), ["k"]);
+}
+
 const elapsed = Date.now() - started;
 console.log(`\n[perf] total wall clock: ${elapsed} ms (ceiling ${CEILING_MS} ms)`);
 if (elapsed > CEILING_MS) {

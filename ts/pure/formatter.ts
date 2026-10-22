@@ -5,6 +5,7 @@
 // every comment / blank line is attached to the construct that follows
 // it and re-emitted at that construct's indent.
 
+import { decodedPathSegments } from "./insert.js";
 import { decodeRange, eqLit, leadingBomLen, startsWithLit, trimWs, trimWsEnd, trimWsStart, validateUtf8 } from "./bytes.js";
 import { throwKtav, type ErrCtx, type Span } from "./errors.js";
 import {
@@ -32,6 +33,8 @@ import {
     stringNeedsMultiline,
     unrepresentableAt,
     writerSignalCode,
+    materializePath,
+    type PathNode,
     type ReasonCodeName,
 } from "./writer.js";
 
@@ -89,10 +92,6 @@ function isObjectP(v: [Trivia, PValue]): boolean {
 // Dotted insertion over PObject — insert.rs / insert.ts semantics.
 // ---------------------------------------------------------------------------
 
-function decodedPathSegmentsP(bytes: Uint8Array, lo: number, hi: number, ctx: ErrCtx): string[] {
-    return splitKeyPath(bytes, lo, hi).map(([slo, shi]) => decodeKeySegment(bytes, slo, shi, ctx));
-}
-
 function rawPathSegmentsP(bytes: Uint8Array, lo: number, hi: number): string[] {
     return splitKeyPath(bytes, lo, hi).map(([slo, shi]) => decodeRange(bytes, slo, shi));
 }
@@ -135,13 +134,13 @@ function insertP(
                         },
                     },
                     bytes,
-                    decodedPathSegmentsP(bytes, pathLo, pathHi, ctx),
+                    decodedPathSegments(bytes, pathLo, pathHi, ctx),
                 );
             }
             throwKtav(
                 { k: "DuplicateKey", line: ctx.line, key: decodeRange(bytes, pathLo, pathHi), span: keySpan },
                 bytes,
-                decodedPathSegmentsP(bytes, pathLo, pathHi, ctx),
+                decodedPathSegments(bytes, pathLo, pathHi, ctx),
             );
         }
         table.pairs.set(decoded, value);
@@ -184,7 +183,7 @@ function insertP(
                         conflict: { t: "blocked" },
                     },
                     bytes,
-                    decodedPathSegmentsP(bytes, pathLo, pathHi, ctx),
+                    decodedPathSegments(bytes, pathLo, pathHi, ctx),
                 );
             }
         } else {
@@ -192,7 +191,7 @@ function insertP(
                 throwKtav(
                     { k: "DuplicateKey", line: ctx.line, key: decodeRange(bytes, pathLo, pathHi), span: keySpan },
                     bytes,
-                    decodedPathSegmentsP(bytes, pathLo, pathHi, ctx),
+                    decodedPathSegments(bytes, pathLo, pathHi, ctx),
                 );
             }
             cur.pairs.set(decoded, value);
@@ -915,21 +914,22 @@ function fmtFloat(s: string): string {
 }
 
 /** First §5.9.0 offense over the trivia tree in document order
- *  (representable.rs `check_node`). EXPLICIT STACK, DFS pre-order —
- *  the first hit in pop order is the first offense in document order. */
-function findOffenseP(value: PValue, path: string[]): string[] | null {
-    type Frame = { v: PValue; path: string[]; key: string | null };
-    const stack: Frame[] = [{ v: value, path, key: null }];
+ *  (representable.rs `check_node`); explicit stack, DFS pre-order.
+ *  Parent-linked path nodes materialized only on return (writer.ts
+ *  findOffense): array frames add no path element; keyless root → []. */
+function findOffenseP(value: PValue): string[] | null {
+    type Frame = { v: PValue; node: PathNode | null; key: string | null };
+    const stack: Frame[] = [{ v: value, node: null, key: null }];
     while (stack.length > 0) {
         const fr = stack.pop()!;
-        if (fr.key !== null && fr.key.length === 0) return fr.path;
+        if (fr.key !== null && fr.key.length === 0) return materializePath(fr.node);
         switch (fr.v.t) {
             case "object": {
                 const entries = Array.from(fr.v.pairs.entries());
                 for (let i = entries.length - 1; i >= 0; i--) {
                     stack.push({
                         v: entries[i]![1][1],
-                        path: fr.path.concat(entries[i]![0]),
+                        node: { parent: fr.node, key: entries[i]![0] },
                         key: entries[i]![0],
                     });
                 }
@@ -937,14 +937,14 @@ function findOffenseP(value: PValue, path: string[]): string[] | null {
             }
             case "array": {
                 for (let i = fr.v.items.length - 1; i >= 0; i--) {
-                    stack.push({ v: fr.v.items[i]![1], path: fr.path, key: null });
+                    stack.push({ v: fr.v.items[i]![1], node: fr.node, key: null });
                 }
                 break;
             }
             case "string":
-                if (fr.v.v.includes("\r")) return fr.path;
+                if (fr.v.v.includes("\r")) return materializePath(fr.node);
                 if (stringNeedsMultiline(fr.v.v)) {
-                    if (!chooseMultilineForm(fr.v.v, false).ok) return fr.path;
+                    if (!chooseMultilineForm(fr.v.v, false).ok) return materializePath(fr.node);
                 }
                 break;
             default:
@@ -990,7 +990,7 @@ export function formatText(text: string): string {
         const code =
             e instanceof FmtSignal ? e.code : writerSignalCode(e);
         if (code !== null) {
-            const path = findOffenseP(doc.root, []);
+            const path = findOffenseP(doc.root);
             unrepresentableAt(code, path ?? []);
         }
         throw e;

@@ -5,6 +5,8 @@
 // (`ryu/src/pretty/mod.rs format64`) the canonical form is defined
 // against.
 
+import { decodeRange } from "./bytes.js";
+
 // ---------------------------------------------------------------------------
 // §3.6 integer literal grammar
 // ---------------------------------------------------------------------------
@@ -232,18 +234,13 @@ export function isFloatLiteral(bytes: Uint8Array, lo: number, hi: number): boole
  *  classify.rs `parse_float_value`: null on NaN/Infinity (overflow →
  *  String per §5.2 rule 14). */
 export function parseFloatValue(bytes: Uint8Array, lo: number, hi: number): number | null {
-    let text = decodeAsciiish(bytes, lo, hi);
+    // Float literal grammar is pure ASCII by construction, so the
+    // one-pass byte-range decoder is exact here.
+    let text = decodeRange(bytes, lo, hi);
     if (text.indexOf("_") !== -1) text = text.replace(/_/g, "");
     const v = Number(text);
     if (Number.isNaN(v) || !Number.isFinite(v)) return null;
     return v;
-}
-
-function decodeAsciiish(bytes: Uint8Array, lo: number, hi: number): string {
-    // Float literal grammar is pure ASCII by construction.
-    let out = "";
-    for (let i = lo; i < hi; i++) out += String.fromCharCode(bytes[i]!);
-    return out;
 }
 
 // ---------------------------------------------------------------------------

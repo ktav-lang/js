@@ -179,5 +179,44 @@ export function runCrossBackend({ backends, readTextFile, readBytes, walkKtavFil
         });
     }
 
+    // Independent-oracle dotted-key diagnostic-path pins (see the
+    // dotted-key block in run-perf-checks.mjs for the full insert.rs /
+    // envelope.rs derivation). The expectation is the Rust-derived
+    // CONSTANT, not cross-backend agreement — all backends could share
+    // the same defect, so agreement alone proves nothing. insert_dotted
+    // blocks at segment 0 (`a` → leaf Integer) before segment 1's
+    // invalid `\q` escape is ever decoded; envelope.rs kind_path falls
+    // back to the RAW segment spelling. loadsStrict blocks identically:
+    // for the native backends it is the same Rust insert_dotted walk,
+    // and the pure backend stops at the same earlier segment. The wire
+    // envelope has NO `conflict` field (KtavErrorEnvelope,
+    // ts/internal/api.ts), so only error + path are pinned here.
+    for (const label of labels) {
+        const b = backends[label];
+        const expectConflictPath = (opName, op) => {
+            let err = null;
+            try { op('a: 1\na."\\q": 2\n'); } catch (e) { err = e; }
+            if (!err) throw new Error(`[${label}] ${opName} accepted a conflicting dotted key`);
+            if (err.error === "BadEscapeSequence") {
+                throw new Error(`[${label}] ${opName}: BadEscapeSequence overwrote the original category`);
+            }
+            if (err.error !== "KeyPathConflict") {
+                throw new Error(`[${label}] ${opName}: error = ${JSON.stringify(err.error)}, want "KeyPathConflict"`);
+            }
+            if (JSON.stringify(err.path) !== JSON.stringify(["a", "\"\\q\""])) {
+                throw new Error(`[${label}] ${opName}: path = ${JSON.stringify(err.path)}, want ${JSON.stringify(["a", "\"\\q\""])}`);
+            }
+        };
+        test(`cross diagnostic-path: [${label}] loads keeps KeyPathConflict over later bad escape`, () => {
+            expectConflictPath("loads", b.loads);
+        });
+        test(`cross diagnostic-path: [${label}] loadsStrict keeps KeyPathConflict over later bad escape`, () => {
+            expectConflictPath("loadsStrict", b.loadsStrict);
+        });
+        test(`cross diagnostic-path: [${label}] format keeps KeyPathConflict over later bad escape`, () => {
+            expectConflictPath("format", b.format);
+        });
+    }
+
     return { passed, failed, total: passed + failed };
 }
