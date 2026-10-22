@@ -11,14 +11,27 @@ import type { KtavValue } from "../internal/api.js";
  * `Value::Float(String)` do) so the writer task can emit them
  * byte-exactly; conversion to JS numbers happens only in `toJs`.
  */
+/**
+ * Compound variants carry distinct interfaces so narrowing on the `t`
+ * discriminant yields exactly `Map<string, V>` / `V[]` — no casts.
+ */
+export interface VObject {
+    t: "object";
+    v: Map<string, V>;
+}
+export interface VArray {
+    t: "array";
+    v: V[];
+}
+export type VCompound = VObject | VArray;
+
 export type V =
     | { t: "null" }
     | { t: "bool"; v: boolean }
     | { t: "int"; v: string }
     | { t: "float"; v: string }
     | { t: "string"; v: string }
-    | { t: "array"; v: V[] }
-    | { t: "object"; v: Map<string, V> };
+    | VCompound;
 
 /** Kind labels used verbatim in `KeyPathConflict` diagnostics
  *  (`build/insert.rs InsertShape for Value`). */
@@ -45,7 +58,7 @@ export function isObjectV(v: V): boolean {
     return v.t === "object";
 }
 
-export function newObjectV(): V {
+export function newObjectV(): VObject {
     return { t: "object", v: new Map() };
 }
 

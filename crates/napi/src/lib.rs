@@ -19,7 +19,21 @@ use napi_derive::napi;
 use rustc_hash::FxBuildHasher;
 
 fn envelope_json(err: &ktav::Error, source: &str) -> String {
-    ktav::ErrorEnvelope::from_error(err, source).to_json()
+    let mut env = ktav::ErrorEnvelope::from_error(err, source);
+    // Spec § 6: every source-content parse error carries a 1-based line.
+    // `from_error` takes the line from `Error::line()`, which is `None`
+    // for an EOF-detected `UnclosedCompound` even though the error
+    // carries an opener..EOF span. This layer has the source, so the
+    // line is derived from the span's start (the opener line) here
+    // rather than shipping a null. Errors with no source position (Io,
+    // writer rejections) have no span and keep their honest nulls.
+    // Ported verbatim from `rust/src/cabi/envelope.rs::envelope`.
+    if env.line.is_none() && !source.is_empty() {
+        if let Some(span) = env.span {
+            env.line = Some(line_of_offset(source.as_bytes(), span.start as usize));
+        }
+    }
+    env.to_json()
 }
 
 fn message_envelope(text: impl Into<String>) -> String {
@@ -46,8 +60,7 @@ fn not_utf8_envelope(src: &[u8], err: std::str::Utf8Error) -> String {
             end += 1;
         }
     }
-    let mut env =
-        ktav::ErrorEnvelope::from_error(&ktav::Error::InvalidUtf8 { valid_up_to }, "");
+    let mut env = ktav::ErrorEnvelope::from_error(&ktav::Error::InvalidUtf8 { valid_up_to }, "");
     // `Span` is u32-based; a >4 GiB document is beyond what `Span` can
     // address anywhere in this crate, so saturate (same trade-off as the
     // cabi layer).

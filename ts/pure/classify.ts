@@ -13,7 +13,12 @@ import {
     ryuFormat,
     tryParseInteger,
 } from "./numbers.js";
-import { parseInlineArray, parseInlineObject, scanInlineCloser } from "./inline.js";
+import {
+    parseInlineArray,
+    parseInlineObject,
+    scanInlineBody,
+    type InlineBodyScan,
+} from "./inline.js";
 import { findUnescapedColon } from "./lexer.js";
 import type { V } from "./values.js";
 
@@ -21,8 +26,8 @@ export type ValueStart =
     | { t: "scalar"; lo: number; hi: number }
     | { t: "null" }
     | { t: "bool"; v: boolean }
-    | { t: "int"; dec: string }
-    | { t: "float"; dec: string }
+    | { t: "int"; v: string }
+    | { t: "float"; v: string }
     | { t: "emptyObject" }
     | { t: "emptyArray" }
     | { t: "openObject" }
@@ -126,7 +131,7 @@ export function classifyValueStart(
     // §5.2 rule 13: integer literal.
     if (fastPlainDecimalI64(bytes, tLo, tHi)) {
         // Already canonical decimal — keep the source spelling.
-        return { t: "int", dec: decodeRange(bytes, tLo, tHi) };
+        return { t: "int", v: decodeRange(bytes, tLo, tHi) };
     }
     const intVal = tryParseInteger(bytes, tLo, tHi);
     if (intVal !== null) {
@@ -134,7 +139,7 @@ export function classifyValueStart(
         if (strict && canonical !== decodeRange(bytes, tLo, tHi)) {
             lossyScalar(decodeRange(bytes, tLo, tHi), canonical, ctx);
         }
-        return { t: "int", dec: canonical };
+        return { t: "int", v: canonical };
     }
 
     // §5.2 rule 14: float literal (finite; binary64 roundTiesToEven —
@@ -147,9 +152,9 @@ export function classifyValueStart(
                 const rendered = canonicalFloat(canonical);
                 const body = decodeRange(bytes, tLo, tHi);
                 if (rendered !== body) lossyScalar(body, rendered, ctx);
-                return { t: "float", dec: canonical };
+                return { t: "float", v: canonical };
             }
-            return { t: "float", dec: canonical };
+            return { t: "float", v: canonical };
         }
     }
 
@@ -159,31 +164,32 @@ export function classifyValueStart(
 
 /**
  * §5.2 rules 6–9 tri-state dispatch for a `{`/`[`-prefixed body —
- * classify.rs `dispatch_inline_compound`. A closed compound whose
- * closer is the last byte parses inline; a closer followed by content
- * is `MalformedInlineCompound` (§6.12); no closer is
- * `UnterminatedInlineCompound` (§6.11); `BadEscapeSequence` (§6.13)
- * takes precedence per the rules-6–9 preamble.
+ * classify.rs `dispatch_inline_compound`. ONE `scanInlineBody` pass
+ * yields the closer decision, escape validation (BadEscapeSequence
+ * takes precedence per the rules-6–9 preamble) and the top-level
+ * segments consumed by the nested parse without a re-scan. A closed
+ * compound whose closer is the last byte parses inline; a closer
+ * followed by content is `MalformedInlineCompound` (§6.12); no closer
+ * is `UnterminatedInlineCompound` (§6.11).
  */
-function dispatchInlineCompound(
+function finishInlineCompound(
     bytes: Uint8Array,
     lo: number,
     hi: number,
     ctx: ErrCtx,
     strict: boolean,
+    scan: InlineBodyScan,
     open: number,
-    close: number,
-): ValueStart {
-    const r = scanInlineCloser(bytes, lo, hi, open, close, ctx);
-    if (r.t === "badEscape") throwKtav(r.kind, ctx.bytes, null);
-    if (r.t === "notFound") {
+): V {
+    if (scan.badEscape !== null) throwKtav(scan.badEscape, ctx.bytes, null);
+    if (scan.closerIdx === -1) {
         throwKtav(
             { k: "UnterminatedInlineCompound", line: ctx.line, span: ctx.span },
             ctx.bytes,
             null,
         );
     }
-    if (r.idx !== hi - 1) {
+    if (scan.closerIdx !== hi - 1) {
         throwKtav(
             {
                 k: "MalformedInlineCompound",
@@ -196,10 +202,22 @@ function dispatchInlineCompound(
             null,
         );
     }
-    const v =
-        open === 0x7b
-            ? parseInlineObject(bytes, lo, hi, ctx, strict, 0)
-            : parseInlineArray(bytes, lo, hi, ctx, strict, 0);
+    return open === 0x7b
+        ? parseInlineObject(bytes, lo, hi, ctx, strict, 0, scan.segments, scan.spans)
+        : parseInlineArray(bytes, lo, hi, ctx, strict, 0, scan.segments, scan.spans);
+}
+
+function dispatchInlineCompound(
+    bytes: Uint8Array,
+    lo: number,
+    hi: number,
+    ctx: ErrCtx,
+    strict: boolean,
+    open: number,
+    close: number,
+): ValueStart {
+    const scan = scanInlineBody(bytes, lo, hi, open, close, ctx);
+    const v = finishInlineCompound(bytes, lo, hi, ctx, strict, scan, open);
     return { t: "inline", v };
 }
 
@@ -223,7 +241,7 @@ export function classifyInlineScalar(
         return { t: "string", v: decodeRange(bytes, lo, hi) };
     }
     if (fastPlainDecimalI64(bytes, lo, hi)) {
-        return { t: "int", dec: decodeRange(bytes, lo, hi) };
+        return { t: "int", v: decodeRange(bytes, lo, hi) };
     }
     const intVal = tryParseInteger(bytes, lo, hi);
     if (intVal !== null) {
@@ -231,7 +249,7 @@ export function classifyInlineScalar(
         if (strict && canonical !== decodeRange(bytes, lo, hi)) {
             lossyScalar(decodeRange(bytes, lo, hi), canonical, ctx);
         }
-        return { t: "int", dec: canonical };
+        return { t: "int", v: canonical };
     }
     if (isFloatLiteral(bytes, lo, hi)) {
         const val = parseFloatValue(bytes, lo, hi);
@@ -241,9 +259,9 @@ export function classifyInlineScalar(
                 const rendered = canonicalFloat(canonical);
                 const body = decodeRange(bytes, lo, hi);
                 if (rendered !== body) lossyScalar(body, rendered, ctx);
-                return { t: "float", dec: canonical };
+                return { t: "float", v: canonical };
             }
-            return { t: "float", dec: canonical };
+            return { t: "float", v: canonical };
         }
     }
     return { t: "string", v: decodeRange(bytes, lo, hi) };
@@ -292,32 +310,8 @@ function diagnoseRootInline(
     open: number,
     close: number,
 ): RootResult {
-    const r = scanInlineCloser(bytes, lo, hi, open, close, ctx);
-    if (r.t === "badEscape") throwKtav(r.kind, ctx.bytes, null);
-    if (r.t === "notFound") {
-        throwKtav(
-            { k: "UnterminatedInlineCompound", line: ctx.line, span: ctx.span },
-            ctx.bytes,
-            null,
-        );
-    }
-    if (r.idx !== hi - 1) {
-        throwKtav(
-            {
-                k: "MalformedInlineCompound",
-                line: ctx.line,
-                span: ctx.span,
-                detail:
-                    "matching closer is not the last byte of the body; non-whitespace content follows the closed inline compound",
-            },
-            ctx.bytes,
-            null,
-        );
-    }
-    const v =
-        open === 0x7b
-            ? parseInlineObject(bytes, lo, hi, ctx, strict, 0)
-            : parseInlineArray(bytes, lo, hi, ctx, strict, 0);
+    const scan = scanInlineBody(bytes, lo, hi, open, close, ctx);
+    const v = finishInlineCompound(bytes, lo, hi, ctx, strict, scan, open);
     return open === 0x7b ? { t: "inlineObject", v } : { t: "inlineArray", v };
 }
 
@@ -333,7 +327,7 @@ export function isPairShape(bytes: Uint8Array, lo: number, hi: number): boolean 
     let keyHi = colon;
     for (;;) {
         let s = keyHi - 1;
-        while (s > lo && (bytes[s] & 0xc0) === 0x80) s--;
+        while (s > lo && (bytes[s]! & 0xc0) === 0x80) s--;
         const len = wsLenAt(bytes, s, keyHi);
         if (len > 0 && s + len === keyHi) {
             keyHi = s;

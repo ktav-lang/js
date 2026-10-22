@@ -122,7 +122,7 @@ function convertUnrepresentable(value) {
 
 function text(path) { return readFileSync(path, "utf8"); }
 
-export async function runFfiCorpus({ loads, loadsStrict, dumps, canonicalFromSource, check, label }) {
+export async function runFfiCorpus({ loads, loadsStrict, loadsBytes, dumps, canonicalFromSource, check, label }) {
     let corpus;
     await check("spec 0.8: exact corpus inventory", async () => { corpus = inventory(); });
     if (!corpus) return;
@@ -143,17 +143,37 @@ export async function runFfiCorpus({ loads, loadsStrict, dumps, canonicalFromSou
     for (const { stem, files: [input, oraclePath] } of corpus.invalid) {
         await check(`spec invalid: ${stem}`, async () => {
             if (stem.includes("invalid_utf8/")) {
-                // The C ABI core HAS a byte-level not_utf8_envelope
-                // contract (rust/src/cabi/envelope.rs), but this FFI
-                // binding exposes no raw-byte entry, and a TextDecoder-
-                // only check never proves the PARSER rejects the bytes.
-                // Fail loudly instead of faking a pass — no vacuous
-                // green for the raw-byte conformance claim.
-                throw new Error(
-                    "adapter required: loadsBytes (raw-byte conformance, spec 0.8.1 §6.15) — " +
-                    "this FFI binding exposes no raw-byte entry, so invalid_utf8/ fixtures " +
-                    "cannot be exercised honestly here",
-                );
+                // Raw-byte conformance (spec 0.8.1 §6.15): the raw bytes
+                // ARE the fixture, and only a byte-level entry can prove
+                // the PARSER rejects them. `ktav_loads` validates UTF-8
+                // at the ABI boundary (rust/src/cabi/ops.rs →
+                // not_utf8_envelope), so loadsBytes must reject with the
+                // structured InvalidUtf8 envelope: correct class, a
+                // nonempty byte span, and a 1-based raw line.
+                if (typeof loadsBytes !== "function") {
+                    throw new Error("adapter required: loadsBytes(bytes) -> value (raw-byte conformance, spec 0.8.1 §6.15)");
+                }
+                const bytes = readFileSync(input);
+                let u8err = null;
+                try { await loadsBytes(bytes); } catch (e) { u8err = e; }
+                if (u8err === null) throw new Error(`invalid_utf8: loadsBytes() accepted ${stem}`);
+                if (u8err.error !== "InvalidUtf8") {
+                    throw new Error(`invalid_utf8: expected error=InvalidUtf8, got ${JSON.stringify(u8err.error)} (${String(u8err.message || u8err)})`);
+                }
+                if (!u8err.span || typeof u8err.span.start !== "number" || typeof u8err.span.end !== "number" || u8err.span.end <= u8err.span.start) {
+                    throw new Error(`invalid_utf8: expected nonempty span, got ${JSON.stringify(u8err.span)}`);
+                }
+                if (typeof u8err.line !== "number" || u8err.line < 1) {
+                    throw new Error(`invalid_utf8: expected raw line >= 1, got ${JSON.stringify(u8err.line)}`);
+                }
+                // The raw backend WAS exercised above; the InvalidUtf8
+                // branch is complete. Stop here — do NOT fall through to
+                // the text-mode `loads(text(input))` below: TextDecoder
+                // replaces invalid bytes before the parser runs, so a
+                // text-mode load can never reproduce InvalidUtf8 and
+                // would spuriously fail with "loads() accepted invalid
+                // fixture".
+                return;
             }
             const expected = JSON.parse(text(oraclePath)).expected_error;
             let error;

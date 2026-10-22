@@ -188,6 +188,21 @@ export async function loadsStrict<T = KtavValue>(src: string): Promise<T> {
     return decode(result) as T;
 }
 
+/**
+ * Raw-byte entry (spec 0.8 § 3.1/§ 6.15): parse a Uint8Array of Ktav
+ * source text WITHOUT any TextEncoder round-trip, so the exact bytes
+ * reach the native parser. `ktav_loads` itself validates UTF-8 at the
+ * ABI boundary (rust/src/cabi/ops.rs `loads` → `not_utf8_envelope`),
+ * so invalid bytes throw a `KtavError` with `error === "InvalidUtf8"`,
+ * a byte-exact span and a raw-bytes line number — before any grammar
+ * diagnosis. This is the only path that can honestly exercise the
+ * invalid_utf8/ conformance fixtures.
+ */
+export async function loadsBytes<T = KtavValue>(bytes: Uint8Array): Promise<T> {
+    const result = await callNative("loads", bytes);
+    return decode(result) as T;
+}
+
 export async function dumps<T extends KtavInput = KtavInput>(value: T): Promise<string> {
     if (value === null || typeof value !== "object") {
         throw ktavMessageError("top-level Ktav document must be an object or array");
@@ -249,9 +264,10 @@ export async function canonicalFromSource(src: string): Promise<string> {
 export const ktav: Pick<Ktav, never> & {
     loads: typeof loads;
     loadsStrict: typeof loadsStrict;
+    loadsBytes: typeof loadsBytes;
     dumps: typeof dumps;
     stringifyForceStrings: typeof stringifyForceStrings;
     format: typeof format;
     emitCanonical: typeof emitCanonical;
     canonicalFromSource: typeof canonicalFromSource;
-} = { loads, loadsStrict, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource };
+} = { loads, loadsStrict, loadsBytes, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource };

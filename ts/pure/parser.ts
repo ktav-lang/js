@@ -113,8 +113,8 @@ function trimEndWs(s: string): string {
 export function finishMultiline(mode: MultilineMode, lines: string[]): string {
     if (mode === "verbatim") return lines.join("\n");
     if (lines.length === 1) {
-        const [lo, hi] = trimStringWs(lines[0]);
-        return lines[0].slice(lo, hi);
+        const [lo, hi] = trimStringWs(lines[0]!);
+        return lines[0]!.slice(lo, hi);
     }
     // The common prefix is byte-identified across the first non-blank
     // line's run and every other non-blank line's run.
@@ -213,7 +213,7 @@ export class KtavParser {
         }
         if (this.stack.length > 1) {
             const kind = this.stack[this.stack.length - 1]!.t;
-            const start = this.openerOffsets[this.openerOffsets.length - 1];
+            const start = this.openerOffsets[this.openerOffsets.length - 1]!;
             throwKtav(
                 { k: "UnclosedCompound", kind, span: { start, end: eofOffset } },
                 this.bytes,
@@ -224,7 +224,7 @@ export class KtavParser {
         // UnclosedCompound; an implicit root frame legitimately stays.
         if (this.rootIsExplicitCompound && !this.rootConsumed) {
             const kind = this.stack[this.stack.length - 1]!.t;
-            const start = this.openerOffsets[this.openerOffsets.length - 1];
+            const start = this.openerOffsets[this.openerOffsets.length - 1]!;
             throwKtav(
                 { k: "UnclosedCompound", kind, span: { start, end: eofOffset } },
                 this.bytes,
@@ -470,10 +470,10 @@ export class KtavParser {
                 this.insertValueStart(key, { t: "bool", v: vs.v }, lineNum, keySpan);
                 return;
             case "int":
-                this.insertValueStart(key, { t: "int", v: vs.dec }, lineNum, keySpan);
+                this.insertValueStart(key, { t: "int", v: vs.v }, lineNum, keySpan);
                 return;
             case "float":
-                this.insertValueStart(key, { t: "float", v: vs.dec }, lineNum, keySpan);
+                this.insertValueStart(key, { t: "float", v: vs.v }, lineNum, keySpan);
                 return;
             case "emptyObject":
                 this.insertValueStart(key, newObjectV(), lineNum, keySpan);

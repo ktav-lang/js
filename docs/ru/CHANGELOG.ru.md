@@ -110,8 +110,10 @@ MINOR bump — ломающий.
 - Версии пакета, platform subpackages, workspace metadata и lockfile —
   `0.8.1`.
 - Rust-зависимость — опубликованный `ktav` 0.8.1.
-- Submodule спецификации закреплён на опубликованном коммите Ktav
-  0.8.1 (корпус 228 parseable / 90 invalid / 5 unrepresentable /
+- Submodule спецификации: релизная интеграция закрепляет его на
+  опубликованном коммите Ktav 0.8.1
+  (388982118c0d8f767bf283356ac9c9bb50fdc3f5)
+  (корпус 228 parseable / 90 invalid / 5 unrepresentable /
   4 parseable-unrepresentable / 13 canonical фикстур, из них 9 новых
   фикстур `raw_bytes`).
 

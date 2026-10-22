@@ -221,14 +221,31 @@ function lineTextAt(bytes: Uint8Array, pos: number): string | null {
     return tryDecodeRange(bytes, lineStart, end);
 }
 
-/** The verbatim `Display` rendering — `error/display.rs`, byte-exact. */
+/** The verbatim `Display` rendering — `error/display.rs`, byte-exact.
+ *  Every `ErrorKind`-based error is raised as `Error::Structured(k)`,
+ *  whose `Display` is `"Syntax error: {kind}"` (display.rs lines
+ *  147–168) — so the envelope's `message` is the FULL public Display,
+ *  wrapper included. `InvalidUtf8` is its own top-level `Error`
+ *  variant with its own full message (no wrapper). `Other` is raised
+ *  through `Error::Structured(ErrorKind::Other { .. })` (parser/mod.rs
+ *  245/500/590, fmt_parser/positioned.rs 275/539/636), so it gets the
+ *  same `"Syntax error: "` wrapper around its bare message. */
 function renderMessage(kind: ErrKind): string {
+    if (kind.k === "InvalidUtf8") {
+        return (
+            "InvalidUtf8: input is not valid UTF-8; first invalid byte sequence at byte offset " +
+            kind.validUpTo
+        );
+    }
+    return "Syntax error: " + renderKindMessage(kind);
+}
+
+/** ErrorKind's own Display (display.rs lines ~90–146) — the wrapper
+ *  text is applied by `renderMessage`. */
+function renderKindMessage(
+    kind: Exclude<ErrKind, { k: "InvalidUtf8" }>,
+): string {
     switch (kind.k) {
-        case "InvalidUtf8":
-            return (
-                "InvalidUtf8: input is not valid UTF-8; first invalid byte sequence at byte offset " +
-                kind.validUpTo
-            );
         case "MissingSeparatorSpace":
             return `Line ${kind.line}: MissingSeparatorSpace: separator must be followed by whitespace or end of line`;
         case "LossyScalar":

@@ -11,7 +11,7 @@
 
 import * as testPaths from "../shared/test-paths.mjs";
 import { runFfiCorpus } from "../ffi/corpus.mjs";
-import { loads, loadsStrict, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource, setLibraryPath } from "../../dist/ts/ffi-deno.js";
+import { loads, loadsStrict, loadsBytes, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource, setLibraryPath } from "../../dist/ts/ffi-deno.js";
 
 if (testPaths.cabiBuilt()) setLibraryPath(testPaths.cabi);
 
@@ -155,7 +155,7 @@ await check("0.7.1: parse error carries structured envelope", async () => {
     if (err.spec_section === undefined) throw new Error("missing spec_section field");
 });
 
-await runFfiCorpus({ loads, loadsStrict, dumps, canonicalFromSource, check, label: "deno-ffi" });
+await runFfiCorpus({ loads, loadsStrict, loadsBytes, dumps, canonicalFromSource, check, label: "deno-ffi" });
 
 console.log(`\n[deno-ffi] ${passed}/${passed + failed} passed`);
 Deno.exit(failed > 0 ? 1 : 0);

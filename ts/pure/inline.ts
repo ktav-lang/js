@@ -1,19 +1,42 @@
 // The inline-compound subsystem (spec §5.8): the shared byte-at-a-time
-// scanner, top-level comma splitting, closer scanning, and inline
-// object/array parsing — ported from
+// scanner (closer find + top-level comma splitting + escape validation
+// in ONE pass), and inline object/array parsing — ported from
 // `rust/src/document/parser/inline/scan/scanner.rs`, `scan/split.rs`,
 // `inline/compound.rs` and `inline/scan/scan_config.rs`.
 //
 // Fidelity notes:
 // - The Rust engine monomorphizes six configs of one machine. Here a
-//   single quote-aware machine serves scan/find (they are byte-
-//   identical on quote-free input by R8-F2), and split uses the same
-//   machine with split-mode policy. The `InlineBounds` gate-scan memo
-//   is a pure optimization with a proven purity invariant and is
-//   deliberately not ported — every decision below runs the live scan.
+//   single quote-aware machine serves every purpose: it validates
+//   escapes, tracks the scope stack to find the body's own closer,
+//   and in the same pass records EVERY gated compound's matching
+//   closer byte and its own top-level comma segments (`spans`), so
+//   the top-level body range is scanned exactly ONCE per parseValue
+//   entry (`scanInlineBody`) and nested compounds are resolved by
+//   O(1) span lookups. Nesting is counted in place (§5.8.5 value-
+//   start gating + per-scope raw markers), reproducing split-mode's
+//   opener-jump verdicts without the sub-scans.
+// - COMPLEXITY (honest bound): parsing an inline body of length n
+//   costs ONE pass over the top-level body per parseValue entry
+//   (O(n)); that pass records, for EVERY gated compound opener, the
+//   byte index of its matching closer AND that compound's own
+//   top-level comma segments (`spans`, O(compounds) map memory).
+//   Nested compounds are NEVER re-scanned: their parse is a pure
+//   O(1) span lookup + segment consumption. Block-context frames are
+//   line-oriented and never re-scanned. There are NO duplicate
+//   same-level passes: closer-find, escape validation, comma
+//   splitting and span recording share one cursor. (The previous
+//   O(n · MAX_INLINE_DEPTH) bound is gone — nested bodies no longer
+//   recurse into `scanInlineBody`.)
 // - MAX_INLINE_DEPTH = 128 bounds INLINE recursion only (compound.rs);
 //   the block (line-oriented) frame stack has NO depth limit in the
 //   Rust core.
+//
+// Error precedence (unchanged from the previous three-pass flow, whose
+// first pass was this same machine): scanning is byte-ordered, so
+// `BadEscapeSequence` (§6.13) is raised before the closer decision
+// (`UnterminatedInlineCompound` §6.11 / closer-not-at-end
+// `MalformedInlineCompound` §6.12), which in turn precedes all
+// per-segment errors raised while consuming the segments.
 
 import { decodeRange, trimWs, wsLenAt, eqLit } from "./bytes.js";
 import { throwKtav, type ErrCtx } from "./errors.js";
@@ -38,7 +61,7 @@ type Stop =
     | { t: "exhausted" }
     | { t: "badEscape"; kind: ErrKindBadEscape };
 
-interface ErrKindBadEscape {
+export interface ErrKindBadEscape {
     k: "BadEscapeSequence";
     line: number;
     span: ErrCtx["span"];
@@ -50,6 +73,20 @@ interface Frame {
     inKey: boolean;
     segStart: boolean;
     raw: boolean;
+    /** Byte index of this compound's gated opener (span key). */
+    openIdx: number;
+    /** This compound's own next segment start (per-level segAt). */
+    segAt: number;
+    /** This compound's own top-level (depth-1 of itself) segments. */
+    segments: Array<[number, number]>;
+}
+
+/** Everything a nested parse needs about one gated compound: the
+ *  matching closer's byte index and the compound's own top-level
+ *  comma segments — both recorded by the parent body's single pass. */
+export interface InlineSpan {
+    closerIdx: number;
+    segments: Array<[number, number]>;
 }
 
 interface MachineState {
@@ -63,55 +100,29 @@ interface MachineState {
     segAt: number;
     stack: Frame[];
     segments: Array<[number, number]>;
+    /** opener byte index → its closer + own segments. */
+    spans: Map<number, InlineSpan>;
     stop: Stop | null;
 }
 
-/** Mode knobs shared by the three machine shapes. */
+/** Mode knobs of the single body machine (scan_config.rs policy). */
 interface Mode {
-    /** find/scan: `}`/`]` decrement shared depth; split: literal. */
-    closersLiteral: boolean;
-    /** scan only: validate `\X` with BadEscapeSequence precedence. */
+    /** Validate `\X` with BadEscapeSequence precedence. */
     validateEscapes: boolean;
-    /** find/scan: `::` raw marker + prev tracking. */
+    /** `::` raw marker + prev tracking (§5.4). */
     trackRaw: boolean;
-    /** split: record a segment at every loop-seen comma. */
+    /** Record comma segments (per current nesting level: the body's
+     *  own top level on the state, inner compounds on their frames). */
     commaSplits: boolean;
-    /** find/scan: comma key context from the stack top. */
-    commaCtxScope: boolean;
-    /** find/scan: an unescaped comma ends raw mode. */
-    commaClearsRaw: boolean;
-    /** split: a non-key `:` clears the value position. */
-    colonElseClearVs: boolean;
-    /** split: sub-scan and jump over candidate nested compounds. */
-    openerJump: boolean;
-    /** find/scan: restore in_key from a kind-matched popped scope. */
+    /** Restore in_key from a kind-matched popped scope. */
     restoreInKeyOnMatch: boolean;
 }
 
-const SCAN_MODE: Mode = {
-    closersLiteral: false,
+const BODY_MODE: Mode = {
     validateEscapes: true,
     trackRaw: true,
-    commaSplits: false,
-    commaCtxScope: true,
-    commaClearsRaw: true,
-    colonElseClearVs: false,
-    openerJump: false,
-    restoreInKeyOnMatch: true,
-};
-
-const FIND_MODE: Mode = { ...SCAN_MODE, validateEscapes: false };
-
-const SPLIT_MODE: Mode = {
-    closersLiteral: true,
-    validateEscapes: false,
-    trackRaw: false,
     commaSplits: true,
-    commaCtxScope: false,
-    commaClearsRaw: false,
-    colonElseClearVs: true,
-    openerJump: true,
-    restoreInKeyOnMatch: false,
+    restoreInKeyOnMatch: true,
 };
 
 /**
@@ -190,22 +201,31 @@ function runMachine(
                 // A lone `:` opening the value's scalar consumes the
                 // value position unless a `::` marker may still form.
                 if (st.valueStart && bytes[st.i + 1] !== 0x3a) st.valueStart = false;
-            } else if (mode.colonElseClearVs) {
-                st.valueStart = false;
             }
         } else if (b === 0x2c) {
             if (mode.commaSplits) {
-                st.segments.push([st.segAt, st.i]);
-                st.segAt = st.i + 1;
+                // The comma closes the CURRENT level's segment: the
+                // body's own top level keeps its segment on the state,
+                // an inner compound's on its frame (split.rs records
+                // per-level; here in one cursor pass).
+                if (st.stack.length === 0) {
+                    st.segments.push([st.segAt, st.i]);
+                    st.segAt = st.i + 1;
+                } else {
+                    const top = st.stack[st.stack.length - 1]!;
+                    top.segments.push([top.segAt, st.i]);
+                    top.segAt = st.i + 1;
+                }
             }
-            const scopeObject = mode.commaCtxScope
-                ? st.stack.length > 0
-                    ? st.stack[st.stack.length - 1]!.kind === 0x7b
-                    : bodyObject
+            // Comma key context: the innermost scope's kind, or the
+            // body's own shape at depth 1 (split.rs `InlineBody`).
+            const scopeObject = st.stack.length > 0
+                ? st.stack[st.stack.length - 1]!.kind === 0x7b
                 : bodyObject;
             st.inKey = scopeObject;
             st.segStart = scopeObject;
-            if (mode.commaClearsRaw) st.raw = false;
+            // An unescaped comma ends raw mode (§5.8.5).
+            st.raw = false;
             st.valueStart = !scopeObject;
         } else if (b === 0x2e && st.inKey) {
             st.segStart = true;
@@ -214,32 +234,18 @@ function runMachine(
             if (!gatedOpen) {
                 // Mid-scalar (or raw-mode) opener: a literal byte (§5.8.5).
                 st.valueStart = false;
-            } else if (mode.openerJump) {
-                // split: sub-scan the candidate nested compound with
-                // its own pair and jump over it — a naive byte count
-                // would treat mid-scalar openers inside the span as
-                // nesting. A BadEscape sub-scan result is deliberately
-                // not propagated (validation happens later in
-                // processEscapes); no closer inside → literal byte.
-                const close2 = b === 0x7b ? 0x7d : 0x5d;
-                const sub = scanInlineCloser(bytes, st.i, hi, b, close2, ctx!);
-                if (sub.t === "found") {
-                    st.i = sub.idx + 1;
-                    st.valueStart = false;
-                    st.segStart = false;
-                    continue;
-                }
-                st.valueStart = false;
-                st.i += 1;
-                continue;
             } else {
-                // Count in place (find/scan use the scope stack).
+                // Count in place (§5.8.5 value-start nesting); open a
+                // span record so the nested parse never re-scans.
                 st.depth += 1;
                 st.stack.push({
                     kind: b,
                     inKey: st.inKey,
                     segStart: st.segStart,
                     raw: st.raw,
+                    openIdx: st.i,
+                    segAt: st.i + 1,
+                    segments: [],
                 });
                 // After an array's `[` the next position is still a
                 // value position (its first item); after a nested `{`
@@ -248,10 +254,9 @@ function runMachine(
                 st.inKey = b === 0x7b;
                 st.segStart = b === 0x7b;
             }
-        } else if ((b === 0x7d || b === 0x5d) && !mode.closersLiteral) {
-            // Both closer kinds decrement the shared depth; a closer
-            // returning depth to zero must be the body's own kind; an
-            // unescaped closer ALWAYS ends raw mode (§5.8.5).
+        } else if (b === 0x7d || b === 0x5d) {
+            // A closer returning depth to zero must be the body's own
+            // kind; an unescaped closer ALWAYS ends raw mode (§5.8.5).
             st.raw = false;
             st.depth -= 1;
             if (st.depth === 0) {
@@ -262,6 +267,12 @@ function runMachine(
             const top = st.stack.length > 0 ? st.stack[st.stack.length - 1]! : null;
             if (top !== null && top.kind === want) {
                 const f = st.stack.pop()!;
+                // The parent pass already knows this compound's closer
+                // and its own segments — record for the nested parse.
+                // (Mirrors scanInlineBody's own final-segment push, so
+                // a trailing comma surfaces as an empty last segment.)
+                f.segments.push([f.segAt, st.i]);
+                st.spans.set(f.openIdx, { closerIdx: st.i, segments: f.segments });
                 if (mode.restoreInKeyOnMatch) st.inKey = f.inKey;
                 // Quote-aware machine: a kind-matched closer restores
                 // the saved segment-start state (RESTORE_SEG_ON_MATCH).
@@ -290,122 +301,74 @@ function runMachine(
 }
 
 // ---------------------------------------------------------------------------
-// §5.2 rules 6–9 closer scan (split.rs `scan_inline_closer`)
-// ---------------------------------------------------------------------------
-
-export type InlineCloserScan =
-    | { t: "found"; idx: number }
-    | { t: "notFound" }
-    | { t: "badEscape"; kind: ErrKindBadEscape };
-
-/** Scan a body that MUST start with `open` and report the matching
- *  `close`, quote-aware and escape-validating. */
-export function scanInlineCloser(
-    bytes: Uint8Array,
-    lo: number,
-    hi: number,
-    open: number,
-    close: number,
-    ctx: ErrCtx,
-): InlineCloserScan {
-    if (lo >= hi || bytes[lo] !== open) return { t: "notFound" };
-    const st: MachineState = {
-        i: lo + 1,
-        depth: 1,
-        inKey: open === 0x7b,
-        segStart: open === 0x7b,
-        valueStart: open !== 0x7b,
-        raw: false,
-        prev: open,
-        segAt: lo,
-        stack: [],
-        segments: [],
-        stop: null,
-    };
-    runMachine(bytes, lo, hi, open, close, open === 0x7b, SCAN_MODE, st, ctx);
-    if (st.stop!.t === "badEscape") return { t: "badEscape", kind: st.stop!.kind };
-    if (st.stop!.t === "closer" && st.stop!.byte === close) {
-        return { t: "found", idx: st.stop!.idx };
-    }
-    return { t: "notFound" };
-}
-
-// ---------------------------------------------------------------------------
-// Delimiter matching (split.rs `find_matching_close`)
-// ---------------------------------------------------------------------------
-
-/** Matching closer index or -1; identical machine minus escape
- *  validation. */
-export function findMatchingClose(
-    bytes: Uint8Array,
-    lo: number,
-    hi: number,
-    open: number,
-    close: number,
-): number {
-    if (lo >= hi || bytes[lo] !== open) return -1;
-    const st: MachineState = {
-        i: lo + 1,
-        depth: 1,
-        inKey: open === 0x7b,
-        segStart: open === 0x7b,
-        valueStart: open !== 0x7b,
-        raw: false,
-        prev: open,
-        segAt: lo,
-        stack: [],
-        segments: [],
-        stop: null,
-    };
-    runMachine(bytes, lo, hi, open, close, open === 0x7b, FIND_MODE, st, null);
-    const stop = st.stop!;
-    return stop.t === "closer" && stop.byte === close ? stop.idx : -1;
-}
-
-// ---------------------------------------------------------------------------
-// Top-level comma splitting (split.rs `split_top_level`)
+// One-pass body scan (split.rs `scan_inline_closer_with_bounds` +
+// `split_top_level` merged) — §5.2 rules 6–9
 // ---------------------------------------------------------------------------
 
 /**
- * Split `bytes[lo..hi)` on unescaped top-level commas. In an object
- * body quoted key segments are comma-opaque (§5.3.3); in an array
- * body every position is a value position. The §5.8.5 value-start
- * rule decides which `{`/`[` nest (and thus shield commas): only the
- * first non-whitespace code point of a value.
+ * One-pass body scan (split.rs `scan_inline_closer_with_bounds` +
+ * `split_top_level` merged): over `bytes[lo..hi)` starting at `open`,
+ * the machine validates escapes (§6.13 precedence, byte-ordered),
+ * finds the body's own matching `close`, and records the top-level
+ * comma segments — each of the three jobs the previous three-pass
+ * flow did with separate scans, now in ONE cursor pass.
  */
-export function splitTopLevel(
+export interface InlineBodyScan {
+    /** Matching closer byte index, or -1 (also for a bad escape —
+     *  check `badEscape` FIRST, it takes §6.13 precedence). */
+    closerIdx: number;
+    /** Top-level comma segments of the body (only meaningful when
+     *  `closerIdx !== -1`). */
+    segments: Array<[number, number]>;
+    /** BadEscapeSequence payload when the scan met an invalid escape
+     *  before deciding the closer question. */
+    badEscape: ErrKindBadEscape | null;
+    /** Gated compound opener byte index → its matching closer and
+     *  own top-level segments, all recorded by this single pass.
+     *  Nested parses consult this instead of re-scanning. */
+    spans: Map<number, InlineSpan>;
+}
+
+/** Scan a body that MUST start with `open`; quote-aware and
+ *  escape-validating. */
+export function scanInlineBody(
     bytes: Uint8Array,
     lo: number,
     hi: number,
-    bodyObject: boolean,
+    open: number,
+    close: number,
     ctx: ErrCtx,
-): Array<[number, number]> {
+): InlineBodyScan {
+    if (lo >= hi || bytes[lo] !== open) {
+        return { closerIdx: -1, segments: [], badEscape: null, spans: new Map() };
+    }
     const st: MachineState = {
-        i: lo,
-        depth: 0,
-        inKey: bodyObject,
-        segStart: bodyObject,
-        valueStart: !bodyObject,
+        i: lo + 1,
+        depth: 1,
+        inKey: open === 0x7b,
+        segStart: open === 0x7b,
+        valueStart: open !== 0x7b,
         raw: false,
-        prev: bodyObject ? 0x7b : 0x5b,
-        segAt: lo,
+        prev: open,
+        segAt: lo + 1,
         stack: [],
         segments: [],
+        spans: new Map(),
         stop: null,
     };
-    runMachine(bytes, lo, hi, bodyObject ? 0x7b : 0x5b, bodyObject ? 0x7d : 0x5d, bodyObject, SPLIT_MODE, st, ctx);
+    runMachine(bytes, lo, hi, open, close, open === 0x7b, BODY_MODE, st, ctx);
     const stop = st.stop!;
-    if (stop.t === "eofAfterWsSkip") {
-        // Only whitespace after the last comma → valid trailing comma;
-        // otherwise the remainder is the raw LAST segment.
-        const [tlo, thi] = trimWs(bytes, st.segAt, hi);
-        if (tlo >= thi) return st.segments;
-        st.segments.push([st.segAt, hi]);
-        return st.segments;
+    if (stop.t === "badEscape") {
+        return { closerIdx: -1, segments: [], badEscape: stop.kind, spans: st.spans };
     }
-    // Exhausted (closer/quote stops cannot occur in split mode).
-    st.segments.push([st.segAt, hi]);
-    return st.segments;
+    if (stop.t === "closer" && stop.byte === close) {
+        st.segments.push([st.segAt, stop.idx]);
+        return { closerIdx: stop.idx, segments: st.segments, badEscape: null, spans: st.spans };
+    }
+    // UnterminatedQuote / EofAfterWsSkip / Exhausted — no matching
+    // closer (§6.11 keeps UnterminatedInlineCompound for all of them,
+    // including the unterminated-quoted-key case).
+    return { closerIdx: -1, segments: st.segments, badEscape: null, spans: st.spans };
 }
 
 // ---------------------------------------------------------------------------
@@ -429,7 +392,10 @@ export function malformedCloserNotAtEnd(ctx: ErrCtx): never {
     );
 }
 
-/** Parse a balanced inline object body `{ ... }` → V object. */
+/** Parse a balanced inline object body `{ ... }` → V object. The
+ *  caller MUST have run `scanInlineBody` over the same range and
+ *  passes its precomputed top-level segments (no re-scan here) plus
+ *  the scan's `spans` map for nested compounds. */
 export function parseInlineObject(
     bytes: Uint8Array,
     lo: number,
@@ -437,6 +403,8 @@ export function parseInlineObject(
     ctx: ErrCtx,
     strict: boolean,
     depth: number,
+    segments: Array<[number, number]>,
+    spans: Map<number, InlineSpan>,
 ): V {
     if (depth >= MAX_INLINE_DEPTH) {
         malformed(ctx, "nesting depth exceeds limit (128)");
@@ -444,10 +412,9 @@ export function parseInlineObject(
     const map = newObjectV();
     const [tlo, thi] = trimWs(bytes, lo + 1, hi - 1);
     if (tlo >= thi) return map; // `{}` / `{ }`
-    const segments = splitTopLevel(bytes, lo + 1, hi - 1, true, ctx);
     const n = segments.length;
     for (let s = 0; s < n; s++) {
-        const [slo, shi] = segments[s];
+        const [slo, shi] = segments[s]!; // s < n = segments.length (loop bound)
         const [tlo2, thi2] = trimWs(bytes, slo, shi);
         if (tlo2 >= thi2) {
             // Trailing comma (last segment empty) is OK.
@@ -481,14 +448,17 @@ export function parseInlineObject(
             const [blo, bhi] = trimWs(bytes, colon + 2, thi2);
             value = { t: "string", v: processEscapes(bytes, blo, bhi, ctx).text };
         } else {
-            value = parseInlineValue(bytes, colon + 1, thi2, ctx, strict, depth);
+            value = parseInlineValue(bytes, colon + 1, thi2, ctx, strict, depth, spans);
         }
         insertValue(map.v, bytes, key[0], key[1], value, ctx, ctx.span);
     }
     return map;
 }
 
-/** Parse a balanced inline array body `[ ... ]` → V array. */
+/** Parse a balanced inline array body `[ ... ]` → V array. The
+ *  caller MUST have run `scanInlineBody` over the same range and
+ *  passes its precomputed top-level segments (no re-scan here) plus
+ *  the scan's `spans` map for nested compounds. */
 export function parseInlineArray(
     bytes: Uint8Array,
     lo: number,
@@ -496,6 +466,8 @@ export function parseInlineArray(
     ctx: ErrCtx,
     strict: boolean,
     depth: number,
+    segments: Array<[number, number]>,
+    spans: Map<number, InlineSpan>,
 ): V {
     if (depth >= MAX_INLINE_DEPTH) {
         malformed(ctx, "nesting depth exceeds limit (128)");
@@ -503,10 +475,9 @@ export function parseInlineArray(
     const items: V[] = [];
     const [tlo, thi] = trimWs(bytes, lo + 1, hi - 1);
     if (tlo >= thi) return { t: "array", v: items };
-    const segments = splitTopLevel(bytes, lo + 1, hi - 1, false, ctx);
     const n = segments.length;
     for (let s = 0; s < n; s++) {
-        const [slo, shi] = segments[s];
+        const [slo, shi] = segments[s]!; // s < n = segments.length (loop bound)
         const [tlo2, thi2] = trimWs(bytes, slo, shi);
         if (tlo2 >= thi2) {
             if (s === n - 1) break; // trailing comma OK
@@ -515,7 +486,7 @@ export function parseInlineArray(
                 "empty inline array item (leading comma, double comma, or empty position)",
             );
         }
-        items.push(parseInlineValueRaw(bytes, tlo2, thi2, ctx, strict, depth));
+        items.push(parseInlineValueRaw(bytes, tlo2, thi2, ctx, strict, depth, spans));
     }
     return { t: "array", v: items };
 }
@@ -528,10 +499,11 @@ function parseInlineValue(
     ctx: ErrCtx,
     strict: boolean,
     depth: number,
+    spans: Map<number, InlineSpan>,
 ): V {
     const [tlo, thi] = trimWs(bytes, lo, hi);
     if (tlo >= thi) return emptyStringV();
-    return parseInlineValueRaw(bytes, tlo, thi, ctx, strict, depth);
+    return parseInlineValueRaw(bytes, tlo, thi, ctx, strict, depth, spans);
 }
 
 /**
@@ -546,27 +518,48 @@ function parseInlineValueRaw(
     ctx: ErrCtx,
     strict: boolean,
     depth: number,
+    spans: Map<number, InlineSpan>,
 ): V {
     const first = bytes[lo];
     if (first === 0x7b || first === 0x5b) {
         const close = first === 0x7b ? 0x7d : 0x5d;
-        const closeIdx = findMatchingClose(bytes, lo, hi, first, close);
-        if (closeIdx === -1) {
-            // Fallback scan validates escapes so BadEscapeSequence
-            // still takes precedence over the unterminated decision.
-            const r = scanInlineCloser(bytes, lo, hi, first, close, ctx);
-            if (r.t === "badEscape") throwKtav(r.kind, ctx.bytes, null);
-            if (r.t === "notFound") {
-                throwKtav(
-                    { k: "UnterminatedInlineCompound", line: ctx.line, span: ctx.span },
-                    ctx.bytes,
-                    null,
-                );
+        // The parent body's ONE pass already recorded this opener's
+        // matching closer and this compound's own top-level segments
+        // (`spans`), and validated every escape in the whole subrange
+        // byte-ordered — so §6.13 precedence is preserved with NO
+        // re-scan here (O(1) lookup; nested bodies are never scanned
+        // again).
+        const span = spans.get(lo);
+        if (span !== undefined) {
+            // §6.12: the closer the parent found must end this value's
+            // subrange; non-whitespace content after it is malformed.
+            if (span.closerIdx !== hi - 1) malformedCloserNotAtEnd(ctx);
+            // Empty compound check BEFORE the nested recursion, so
+            // `{}` / `[]` at the depth boundary stays legal (compound.rs).
+            const [ilo, ihi] = trimWs(bytes, lo + 1, hi - 1);
+            if (ilo >= ihi) {
+                return first === 0x7b ? newObjectV() : { t: "array", v: [] };
             }
-            if (r.idx !== hi - 1) malformedCloserNotAtEnd(ctx);
-        } else if (closeIdx !== hi - 1) {
-            malformedCloserNotAtEnd(ctx);
+            return first === 0x7b
+                ? parseInlineObject(bytes, lo, hi, ctx, strict, depth + 1, span.segments, spans)
+                : parseInlineArray(bytes, lo, hi, ctx, strict, depth + 1, span.segments, spans);
         }
+        // Defensive fallback: a compound-first value whose opener was
+        // NOT value-start-gated (raw/mid-scalar content). Unreachable
+        // today — a trimmed segment/value whose first byte is `{`/`[`
+        // always sits at a value position, hence gated — but kept so a
+        // classifier drift can never silently mis-parse. Behaves as
+        // before: a local one-pass scan of this subrange.
+        const scan = scanInlineBody(bytes, lo, hi, first, close, ctx);
+        if (scan.badEscape !== null) throwKtav(scan.badEscape, ctx.bytes, null);
+        if (scan.closerIdx === -1) {
+            throwKtav(
+                { k: "UnterminatedInlineCompound", line: ctx.line, span: ctx.span },
+                ctx.bytes,
+                null,
+            );
+        }
+        if (scan.closerIdx !== hi - 1) malformedCloserNotAtEnd(ctx);
         // Empty compound check happens BEFORE the nested recursion, so
         // `{}` / `[]` at the depth boundary stays legal (compound.rs).
         const [ilo, ihi] = trimWs(bytes, lo + 1, hi - 1);
@@ -574,8 +567,8 @@ function parseInlineValueRaw(
             return first === 0x7b ? newObjectV() : { t: "array", v: [] };
         }
         return first === 0x7b
-            ? parseInlineObject(bytes, lo, hi, ctx, strict, depth + 1)
-            : parseInlineArray(bytes, lo, hi, ctx, strict, depth + 1);
+            ? parseInlineObject(bytes, lo, hi, ctx, strict, depth + 1, scan.segments, scan.spans)
+            : parseInlineArray(bytes, lo, hi, ctx, strict, depth + 1, scan.segments, scan.spans);
     }
 
     // §5.2 rule 5: `()` / `(())` → empty String (raw body — escape

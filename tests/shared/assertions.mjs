@@ -591,6 +591,160 @@ db.name: primary
         });
     }
 
+    // spec 0.8.1 §6.15: EXACT raw-byte coordinate regression. The oracle
+    // below is a small hand-rolled std-semantics UTF-8 diagnostic, fully
+    // independent of the SUT: lead-size table (2/3/4, special second-byte
+    // ranges for E0/ED/F0/F4), an interrupted sequence's error length is
+    // the bytes consumed before the interruptor, truncation at EOF has no
+    // length, and an illegal lead is a one-byte error whose envelope span
+    // swallows any immediately following continuation bytes (the cabi
+    // envelope contract, rust/src/cabi/envelope.rs::not_utf8_envelope).
+    // The §3.2 line counter is mirrored too: each LF, lone CR and CRLF
+    // terminator counted over the raw bytes, a terminator counting only
+    // when it ends at or before the offset.
+    if (typeof readBytes === "function" && typeof loadsBytes === "function") {
+        const isCont = (b) => b >= 0x80 && b <= 0xbf;
+        const lineOfOffsetOracle = (bytes, pos) => {
+            let line = 1;
+            let i = 0;
+            const bound = Math.min(pos, bytes.length);
+            while (i < bound) {
+                if (bytes[i] === 0x0a) { line++; i++; }
+                else if (bytes[i] === 0x0d) {
+                    if (bytes[i + 1] === 0x0a) {
+                        if (i + 2 <= pos) line++;
+                        i += 2;
+                    } else { line++; i++; }
+                } else i++;
+            }
+            return line;
+        };
+        const utf8Oracle = (bytes) => {
+            const len = bytes.length;
+            let i = 0;
+            while (i < len) {
+                const b = bytes[i];
+                if (b < 0x80) {
+                    i++;
+                } else {
+                    let size = 0, lo = 0x80, hi = 0xbf;
+                    if (b >= 0xc2 && b <= 0xdf) size = 2;
+                    else if (b >= 0xe0 && b <= 0xef) {
+                        size = 3;
+                        if (b === 0xe0) lo = 0xa0;
+                        else if (b === 0xed) hi = 0x9f;
+                    } else if (b >= 0xf0 && b <= 0xf4) {
+                        size = 4;
+                        if (b === 0xf0) lo = 0x90;
+                        else if (b === 0xf4) hi = 0x8f;
+                    }
+                    if (size === 0) {
+                        // Illegal lead (80..BF, C0, C1, F5..FF): one-byte
+                        // error; the envelope span swallows continuations.
+                        let end = i + 1;
+                        while (end < len && isCont(bytes[end])) end++;
+                        return { validUpTo: i, end, line: lineOfOffsetOracle(bytes, i) };
+                    }
+                    let j = i + 1, consumed = 1, rangeBad = false, truncated = false, interrupted = false;
+                    while (consumed < size) {
+                        if (j >= len) { truncated = true; break; }
+                        const c = bytes[j];
+                        if (!isCont(c)) { interrupted = true; break; }
+                        if (consumed === 1 && (c < lo || c > hi)) { rangeBad = true; break; }
+                        consumed++; j++;
+                    }
+                    if (truncated) {
+                        return { validUpTo: i, end: len, line: lineOfOffsetOracle(bytes, i) };
+                    }
+                    if (interrupted) {
+                        // error_len = bytes consumed so far — the span
+                        // must NOT include the interrupting byte.
+                        return { validUpTo: i, end: i + consumed, line: lineOfOffsetOracle(bytes, i) };
+                    }
+                    if (rangeBad) {
+                        let end = i + 1;
+                        while (end < len && isCont(bytes[end])) end++;
+                        return { validUpTo: i, end, line: lineOfOffsetOracle(bytes, i) };
+                    }
+                    i += size;
+                }
+            }
+            return null; // valid input — not reached for the fixtures below
+        };
+        const assertUtf8Envelope = (label, bytes, err) => {
+            if (err === null || err === undefined) throw new Error(`${label}: loadsBytes() accepted invalid bytes`);
+            const exp = utf8Oracle(bytes);
+            if (!exp) throw new Error(`${label}: oracle bug — input unexpectedly valid`);
+            if (err.error !== "InvalidUtf8") {
+                throw new Error(`${label}: expected error=InvalidUtf8, got ${JSON.stringify(err.error)} (${String(err.message || err)})`);
+            }
+            if (!err.span || err.span.start !== exp.validUpTo) {
+                throw new Error(`${label}: span.start=${err.span && err.span.start}, expected validUpTo ${exp.validUpTo}`);
+            }
+            if (err.span.end !== exp.end) {
+                throw new Error(`${label}: span.end=${err.span.end}, expected ${exp.end}`);
+            }
+            if (err.line !== exp.line) {
+                throw new Error(`${label}: line=${JSON.stringify(err.line)}, expected raw line ${exp.line}`);
+            }
+            if (err.line_text !== null) {
+                throw new Error(`${label}: line_text must be null (no valid source text), got ${JSON.stringify(err.line_text)}`);
+            }
+            if (typeof err.body !== "string" || !err.body.startsWith("input is not valid UTF-8:")) {
+                throw new Error(`${label}: body=${JSON.stringify(err.body)}`);
+            }
+            const wantMessage = `InvalidUtf8: input is not valid UTF-8; first invalid byte sequence at byte offset ${exp.validUpTo}`;
+            if (err.message !== wantMessage) {
+                throw new Error(`${label}: message=${JSON.stringify(err.message)}, expected ${JSON.stringify(wantMessage)}`);
+            }
+        };
+        // Synthetic cases, built inline as raw byte arrays.
+        const synthetic = [
+            { name: "E1 80 interrupted by ASCII A", bytes: [0x61, 0x3a, 0x20, 0xe1, 0x80, 0x41, 0x0a] },
+            { name: "E1 80 truncated at EOF", bytes: [0x61, 0x0a, 0xe1, 0x80] },
+            { name: "bad byte on line 3 after two CRLFs", bytes: [0x61, 0x0d, 0x0a, 0x62, 0x0d, 0x0a, 0x80] },
+            { name: "bad byte on line 3 after two lone CRs", bytes: [0x61, 0x0d, 0x62, 0x0d, 0x80] },
+            { name: "BOM skipped but offsets include it", bytes: [0xef, 0xbb, 0xbf, 0x61, 0x3a, 0x20, 0x31, 0x0d, 0x80] },
+            { name: "stray continuation byte", bytes: [0x80, 0x0a] },
+        ];
+        test("invalid_utf8: synthetic exact-coordinate cases vs independent oracle", () => {
+            for (const { name, bytes } of synthetic) {
+                const raw = new Uint8Array(bytes);
+                let err = null;
+                try { loadsBytes(raw); } catch (e) { err = e; }
+                assertUtf8Envelope(name, raw, err);
+            }
+        });
+        const u8fixtures = walkKtavFiles(`${base}/invalid`).filter((f) => f.includes("/invalid_utf8/"));
+        test("invalid_utf8: all 9 fixtures match the independent coordinate oracle exactly", () => {
+            if (u8fixtures.length !== 9) {
+                throw new Error(`expected 9 invalid_utf8 fixtures, found ${u8fixtures.length}`);
+            }
+            for (const f of u8fixtures) {
+                const bytes = readBytes(f);
+                let err = null;
+                try { loadsBytes(bytes); } catch (e) { err = e; }
+                assertUtf8Envelope(f, bytes, err);
+            }
+        });
+    }
+
+    // § 6: the EOF-detected UnclosedCompound repair — the envelope must
+    // derive the 1-based line from the opener span (rust/src/cabi/
+    // envelope.rs::envelope post-step). This FAILS if the line-derivation
+    // is reverted (from_error alone ships line=null).
+    test("errors: EOF-detected UnclosedCompound carries the derived opener line", () => {
+        let err = null;
+        try { loads("a: [\n"); } catch (e) { err = e; }
+        if (!err) throw new Error("expected loads to throw on an unterminated array opener");
+        if (err.error !== "UnclosedCompound") throw new Error(`error=${err.error}`);
+        if (err.line !== 1) throw new Error(`expected derived opener line 1, got ${JSON.stringify(err.line)}`);
+        if (!err.span || typeof err.span.start !== "number" || typeof err.span.end !== "number" || err.span.end <= err.span.start) {
+            throw new Error(`expected nonempty span, got ${JSON.stringify(err.span)}`);
+        }
+        if (err.line_text !== "a: [") throw new Error(`line_text=${JSON.stringify(err.line_text)}`);
+    });
+
     // spec 0.7: unrepresentable/ — JSON-only fixtures whose values must be
     // REFUSED by the writer. Non-finite floats are encoded as a sentinel
     // `{ "$float": "NaN" | "Infinity" | "-Infinity" }` one-field object.

@@ -123,7 +123,7 @@ function insertDotted(
     const n = segments.length;
     let cur = table;
     for (let idx = 0; idx < n; idx++) {
-        const [slo, shi] = segments[idx];
+        const [slo, shi] = segments[idx]!; // idx < n
         const [tlo, thi] = trimWs(bytes, slo, shi);
         if (tlo >= thi) {
             throwKtav(

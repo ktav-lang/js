@@ -22,7 +22,8 @@ and introduces the pure-TypeScript backend.
 - Package, platform subpackages, workspace metadata, and lockfile are
   `0.8.1`.
 - Rust dependency is published `ktav` 0.8.1.
-- Spec submodule is pinned to the published Ktav 0.8.1 commit
+- Spec submodule: the release integration pins it to the published
+  Ktav 0.8.1 commit (388982118c0d8f767bf283356ac9c9bb50fdc3f5)
   (corpus 228 parseable / 90 invalid / 5 unrepresentable /
   4 parseable-unrepresentable / 13 canonical fixtures, with 9 new
   `raw_bytes` fixtures).
@@ -51,8 +52,10 @@ and introduces the pure-TypeScript backend.
 - Версии пакета, platform subpackages, workspace metadata и lockfile —
   `0.8.1`.
 - Rust-зависимость — опубликованный `ktav` 0.8.1.
-- Submodule спецификации закреплён на опубликованном коммите Ktav
-  0.8.1 (корпус 228 parseable / 90 invalid / 5 unrepresentable /
+- Submodule спецификации: релизная интеграция закрепляет его на
+  опубликованном коммите Ktav 0.8.1
+  (388982118c0d8f767bf283356ac9c9bb50fdc3f5)
+  (корпус 228 parseable / 90 invalid / 5 unrepresentable /
   4 parseable-unrepresentable / 13 canonical фикстур, из них 9 новых
   фикстур `raw_bytes`).
 
@@ -78,7 +81,8 @@ TypeScript 后端。
 
 - 包、平台子包、workspace metadata 和 lockfile 版本统一为 `0.8.1`。
 - Rust 依赖为已发布的 `ktav` 0.8.1。
-- 规范 submodule 固定到已发布的 Ktav 0.8.1 提交（语料库 228
+- 规范 submodule：发布集成会将其固定到已发布的 Ktav 0.8.1 提交
+  （388982118c0d8f767bf283356ac9c9bb50fdc3f5）（语料库 228
   parseable / 90 invalid / 5 unrepresentable / 4
   parseable-unrepresentable / 13 个 canonical fixture，含 9 个新的
   `raw_bytes` fixture）。

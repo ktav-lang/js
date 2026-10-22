@@ -62,7 +62,7 @@ function renderMalformedUnicodeEscape(
     const end = Math.min(i + 6, hi);
     let seq = "\\u";
     for (let j = i + 2; j < end; j++) {
-        const b = bytes[j];
+        const b = bytes[j]!; // j < end ≤ hi ≤ len
         if (b < 0x80) {
             seq += String.fromCharCode(b);
         } else {
@@ -81,7 +81,7 @@ export function scanEscape(bytes: Uint8Array, i: number, hi: number): Recognised
     if (i + 1 >= hi) {
         return { ok: false, seq: "\\<end-of-line>" };
     }
-    const next = bytes[i + 1];
+    const next = bytes[i + 1]!; // i + 1 < hi (guard above)
     const simple = SIMPLE_ESCAPES[next];
     if (simple !== undefined) {
         return { ok: true, ch: simple, len: 2 };
@@ -92,10 +92,10 @@ export function scanEscape(bytes: Uint8Array, i: number, hi: number): Recognised
             return { ok: false, seq: renderMalformedUnicodeEscape(bytes, i, hi) };
         }
         const value =
-            (hexVal(bytes[i + 2]) << 12) |
-            (hexVal(bytes[i + 3]) << 8) |
-            (hexVal(bytes[i + 4]) << 4) |
-            hexVal(bytes[i + 5]);
+            (hexVal(bytes[i + 2]!) << 12) |
+            (hexVal(bytes[i + 3]!) << 8) |
+            (hexVal(bytes[i + 4]!) << 4) |
+            hexVal(bytes[i + 5]!);
         if (value >= 0xd800 && value <= 0xdbff) {
             // High surrogate: must pair with an immediately following
             // low-surrogate `\uXXXX` (12 bytes total).
@@ -109,10 +109,10 @@ export function scanEscape(bytes: Uint8Array, i: number, hi: number): Recognised
                 isHex(bytes[i + 11]!)
             ) {
                 const low =
-                    (hexVal(bytes[i + 8]) << 12) |
-                    (hexVal(bytes[i + 9]) << 8) |
-                    (hexVal(bytes[i + 10]) << 4) |
-                    hexVal(bytes[i + 11]);
+                    (hexVal(bytes[i + 8]!) << 12) |
+                    (hexVal(bytes[i + 9]!) << 8) |
+                    (hexVal(bytes[i + 10]!) << 4) |
+                    hexVal(bytes[i + 11]!);
                 if (low >= 0xdc00 && low <= 0xdfff) {
                     const combined = 0x10000 + (value - 0xd800) * 0x400 + (low - 0xdc00);
                     return { ok: true, ch: String.fromCodePoint(combined), len: 12 };
@@ -175,7 +175,7 @@ export function processEscapes(
         } else {
             // Copy one whole code point.
             let j = i + 1;
-            while (j < hi && (bytes[j] & 0xc0) === 0x80) j++;
+            while (j < hi && (bytes[j]! & 0xc0) === 0x80) j++;
             out += decodeRange(bytes, i, j);
             i = j;
         }
@@ -237,7 +237,7 @@ export function scanUnescapedColon(bytes: Uint8Array, lo: number, hi: number): C
     while (i < hi) {
         if (segStart) {
             i = skipSegmentWs(bytes, i, hi);
-            if (i < hi && isQuoteByte(bytes[i])) {
+            if (i < hi && isQuoteByte(bytes[i]!)) {
                 const end = quotedSpanEnd(bytes, i, hi);
                 if (end === -1) return { t: "unterminated" };
                 i = end + 1;
@@ -282,7 +282,7 @@ export function splitKeyPath(bytes: Uint8Array, lo: number, hi: number): Array<[
     while (i < hi) {
         if (segStart) {
             i = skipSegmentWs(bytes, i, hi);
-            if (i < hi && isQuoteByte(bytes[i])) {
+            if (i < hi && isQuoteByte(bytes[i]!)) {
                 const end = quotedSpanEnd(bytes, i, hi);
                 if (end === -1) break;
                 i = end + 1;
@@ -314,7 +314,7 @@ export function keyIsSingleSegment(bytes: Uint8Array, lo: number, hi: number): b
     while (i < hi) {
         if (segStart) {
             i = skipSegmentWs(bytes, i, hi);
-            if (i < hi && isQuoteByte(bytes[i])) {
+            if (i < hi && isQuoteByte(bytes[i]!)) {
                 const end = quotedSpanEnd(bytes, i, hi);
                 if (end === -1) return true;
                 i = end + 1;
@@ -357,20 +357,20 @@ function escapedLen(bytes: Uint8Array, i: number, hi: number): number {
         if (!isHex(bytes[j]!)) return 2;
     }
     const value =
-        (hexVal(bytes[i + 2]) << 12) |
-        (hexVal(bytes[i + 3]) << 8) |
-        (hexVal(bytes[i + 4]) << 4) |
-        hexVal(bytes[i + 5]);
+        (hexVal(bytes[i + 2]!) << 12) |
+        (hexVal(bytes[i + 3]!) << 8) |
+        (hexVal(bytes[i + 4]!) << 4) |
+        hexVal(bytes[i + 5]!);
     if (!(value >= 0xd800 && value <= 0xdbff)) return 6;
     if (i + 12 > hi || bytes[i + 6] !== 0x5c || bytes[i + 7] !== 0x75) return 6;
     for (let j = i + 8; j < i + 12; j++) {
         if (!isHex(bytes[j]!)) return 6;
     }
     const low =
-        (hexVal(bytes[i + 8]) << 12) |
-        (hexVal(bytes[i + 9]) << 8) |
-        (hexVal(bytes[i + 10]) << 4) |
-        hexVal(bytes[i + 11]);
+        (hexVal(bytes[i + 8]!) << 12) |
+        (hexVal(bytes[i + 9]!) << 8) |
+        (hexVal(bytes[i + 10]!) << 4) |
+        hexVal(bytes[i + 11]!);
     return low >= 0xdc00 && low <= 0xdfff ? 12 : 6;
 }
 

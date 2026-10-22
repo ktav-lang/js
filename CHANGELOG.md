@@ -103,7 +103,8 @@ and introduces the pure-TypeScript backend.
 - Package, platform subpackages, workspace metadata, and lockfile are
   `0.8.1`.
 - Rust dependency is published `ktav` 0.8.1.
-- Spec submodule is pinned to the published Ktav 0.8.1 commit
+- Spec submodule: the release integration pins it to the published
+  Ktav 0.8.1 commit (388982118c0d8f767bf283356ac9c9bb50fdc3f5)
   (corpus 228 parseable / 90 invalid / 5 unrepresentable /
   4 parseable-unrepresentable / 13 canonical fixtures, with 9 new
   `raw_bytes` fixtures).

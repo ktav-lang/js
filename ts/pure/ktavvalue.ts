@@ -4,7 +4,7 @@
 // byte-identically to the native binding.
 
 import { ryuFormat } from "./numbers.js";
-import type { V } from "./values.js";
+import type { V, VCompound } from "./values.js";
 import { KtavError } from "../internal/api.js";
 
 /** Rust `Error::Message` envelope: `body` and `message` both carry the
@@ -46,7 +46,7 @@ export function jsToV(obj: unknown): V {
     }
     interface Rec {
         src: object;
-        container: V;
+        container: VCompound;
         keys: string[] | null; // null → array (index order)
         slots: Slot[];
     }
@@ -109,8 +109,9 @@ export function jsToV(obj: unknown): V {
                 if (!(i in src)) messageError("Array element missing");
                 slots[i] = { v: { t: "null" } };
             }
-            task.slot.v = { t: "array", v: [] };
-            stack.push({ t: "leave", rec: { src, container: task.slot.v, keys: null, slots } });
+            const container: VCompound = { t: "array", v: [] };
+            task.slot.v = container;
+            stack.push({ t: "leave", rec: { src, container, keys: null, slots } });
             for (let i = src.length - 1; i >= 0; i--) {
                 stack.push({ t: "enter", src: src[i], slot: slots[i]! });
             }
@@ -121,9 +122,10 @@ export function jsToV(obj: unknown): V {
             messageError("cyclic value cannot be represented in Ktav");
         }
         path.add(src);
-        const slots: Slot[] = keys.map(() => ({ v: { t: "null" } as V }));
-        task.slot.v = { t: "object", v: new Map<string, V>() };
-        stack.push({ t: "leave", rec: { src, container: task.slot.v, keys, slots } });
+        const slots: Slot[] = keys.map((): Slot => ({ v: { t: "null" } }));
+        const container: VCompound = { t: "object", v: new Map<string, V>() };
+        task.slot.v = container;
+        stack.push({ t: "leave", rec: { src, container, keys, slots } });
         for (let i = keys.length - 1; i >= 0; i--) {
             stack.push({
                 t: "enter",

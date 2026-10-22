@@ -1,11 +1,9 @@
 // Comment-preserving formatter — ported from
 // `rust/src/document/parser/fmt_parser/{mod,positioned,frame,doc}.rs`
-// (trivia-carrying parse) and `render/formatted.rs` (emission).
-//
-// Mirrors the plain parser's line dispatch exactly (same errors via the
-// shared classify/lexer modules), but every comment / blank line is
-// attached to the construct that follows it (blank runs pre-collapsed,
-// bracket padding dropped) and re-emitted at that construct's indent.
+// and `render/formatted.rs`. Mirrors the plain parser's line dispatch
+// exactly (same errors via the shared classify/lexer modules), but
+// every comment / blank line is attached to the construct that follows
+// it and re-emitted at that construct's indent.
 
 import { decodeRange, eqLit, leadingBomLen, startsWithLit, trimWs, trimWsEnd, trimWsStart, validateUtf8 } from "./bytes.js";
 import { throwKtav, type ErrCtx, type Span } from "./errors.js";
@@ -44,7 +42,7 @@ import {
 export type TriviaLine = { k: "blank" } | { k: "comment"; text: string };
 type Trivia = TriviaLine[];
 
-type PValue =
+export type PValue =
     | { t: "null" }
     | { t: "bool"; v: boolean }
     | { t: "int"; v: string }
@@ -53,8 +51,10 @@ type PValue =
     | { t: "array"; items: Array<[Trivia, PValue]>; trailing: Trivia }
     | { t: "object"; pairs: Map<string, [Trivia, PValue]>; trailing: Trivia };
 
-type PObject = { pairs: Map<string, [Trivia, PValue]>; trailing: Trivia };
-type PArray = { items: Array<[Trivia, PValue]>; trailing: Trivia };
+/** Compound view + frame-table views (narrowing without casts). */
+type PCompound = Extract<PValue, { t: "object" } | { t: "array" }>;
+type PObject = Extract<PCompound, { t: "object" }>;
+type PArray = Extract<PCompound, { t: "array" }>;
 
 interface FmtDoc {
     leading: Trivia;
@@ -62,11 +62,11 @@ interface FmtDoc {
 }
 
 function newPObject(): PObject {
-    return { pairs: new Map(), trailing: [] };
+    return { t: "object", pairs: new Map(), trailing: [] };
 }
 
 function newPArray(): PArray {
-    return { items: [], trailing: [] };
+    return { t: "array", items: [], trailing: [] };
 }
 
 function kindLabelP(v: PValue): string {
@@ -86,9 +86,7 @@ function isObjectP(v: [Trivia, PValue]): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Dotted insertion over PObject — insert.rs / insert.ts semantics with
-// trivia-carrying values (empty trivia on synthesized intermediates,
-// fmt_parser/doc.rs `InsertTable for PObject`).
+// Dotted insertion over PObject — insert.rs / insert.ts semantics.
 // ---------------------------------------------------------------------------
 
 function decodedPathSegmentsP(bytes: Uint8Array, lo: number, hi: number, ctx: ErrCtx): string[] {
@@ -152,7 +150,7 @@ function insertP(
     const segments = splitKeyPath(bytes, pathLo, pathHi);
     let cur: PObject = table;
     for (let idx = 0; idx < segments.length; idx++) {
-        const [slo, shi] = segments[idx];
+        const [slo, shi] = segments[idx]!; // idx < segments.length
         const [tlo, thi] = trimWs(bytes, slo, shi);
         if (tlo >= thi || checkKey(bytes, tlo, thi) === "empty") {
             throwKtav({ k: "EmptyKey", line: ctx.line, span: keySpan }, bytes, null);
@@ -168,9 +166,12 @@ function insertP(
         if (idx + 1 < segments.length) {
             const existing = cur.pairs.get(decoded);
             if (existing === undefined) {
-                const sub: [Trivia, PValue] = [[], { t: "object", pairs: new Map(), trailing: [] }];
+                const subTable: PObject = newPObject();
+                const sub: [Trivia, PValue] = [
+                    [], { t: "object", pairs: subTable.pairs, trailing: subTable.trailing },
+                ];
                 cur.pairs.set(decoded, sub);
-                cur = sub[1] as PObject;
+                cur = subTable;
             } else if (existing[1].t === "object") {
                 cur = existing[1];
             } else {
@@ -200,10 +201,9 @@ function insertP(
     }
 }
 
-/** doc.rs `stamp` — a plain `Value` (from the shared inline/root
- *  helpers) wrapped into the trivia tree with empty trivia throughout.
- *  Sound because a comment can never occur inside an inline compound
- *  (§3.4). */
+/** doc.rs `stamp` — a plain `Value` wrapped into the trivia tree with
+ *  empty trivia throughout. Sound because a comment can never occur
+ *  inside an inline compound (§3.4). */
 function stampP(v: import("./values.js").V): PValue {
     switch (v.t) {
         case "null":
@@ -215,7 +215,7 @@ function stampP(v: import("./values.js").V): PValue {
         case "array":
             return {
                 t: "array",
-                items: v.v.map((item) => [[], stampP(item)] as [Trivia, PValue]),
+                items: v.v.map((item): [Trivia, PValue] => [[], stampP(item)]),
                 trailing: [],
             };
         case "object": {
@@ -229,7 +229,6 @@ function stampP(v: import("./values.js").V): PValue {
 // ---------------------------------------------------------------------------
 // PositionedParser (fmt_parser/positioned.rs)
 // ---------------------------------------------------------------------------
-
 type PFrame =
     | {
           t: "object";
@@ -320,7 +319,7 @@ class PositionedParser {
         }
         if (this.stack.length > 1 || (this.rootIsExplicitCompound && !this.rootConsumed)) {
             const kind = this.stack[this.stack.length - 1]!.t;
-            const start = this.openerOffsets[this.openerOffsets.length - 1];
+            const start = this.openerOffsets[this.openerOffsets.length - 1]!;
             throwKtav(
                 { k: "UnclosedCompound", kind, span: { start, end: eofOffset } },
                 bytes,
@@ -328,12 +327,12 @@ class PositionedParser {
             );
         }
         const eofTrivia = trimTrailingBlanks(this.pendingTrivia);
-        if (this.rootInlineValue !== null) {
-            this.rootInlineValue.trailing.push(...eofTrivia);
-            return { leading: this.docLeading, root: this.rootInlineValue };
-        }
+        const rv = this.rootInlineValue;
+        // Invariant: set only from `stampP` of an inline compound.
+        if (rv !== null && (rv.t === "array" || rv.t === "object")) rv.trailing.push(...eofTrivia);
+        if (rv !== null) return { leading: this.docLeading, root: rv };
         if (this.stack.length === 0) {
-            return { leading: this.docLeading.concat(eofTrivia), root: { t: "object", ...newPObject() } };
+            return { leading: this.docLeading.concat(eofTrivia), root: newPObject() };
         }
         const frame = this.stack.pop()!;
         const root: PValue =
@@ -562,16 +561,16 @@ class PositionedParser {
                 leaf({ t: "bool", v: vs.v });
                 return;
             case "int":
-                leaf({ t: "int", v: vs.dec });
+                leaf({ t: "int", v: vs.v });
                 return;
             case "float":
-                leaf({ t: "float", v: vs.dec });
+                leaf({ t: "float", v: vs.v });
                 return;
             case "emptyObject":
-                leaf({ t: "object", ...newPObject() });
+                leaf(newPObject());
                 return;
             case "emptyArray":
-                leaf({ t: "array", ...newPArray() });
+                leaf(newPArray());
                 return;
             case "openObject":
             case "openArray": {
@@ -749,10 +748,9 @@ function emitTrivia(trivia: Trivia, indent: number, out: W): void {
     }
 }
 
-// EXPLICIT-STACK emission (render/formatted.rs) — no recursion: block
-// trees have no depth limit. Task order reproduces the recursive
-// emitters byte-for-byte; per-pair trivia pops before its pair, the
-// trailing-bucket trivia pops after the container's children.
+// EXPLICIT-STACK emission (render/formatted.rs) — no recursion; task
+// order reproduces the recursive emitters byte-for-byte; per-pair
+// trivia pops before its pair, trailing-bucket trivia after children.
 type FmtTask =
     | { t: "pair"; key: string; v: PValue; indent: number; rootFirstKey: boolean }
     | { t: "item"; v: PValue; indent: number; rootFirst: boolean }
@@ -765,7 +763,7 @@ function fmtCloseChunks(indent: number, closer: string): string[] {
 
 function pushFmtCompound(
     stack: FmtTask[],
-    v: PValue,
+    v: PCompound,
     indent: number,
     ctx: "pair" | "item",
     out: W,
@@ -864,7 +862,7 @@ function runFmtEmitter(rootTasks: FmtTask[], out: W): void {
 
 /** Root-shape tasks — emitObjectPairs(root, 0, true) /
  *  emitArrayRoot over the trivia tree. */
-function fmtRootTasks(root: PValue): FmtTask[] {
+function fmtRootTasks(root: PCompound): FmtTask[] {
     if (root.t === "object") {
         const tasks: FmtTask[] = [];
         let first = true;
@@ -917,9 +915,8 @@ function fmtFloat(s: string): string {
 }
 
 /** First §5.9.0 offense over the trivia tree in document order
- *  (representable.rs `check_node` — trivia cannot change the verdict).
- *  EXPLICIT STACK, DFS pre-order — frames carry their own path; the
- *  first hit in pop order is the first offense in document order. */
+ *  (representable.rs `check_node`). EXPLICIT STACK, DFS pre-order —
+ *  the first hit in pop order is the first offense in document order. */
 function findOffenseP(value: PValue, path: string[]): string[] | null {
     type Frame = { v: PValue; path: string[]; key: string | null };
     const stack: Frame[] = [{ v: value, path, key: null }];
@@ -978,9 +975,12 @@ export function formatText(text: string): string {
     const out: W = [];
     try {
         const leading: FmtTask[] = [{ t: "trivia", trivia: doc.leading, indent: 0 }];
-        if (doc.root.t === "object") {
-            runFmtEmitter([...leading, ...fmtRootTasks(doc.root)], out);
-        } else if (doc.root.items.length === 0 && doc.root.trailing.length === 0) {
+        // Parser invariant (§5.0.1): the formatted root is a compound.
+        // Narrow explicitly so the compound call below typechecks.
+        if (doc.root.t !== "object" && doc.root.t !== "array") {
+            throw new Error("internal error: formatted root is not an object or array");
+        }
+        if (doc.root.t === "array" && doc.root.items.length === 0 && doc.root.trailing.length === 0) {
             runFmtEmitter(leading, out);
             out.push("[]\n");
         } else {

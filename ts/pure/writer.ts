@@ -8,9 +8,11 @@
 
 import { isPairShape } from "./classify.js";
 import { canonicalFloat } from "./numbers.js";
+// Re-export for formatter.ts (writer is the shared §5.9 façade).
+export { canonicalFloat };
 import { forcedStringText } from "./ktavvalue.js";
 import { KtavError } from "../internal/api.js";
-import type { V } from "./values.js";
+import type { V, VCompound } from "./values.js";
 
 // ---------------------------------------------------------------------------
 // §5.9.0 writer-time errors — envelope.rs `from_error` wire contract
@@ -278,7 +280,7 @@ function pushBareKeyEscaped(key: string, out: string[]): void {
     const cps = Array.from(key);
     const lastIdx = cps.length - 1;
     for (let i = 0; i < cps.length; i++) {
-        const ch = cps[i];
+        const ch = cps[i]!; // i < cps.length
         const atEdge = i === 0 || i === lastIdx;
         const cp = ch.codePointAt(0)!;
         if (ch === "\\") out.push("\\\\");
@@ -629,7 +631,7 @@ function closeChunks(indent: number, closer: string): string[] {
  *  plus the closer task (pushed first → pops last). */
 function pushCompoundTasks(
     stack: EmitTask[],
-    v: V,
+    v: VCompound,
     indent: number,
     ctx: "pair" | "item",
     out: W,
@@ -751,43 +753,55 @@ function runEmitter(rootTasks: EmitTask[], cfg: EmitterCfg, out: W): void {
     }
 }
 
-/** §5.0.1 root shape — emitRootPretty / emit_canonical's root switch. */
-function rootTasks(value: V, cfg: EmitterCfg): EmitTask[] {
-    if (value.t === "object") {
-        const tasks: EmitTask[] = [];
-        let first = true;
-        for (const [k, v] of value.v) {
-            tasks.push({ t: "pair", key: k, v, indent: 0, rootFirstKey: first });
-            first = false;
+/** §5.0.1 root shape — emitRootPretty / emit_canonical's root switch.
+ *  Exhaustive over `VCompound`: the `default` arm is statically
+ *  unreachable (`never`). */
+function rootTasks(value: VCompound, cfg: EmitterCfg): EmitTask[] {
+    switch (value.t) {
+        case "object": {
+            const tasks: EmitTask[] = [];
+            let first = true;
+            for (const [k, v] of value.v) {
+                tasks.push({ t: "pair", key: k, v, indent: 0, rootFirstKey: first });
+                first = false;
+            }
+            return tasks;
         }
-        return tasks;
-    }
-    const items = value.v;
-    if (items.length === 0) return [{ t: "text", chunks: ["[]\n"] }];
-    if (isCompound(items[0]!)) {
-        const tasks: EmitTask[] = [{ t: "text", chunks: ["[\n"] }];
-        for (const item of items) {
-            tasks.push({ t: "item", v: item, indent: 1, rootFirst: false });
+        case "array": {
+            const items = value.v;
+            if (items.length === 0) return [{ t: "text", chunks: ["[]\n"] }];
+            if (isCompound(items[0]!)) {
+                const tasks: EmitTask[] = [{ t: "text", chunks: ["[\n"] }];
+                for (const item of items) {
+                    tasks.push({ t: "item", v: item, indent: 1, rootFirst: false });
+                }
+                tasks.push({ t: "text", chunks: ["]\n"] });
+                return tasks;
+            }
+            const tasks: EmitTask[] = [];
+            for (let i = 0; i < items.length; i++) {
+                tasks.push({ t: "item", v: items[i]!, indent: 0, rootFirst: i === 0 });
+            }
+            return tasks;
         }
-        tasks.push({ t: "text", chunks: ["]\n"] });
-        return tasks;
+        default: {
+            // Exhaustiveness guard: VCompound has exactly these two arms.
+            const _never: never = value;
+            return _never;
+        }
     }
-    const tasks: EmitTask[] = [];
-    for (let i = 0; i < items.length; i++) {
-        tasks.push({ t: "item", v: items[i]!, indent: 0, rootFirst: i === 0 });
-    }
-    return tasks;
 }
 
 /** render.rs `render` / `to_string_force_strings`. */
 export function renderPretty(value: V, forceStrings: boolean): string {
-    if (!isCompound(value)) {
+    if (value.t !== "object" && value.t !== "array") {
         unrepresentableAt("ScalarRoot", []);
     }
+    const root: VCompound = value;
     const out: W = [];
     const cfg: EmitterCfg = { forceStrings, pretty: true };
     try {
-        runEmitter(rootTasks(value, cfg), cfg, out);
+        runEmitter(rootTasks(root, cfg), cfg, out);
     } catch (e) {
         if (e instanceof WriterSignal) attachPath(value, e.code, forceStrings);
         throw e;
@@ -878,13 +892,14 @@ function requireForm(s: string, preferStripped: boolean): MultilineForm {
 /** canonical/walk.rs `emit_canonical` — same explicit-stack emitter
  *  as `renderPretty` (canonical mode). */
 export function emitCanonicalV(value: V): string {
-    if (!isCompound(value)) {
+    if (value.t !== "object" && value.t !== "array") {
         unrepresentableAt("ScalarRoot", []);
     }
+    const root: VCompound = value;
     const out: W = [];
     const cfg: EmitterCfg = { forceStrings: false, pretty: false };
     try {
-        runEmitter(rootTasks(value, cfg), cfg, out);
+        runEmitter(rootTasks(root, cfg), cfg, out);
     } catch (e) {
         if (e instanceof WriterSignal) attachPath(value, e.code, false);
         throw e;

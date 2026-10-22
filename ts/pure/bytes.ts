@@ -7,13 +7,24 @@
 // byte-for-byte.
 
 /** Shared decoder — the whole input is UTF-8-validated before any
- *  decode, and slices always land on char boundaries. */
-const DECODER = new TextDecoder("utf-8");
+ *  decode, and slices always land on char boundaries.
+ *
+ *  `ignoreBOM: true` does NOT mean "strip the BOM": per the Encoding
+ *  Standard it means the decoder will NOT strip a leading U+FEFF —
+ *  the BOM is kept as decoded content. The document-level BOM is
+ *  handled exactly once (leadingBomLen + the parser/formatter skip),
+ *  so a leaf whose range genuinely begins with U+FEFF (e.g.
+ *  `:: \uFEFFplain` → value "\uFEFFplain") must survive decoding
+ *  verbatim. Interior ranges never start with the document BOM, so
+ *  no double-BOM handling is possible. */
+const DECODER = new TextDecoder("utf-8", { ignoreBOM: true });
 
 /** Strict decoder used only by `lineTextAt`: throws instead of
  *  substituting U+FFFD, so a raw (not-yet-validated) line can be
- *  reported honestly as null text. */
-const FATAL_DECODER = new TextDecoder("utf-8", { fatal: true });
+ *  reported honestly as null text. `ignoreBOM: true` keeps the BOM —
+ *  matching Rust `line_text_at` (rust/src/error/envelope.rs), which
+ *  slices the RAW source (document BOM included, only \r stripped). */
+const FATAL_DECODER = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
 /** Decode `bytes[lo..hi)` as UTF-8. Precondition: the range was
  *  validated (`validateUtf8`) and starts/ends on char boundaries. */
@@ -188,14 +199,18 @@ export function wsLenAt(bytes: Uint8Array, i: number, hi: number): number {
         if (i + 2 < hi && bytes[i + 1] === 0x9a && bytes[i + 2] === 0x80) return 3;
         return 0;
     }
-    // U+2000..U+200A, U+2028, U+2029, U+202F (E2 80 80..8A / A8 / A9 / AF)
-    if (b === 0xe2 && i + 2 < hi && bytes[i + 1] === 0x80) {
-        const t = bytes[i + 2];
-        if ((t >= 0x80 && t <= 0x8a) || t === 0xa8 || t === 0xa9 || t === 0xaf) return 3;
+    // U+2000..U+200A, U+2028, U+2029, U+202F (E2 80 80..8A / A8 / A9
+    // / AF) and U+205F (E2 81 9F) — one 0xE2 dispatch so every
+    // whitespace code point with that lead byte stays reachable.
+    if (b === 0xe2 && i + 2 < hi) {
+        const t = bytes[i + 2]!;
+        if (bytes[i + 1] === 0x80) {
+            if ((t >= 0x80 && t <= 0x8a) || t === 0xa8 || t === 0xa9 || t === 0xaf) return 3;
+            return 0;
+        }
+        if (bytes[i + 1] === 0x81 && t === 0x9f) return 3; // U+205F
         return 0;
     }
-    // U+205F (E2 81 9F)
-    if (b === 0xe2 && i + 2 < hi && bytes[i + 1] === 0x81 && bytes[i + 2] === 0x9f) return 3;
     // U+3000 (E3 80 80)
     if (b === 0xe3 && i + 2 < hi && bytes[i + 1] === 0x80 && bytes[i + 2] === 0x80) return 3;
     return 0;

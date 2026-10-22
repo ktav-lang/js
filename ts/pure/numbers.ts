@@ -196,7 +196,7 @@ function scanExponent(bytes: Uint8Array, i: number, hi: number): number {
  *  `.`; a dotless form requires an exponent. */
 export function isFloatLiteral(bytes: Uint8Array, lo: number, hi: number): boolean {
     if (lo >= hi) return false;
-    const first = bytes[lo];
+    const first = bytes[lo]!; // lo < hi (guard above)
     if (!(first >= 0x30 && first <= 0x39) && first !== 0x2b && first !== 0x2d) return false;
     let hasDotOrExp = false;
     for (let i = lo; i < hi; i++) {
@@ -252,9 +252,13 @@ function decodeAsciiish(bytes: Uint8Array, lo: number, hi: number): string {
 
 /** Decompose a finite non-zero double into its shortest round-trip
  *  digits: `sign * 0.<digits> * 10^e10` (JS `Number#toString` yields
- *  the same shortest-correctly-rounded digit sequence as ryu). */
+ *  the same shortest-correctly-rounded digit sequence as ryu).
+ *  SIGN HANDLED ONCE: callers strip the sign via `neg = v < 0` and
+ *  prefix "-" themselves, so this works on `Math.abs(v)` — a '-' must
+ *  never leak into `digits` (it would double the sign downstream). */
 function shortestDigits(v: number): { digits: string; e10: number } {
-    let s = String(v);
+    const a = Math.abs(v); // callers guarantee v !== 0 (finite, nonzero)
+    let s = String(a);
     let exp = 0;
     const ePos = s.indexOf("e");
     if (ePos !== -1) {

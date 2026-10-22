@@ -90,7 +90,8 @@ TypeScript 后端。
 
 - 包、平台子包、workspace metadata 和 lockfile 版本统一为 `0.8.1`。
 - Rust 依赖为已发布的 `ktav` 0.8.1。
-- 规范 submodule 固定到已发布的 Ktav 0.8.1 提交（语料库 228
+- 规范 submodule：发布集成会将其固定到已发布的 Ktav 0.8.1 提交
+  （388982118c0d8f767bf283356ac9c9bb50fdc3f5）（语料库 228
   parseable / 90 invalid / 5 unrepresentable / 4
   parseable-unrepresentable / 13 个 canonical fixture，含 9 个新的
   `raw_bytes` fixture）。
