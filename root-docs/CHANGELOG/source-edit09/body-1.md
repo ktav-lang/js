@@ -23,6 +23,10 @@
   runner validates the `expected_location` metadata (line / start /
   end-or-minimum_end) on every backend.
 
+### Documentation
+
+- Expand README examples for dotted and literal-key paths, mixed arrays, String/Integer identity, multiline unfolding, byte-identical no-op and BOM/CRLF/EOF preservation. Clarify 0.9 byte diagnostics, safe refusal, ABI 2 and standalone pure usage; these additions are not part of published 0.8.1.
+
 >>>>> lang=ru
 ## Unreleased (source-edit 0.9)
 
@@ -49,6 +53,10 @@
   Новый раннер проверяет метаданные `expected_location`
   (line / start / end-или-minimum_end) на каждом бэкенде.
 
+### Документация
+
+- Дополнены примеры README: dotted-пути и буквальные ключи, смешанные массивы, различие String/Integer, раскрытие многострочной замены, побайтовый no-op и сохранение BOM/CRLF/EOF. Уточнены байтовая диагностика 0.9, безопасные отказы, ABI 2 и самостоятельный pure-бэкенд; дополнения не относятся к опубликованному 0.8.1.
+
 >>>>> lang=zh
 ## Unreleased（source-edit 0.9）
 
@@ -69,4 +77,8 @@
   的原始字节位置，保留 BOM，CRLF 算一个终止符，无效 UTF-8 时
   `line_text` 为 null）。新运行器会在每个后端上校验
   `expected_location` 元数据（line / start / end 或 minimum_end）。
+
+### 文档
+
+- 扩展 README 示例：点分路径与字面键、混合数组、String/Integer 区别、多行展开、逐字节 no-op 及 BOM/CRLF/EOF 保留。明确 0.9 字节诊断、安全拒绝、ABI 2 和独立纯实现用法；这些新增功能不属于已发布的 0.8.1。
 

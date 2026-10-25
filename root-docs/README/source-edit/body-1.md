@@ -12,6 +12,8 @@ function editValue(source: string, textualPath: string, replacement: KtavValue):
 function editValueSegments(source: string, segments: readonly string[], replacement: KtavValue): string;
 ```
 
+Bun/Deno FFI accepts the same arguments but returns `Promise<string>`; use `await`. The signatures above describe synchronous exports.
+
 >>>>> lang=ru
 ## Редактирование исходника (спека 0.9)
 
@@ -26,6 +28,8 @@ function editValue(source: string, textualPath: string, replacement: KtavValue):
 function editValueSegments(source: string, segments: readonly string[], replacement: KtavValue): string;
 ```
 
+FFI Bun/Deno принимает те же аргументы, но возвращает `Promise<string>`; используйте `await`. Сигнатуры выше относятся к синхронным экспортам.
+
 >>>>> lang=zh
 ## 源码编辑（spec 0.9）
 
@@ -37,4 +41,6 @@ function editValueSegments(source: string, segments: readonly string[], replacem
 function editValue(source: string, textualPath: string, replacement: KtavValue): string;
 function editValueSegments(source: string, segments: readonly string[], replacement: KtavValue): string;
 ```
+
+Bun/Deno FFI 接收相同参数，但返回 `Promise<string>`，需要 `await`。以上签名描述同步导出。
 
