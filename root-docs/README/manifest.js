@@ -12,6 +12,8 @@ export default [
   "api-loads-strict",
   "source-edit-status",
   "source-edit",
+  "editing-cookbook",
+  "diagnostics09",
   "canonical",
   "errors",
   "type-mapping",

@@ -35,6 +35,10 @@ format itself — for the latter see
   runner validates the `expected_location` metadata (line / start /
   end-or-minimum_end) on every backend.
 
+### Documentation
+
+- Expand README examples for dotted and literal-key paths, mixed arrays, String/Integer identity, multiline unfolding, byte-identical no-op and BOM/CRLF/EOF preservation. Clarify 0.9 byte diagnostics, safe refusal, ABI 2 and standalone pure usage; these additions are not part of published 0.8.1.
+
 ## 0.8.0
 
 ### Added

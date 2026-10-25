@@ -30,6 +30,10 @@ MINOR 版本升级视为破坏性。
   `line_text` 为 null）。新运行器会在每个后端上校验
   `expected_location` 元数据（line / start / end 或 minimum_end）。
 
+### 文档
+
+- 扩展 README 示例：点分路径与字面键、混合数组、String/Integer 区别、多行展开、逐字节 no-op 及 BOM/CRLF/EOF 保留。明确 0.9 字节诊断、安全拒绝、ABI 2 和独立纯实现用法；这些新增功能不属于已发布的 0.8.1。
+
 ## 0.8.0
 
 ### 新增

@@ -17,8 +17,8 @@
   all location fields are null (an edit failure is not a parse error).
   `EditUnsupported.body` carries the reason: a noncontiguous
   (dotted-key / reopen) whole target, structural replacement that would
-  erase interior comment lines, or a multiline string containing a line
-  `))` — no lossless form exists.
+  erase interior comment lines, or a replacement without a lossless
+  representation in its target context.
 - **Guarantees.** A byte-identical replacement is a byte-identical
   no-op even for noncanonical spelling. Every successful patch is
   re-parsed and semantically verified: exactly the target replaced, the
@@ -57,8 +57,8 @@ error instead of a silent fallback.
   все поля позиции null (ошибка правки — не parse-ошибка).
   `EditUnsupported.body` содержит причину: noncontiguous-цель
   (dotted-key / reopen), структурная замена, стирающая комментарии
-  внутри контейнера, или многострочная строка со строкой `))` —
-  lossless-формы не существует.
+  внутри контейнера, или замена без lossless-представления в контексте
+  целевого значения.
 - **Гарантии.** Байт-идентичная замена — байт-идентичный no-op даже
   при неканоничном написании. Каждый успешный патч перепарсится и
   семантически проверяется: заменено ровно целевое значение, остальное
@@ -90,7 +90,7 @@ error instead of a silent fallback.
   `error === "EditInvalidPath" | "EditNotFound" | "EditUnsupported"`；
   所有位置字段为 null（编辑失败不是解析错误）。`EditUnsupported.body`
   携带原因：非连续（dotted-key / reopen）的整体目标、会删除容器内部
-  注释的结构性替换、或包含一行 `))` 的多行字符串——不存在无损形式。
+  注释的结构性替换、或无法在目标上下文中无损表示的替换值。
 - **保证。** 字节相同的替换是字节相同的 no-op，即使拼写非规范亦然。
   每个成功的补丁都会重新解析并做语义校验：恰好替换目标值，其余树相等。
   无效的源文本抛出解析器自己的 envelope，而不是编辑错误。
