@@ -12,6 +12,31 @@ MINOR bump — ломающий.
 формата Ktav — для последнего см.
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
+## Unreleased (source-edit 0.9)
+
+### Добавлено
+
+- Добавлено lossless-редактирование исходника на каждом входе:
+  `editValue(source, textualPath, replacement)` и
+  `editValueSegments(source, segments, replacement)` сплайсят ИСХОДНЫЙ
+  текст вместо пересериализации, поэтому комментарии, пробелы,
+  написание/порядок ключей, BOM и стиль CR/LF/CRLF сохраняются
+  побайтово вне эффективной правки. Только замена существующего
+  значения; типизированные envelope'ы `EditInvalidPath` (с UTF-8
+  байтовым офсетом проблемы в пути), `EditNotFound` и
+  `EditUnsupported`; байт-идентичный no-op для байт-идентичной замены;
+  обязательная семантическая верификация после сплайса. Основа — новые
+  символы C ABI `ktav_edit_value` / `ktav_edit_value_segments`
+  (ABI_VERSION 2), новые биндинги `editValue` в N-API/WASM и полностью
+  самостоятельная pure-TypeScript реализация без нативных и
+  пакетно-менеджерных runtime-зависимостей.
+- Конформанс спеки 0.9: корпус переезжает на `versions/0.9/tests`
+  (412 фикстур) с новыми invalid-фикстурами `diagnostics09` (EOF и
+  raw-byte позиции malformed-UTF8 по исходным байтам, BOM сохранён,
+  CRLF — один терминатор, `line_text` null при невалидном UTF-8).
+  Новый раннер проверяет метаданные `expected_location`
+  (line / start / end-или-minimum_end) на каждом бэкенде.
+
 ## 0.8.0
 
 ### Добавлено

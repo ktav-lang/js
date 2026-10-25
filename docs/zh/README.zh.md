@@ -219,6 +219,8 @@ function stringifyForceStrings<T extends KtavInput = KtavInput>(obj: T): string;
 function format(s: string): string;
 function canonicalFromSource(s: string): string;
 function emitCanonical<T extends KtavInput = KtavInput>(obj: T): string;
+function editValue(source: string, textualPath: string, replacement: KtavValue): string;
+function editValueSegments(source: string, segments: readonly string[], replacement: KtavValue): string;
 
 // web / Deno / browser only; Node + Bun ignore it
 function ready(input?: URL | Response | ArrayBuffer): Promise<void>;
@@ -230,6 +232,46 @@ canonical writer 生成的形式。
 `stringifyForceStrings` 的输出与 `dumps` 一致，但会把每个叶子标量 ——
 integer、float、boolean、`null` —— 通过原始标记（`::`）压平为文本形式。
 复合值保持其结构，结果经 `loads` 解析回来仍是同一组 String 标量。
+
+> **尚未发布（0.9 准备版本）：** 这些编辑 API 和更新后的诊断不包含在已发布的 0.8.1 包中。原生后端需要固定的 0.9 核心（C-FFI 使用 C ABI 2）；纯实现仍完全独立。
+
+## 源码编辑（spec 0.9）
+
+两个操作在**现有文档内部**替换一个值，方式是对源文本做拼接（splice）
+而不是重新序列化：注释、空白、键的拼写与顺序、BOM、CR / LF / CRLF 风格
+（以及末尾换行符的有无）在有效编辑范围之外逐字节保留：
+
+```ts
+function editValue(source: string, textualPath: string, replacement: KtavValue): string;
+function editValueSegments(source: string, segments: readonly string[], replacement: KtavValue): string;
+```
+
+- **只替换已存在的值。** 不支持创建、删除或重命名。缺失的键、穿过标量的
+  下行、越界或非数字的数组索引、空段列表都会抛出 `EditNotFound`。
+- **路径。** `textualPath` 是点分形式 `key1.key2.0.key4`；段内 `\.` 表示
+  字面点号，`\\` 表示字面反斜杠；任何其他转义、结尾孤立的反斜杠或空段
+  都会抛出 `EditInvalidPath`，`body` 是路径参数中出错位置的十进制
+  **UTF-8 字节偏移**。`editValueSegments` 接收已解码的字面段，不做额外
+  反转义。数字段在 Object 中是字符串键，在 Array 中是从零开始的
+  ASCII 数字索引（允许前导零，不允许符号）。
+- **错误**是通常的十字段 envelope，
+  `error === "EditInvalidPath" | "EditNotFound" | "EditUnsupported"`；
+  所有位置字段为 null（编辑失败不是解析错误）。`EditUnsupported.body`
+  携带原因：非连续（dotted-key / reopen）的整体目标、会删除容器内部
+  注释的结构性替换、或包含一行 `))` 的多行字符串——不存在无损形式。
+- **保证。** 字节相同的替换是字节相同的 no-op，即使拼写非规范亦然。
+  每个成功的补丁都会重新解析并做语义校验：恰好替换目标值，其余树相等。
+  无效的源文本抛出解析器自己的 envelope，而不是编辑错误。
+- **版式。** dotted、inline 与块形态均被保留，包括完整的 inline 容器和
+  被清空（但不折叠）的块容器。当出现多行字符串、行宽超过
+  `max(100 个 Unicode 标量, 原行宽)`，或替换需要 ≥ 4 个转义且开销
+  ≥ 25 % 时，inline 包装沿被触及的分支最小展开。替换值是 JS 值：
+  `bigint` 与整数 `number` 保持精确的 Integer 形式，非整数则成为
+  Float。
+
+所有后端均可用：`@ktav-lang/ktav`（N-API）、`/wasm`、`/pure` 以及
+`/ffi` 子导出（Bun / Deno，异步）。早于 0.9 内核的原生二进制会报告
+清晰的版本不支持错误，而不是静默回退。
 
 有三个函数都产生规范输出，而它们并不可以互换：
 

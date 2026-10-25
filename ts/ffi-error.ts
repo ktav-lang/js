@@ -44,4 +44,12 @@ export function canonicalFromSource(_src: string): never {
     throw new Error(MESSAGE);
 }
 
-export const ktav = { loads, loadsStrict, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource };
+export function editValue(_source: string, _path: string, _replacement: unknown): never {
+    throw new Error(MESSAGE);
+}
+
+export function editValueSegments(_source: string, _segments: readonly string[], _replacement: unknown): never {
+    throw new Error(MESSAGE);
+}
+
+export const ktav = { loads, loadsStrict, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource, editValue, editValueSegments };

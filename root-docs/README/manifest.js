@@ -10,6 +10,8 @@ export default [
   "ffi-tradeoff",
   "api",
   "api-loads-strict",
+  "source-edit-status",
+  "source-edit",
   "canonical",
   "errors",
   "type-mapping",

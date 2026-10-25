@@ -4,6 +4,9 @@
 # `git status` from Windows clients.
 * text=auto eol=lf
 
+# Polydoc требует пустую строку в конце промежуточных source parts.
+root-docs/**/body-*.md whitespace=-blank-at-eof
+
 # Windows-only scripts must stay CRLF — cmd.exe refuses to parse .bat
 # files with LF-only endings. Only applies to the three local build
 # helpers under `scripts/`; everything else (Rust, JS, TS, Python,

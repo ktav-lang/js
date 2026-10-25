@@ -812,6 +812,23 @@ function rootTasks(value: VCompound, cfg: EmitterCfg): EmitTask[] {
     }
 }
 
+/** render.rs `render_compound_item` — a compound (or any value)
+ *  rendered as an ARRAY ITEM at indent level 1 (four spaces), the form
+ *  the source-edit splice re-indents under the target's own indent.
+ *  Mirrors `render_array_item(value, 1, false, false)` including the
+ *  trailing newline, which `reindent` drops. */
+export function renderCompoundItem(value: V): string {
+    const out: W = [];
+    const cfg: EmitterCfg = { forceStrings: false, pretty: true };
+    try {
+        runEmitter([{ t: "item", v: value, indent: 1, rootFirst: false }], cfg, out);
+    } catch (e) {
+        if (e instanceof WriterSignal) attachPath({ t: "array", v: [value] }, e.code, false);
+        throw e;
+    }
+    return out.join("");
+}
+
 /** render.rs `render` / `to_string_force_strings`. */
 export function renderPretty(value: V, forceStrings: boolean): string {
     if (value.t !== "object" && value.t !== "array") {

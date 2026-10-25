@@ -19,9 +19,11 @@ export { setLibraryPath } from "./internal/ffi-loader.js";
 // deps. We type the surface we actually use, and `@ts-expect-error`
 // the dynamic import so tsc doesn't need a `declare module`.
 interface BunFFI {
-    FFIType: { ptr: number; u64: number; i32: number; void: number };
+    FFIType: { ptr: number; u64: number; i32: number; u32: number; void: number };
     dlopen(path: string, symbols: Record<string, { args: number[]; returns: number }>): {
         symbols: Record<string, (...args: unknown[]) => unknown>;
+        /** Available on modern Bun — releases the OS handle. */
+        close?: () => void;
     };
     /** Convert a native pointer (number on 64-bit) into an ArrayBuffer view. */
     toArrayBuffer(ptr: number, byteOffset?: number, byteLength?: number): ArrayBuffer;
@@ -33,6 +35,21 @@ interface FFILib {
 }
 
 let cachedLib: FFILib | null = null;
+
+// The binding's ABI contract: ktav 0.9 source-edit (ABI_VERSION 2).
+// The gate is STRICT and runs BEFORE any document operation: a library
+// that reports any other version (or none) is refused for EVERY native
+// call — never a silent pure fallback, never a half-working subset.
+const EXPECTED_ABI_VERSION = 2;
+
+function abiGateError(actual: string): Error {
+    return new Error(
+        `ktav_cabi ABI_VERSION gate: library reports ${actual}, ` +
+            `this binding requires ${EXPECTED_ABI_VERSION} (source-edit 0.9, ABI_VERSION 2). ` +
+            `All native document operations are refused — upgrade/rebuild ktav_cabi; ` +
+            `no pure fallback is performed.`,
+    );
+}
 
 // Rust требует ненулевой указатель даже при длине 0. Буфер живёт весь вызов.
 const EMPTY_SRC_PLACEHOLDER = new Uint8Array(1);
@@ -100,6 +117,16 @@ async function getLib(): Promise<FFILib> {
             args: [ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr],
             returns: ffi.FFIType.i32,
         },
+        // source-edit 0.9 (ABI_VERSION 2): three input buffers, same
+        // output/error out-pointer contract as every other op.
+        ktav_edit_value: {
+            args: [ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr],
+            returns: ffi.FFIType.i32,
+        },
+        ktav_edit_value_segments: {
+            args: [ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr],
+            returns: ffi.FFIType.i32,
+        },
         ktav_free: {
             args: [ffi.FFIType.ptr, ffi.FFIType.u64],
             returns: ffi.FFIType.void,
@@ -108,7 +135,34 @@ async function getLib(): Promise<FFILib> {
             args: [],
             returns: ffi.FFIType.ptr,
         },
+        // Strict gate (uint32): probed before ANY document call; a
+        // mismatch releases the handle and refuses every operation.
+        ktav_abi_version: {
+            args: [],
+            returns: ffi.FFIType.u32,
+        },
     });
+    // Strict ABI gate — document ops must never run against a foreign
+    // ABI (e.g. an old ABI_VERSION 1 artifact without the edit
+    // symbols). Probe first, close the library on mismatch, and cache
+    // nothing: every later call fails with the same clear error.
+    try {
+        const abiVersion = opened.symbols.ktav_abi_version as (() => number) | undefined;
+        if (typeof abiVersion !== "function") {
+            throw abiGateError("no ktav_abi_version symbol (pre-metadata library)");
+        }
+        const actual = Number(abiVersion()) >>> 0; // uint32
+        if (actual !== EXPECTED_ABI_VERSION) {
+            throw abiGateError(String(actual));
+        }
+    } catch (e) {
+        try {
+            (opened as { close?: () => void }).close?.();
+        } catch {
+            // Best effort — the handle is process-lifetime anyway.
+        }
+        throw e;
+    }
     cachedLib = { ffi, symbols: opened.symbols };
     return cachedLib;
 }
@@ -270,6 +324,95 @@ export async function canonicalFromSource(src: string): Promise<string> {
     return new TextDecoder().decode(result);
 }
 
+/** Shared edit call: source / path (or JSON segments) / replacement
+ *  (tagged wire JSON from the shared codec) → patched source text.
+ *  All three inputs are snapshotted synchronously; the strict ABI gate
+ *  in getLib() refuses any library whose ABI_VERSION differs from 2
+ *  BEFORE any operation runs — clear error, no pure fallback. */
+async function callEdit(
+    op: "edit_value" | "edit_value_segments",
+    source: string,
+    pathArg: string,
+    replacement: KtavValue,
+): Promise<string> {
+    const { ffi, symbols } = await getLib();
+    const symbolName = op === "edit_value" ? "ktav_edit_value" : "ktav_edit_value_segments";
+    const sym = symbols[symbolName] as ((...args: unknown[]) => number) | undefined;
+    if (typeof sym !== "function") {
+        throw ktavMessageError(
+            `installed ktav_cabi library does not export ${symbolName} ` +
+                `(source-edit requires ABI_VERSION 2 / ktav 0.9 core)`,
+        );
+    }
+    let replInput: Uint8Array;
+    try {
+        replInput = encode(replacement);
+    } catch (e) {
+        throw toKtavError(e);
+    }
+    const src = new Uint8Array(new TextEncoder().encode(source));
+    const path = new Uint8Array(new TextEncoder().encode(pathArg));
+    const outBuf = new BigUint64Array(1);
+    const outLen = new BigUint64Array(1);
+    const outErr = new BigUint64Array(1);
+    const outErrLen = new BigUint64Array(1);
+    const rc = sym(
+        src.length === 0 ? EMPTY_SRC_PLACEHOLDER : src,
+        BigInt(src.length),
+        path.length === 0 ? EMPTY_SRC_PLACEHOLDER : path,
+        BigInt(path.length),
+        replInput.length === 0 ? EMPTY_SRC_PLACEHOLDER : replInput,
+        BigInt(replInput.length),
+        outBuf,
+        outLen,
+        outErr,
+        outErrLen,
+    );
+    const ktavFree = symbols.ktav_free as (ptr: number, len: bigint) => void;
+    const readPtr = (b: BigUint64Array): number => Number(b[0]);
+    if (rc !== 0) {
+        const errPtr = readPtr(outErr);
+        const errLen = Number(outErrLen[0]!);
+        let msg = `native call failed with code ${rc}`;
+        if (errPtr !== 0 && errLen > 0) {
+            const buf = ffi.toArrayBuffer(errPtr, 0, errLen);
+            msg = new TextDecoder().decode(new Uint8Array(buf));
+            ktavFree(errPtr, BigInt(errLen));
+        }
+        const okPtr = readPtr(outBuf);
+        const okLen = Number(outLen[0]!);
+        if (okPtr !== 0 && okLen > 0) ktavFree(okPtr, BigInt(okLen));
+        throw toKtavError(new Error(msg));
+    }
+    const okPtr = readPtr(outBuf);
+    const okLen = Number(outLen[0]!);
+    if (okPtr === 0 || okLen === 0) return "";
+    const buf = ffi.toArrayBuffer(okPtr, 0, okLen);
+    const copy = new Uint8Array(buf.slice(0));
+    ktavFree(okPtr, BigInt(okLen));
+    // The patched SOURCE bytes may legitimately begin with a BOM the
+    // edit preserved — a default TextDecoder would silently STRIP it.
+    // ignoreBOM:true means "keep U+FEFF" (it does not add one).
+    return new TextDecoder("utf-8", { ignoreBOM: true }).decode(copy);
+}
+
+export function editValue(
+    source: string,
+    path: string,
+    replacement: KtavValue,
+): Promise<string> {
+    return callEdit("edit_value", source, path, replacement);
+}
+
+export function editValueSegments(
+    source: string,
+    segments: readonly string[],
+    replacement: KtavValue,
+): Promise<string> {
+    const pathArg = JSON.stringify([...segments]);
+    return callEdit("edit_value_segments", source, pathArg, replacement);
+}
+
 export const ktav: Pick<Ktav, never> & {
     loads: typeof loads;
     loadsStrict: typeof loadsStrict;
@@ -279,4 +422,6 @@ export const ktav: Pick<Ktav, never> & {
     format: typeof format;
     emitCanonical: typeof emitCanonical;
     canonicalFromSource: typeof canonicalFromSource;
-} = { loads, loadsStrict, loadsBytes, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource };
+    editValue: typeof editValue;
+    editValueSegments: typeof editValueSegments;
+} = { loads, loadsStrict, loadsBytes, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource, editValue, editValueSegments };

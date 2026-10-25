@@ -120,6 +120,10 @@ jobs:
       - run: npm run build
       - run: npm run test:node-napi
       - run: npm run test:node-wasm
+      - run: npm run test:edit-napi
+      - run: npm run test:edit-wasm
+      - run: npm run test:spec09-napi
+      - run: npm run test:spec09-wasm
 
   test-bun:
     name: Tests — Bun / ${{ matrix.os }}
@@ -248,6 +252,7 @@ jobs:
           tool: wasm-pack
       - run: npm run build:wasm
       - run: npm run build:ts
+      - run: npm run test:edit-wasm
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
 
@@ -275,6 +280,8 @@ jobs:
       - run: npm install
       - run: npm run build:ts
       - run: node tests/node/run-node-pure.mjs
+      - run: node tests/node/run-edit-pure.mjs
+      - run: node tests/node/run-spec09-pure.mjs
       - run: node scripts/check-pure-isolation.mjs
 
   # ------------------------------------------------------------------
