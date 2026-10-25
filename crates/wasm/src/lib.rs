@@ -54,19 +54,46 @@ fn message_envelope(text: impl Into<String>) -> String {
     envelope_json(&ktav::Error::Message(text.into()), "")
 }
 
-/// The raw-`InvalidUtf8` envelope for the `loadsBytes` byte entry
-/// (spec 0.8 § 3.1/§ 6.15). Contract mirrored from
-/// `rust/src/cabi/envelope.rs::not_utf8_envelope` — the core exposes
-/// `ktav::parse(&str)` only, so the binding layer performs the UTF-8
-/// validation itself: class `InvalidUtf8` (never `Message`), with the
-/// § 6 location computed over the ORIGINAL bytes. The span covers the
-/// offending sequence (`Utf8Error::error_len`), or runs to end-of-input
-/// when the sequence is truncated at EOF (`error_len` is `None`); an
-/// illegal lead byte reported as one byte swallows the following
-/// continuation bytes so the span covers the ill-formed region whole.
-/// No valid source text exists, so `line_text` stays null while `line`
-/// and `span` are filled from the raw bytes.
-fn not_utf8_envelope(src: &[u8], err: std::str::Utf8Error) -> String {
+/// The ten-field envelope for the edit error classes — same wire
+/// contract as the napi crate. Built through
+/// `ErrorEnvelope::from_error` + field overwrite + `to_json` (one
+/// escaping implementation); `ktav::edit::EditError` is
+/// `#[non_exhaustive]`, so an unknown future variant degrades to a
+/// typed `EditUnsupported` with the variant's `Display` text — never a
+/// panic, never a bare Message.
+fn edit_error_envelope(e: &ktav::edit::EditError) -> String {
+    let mut env = ktav::ErrorEnvelope::from_error(&ktav::Error::Message(String::new()), "");
+    let (error, body, message) = match e {
+        ktav::edit::EditError::InvalidPath { offset } => (
+            "EditInvalidPath",
+            Some(offset.to_string()),
+            format!("invalid edit path (bad escape or empty segment) at byte {offset}"),
+        ),
+        ktav::edit::EditError::NotFound => (
+            "EditNotFound",
+            None,
+            "edit path does not address an existing value".to_string(),
+        ),
+        ktav::edit::EditError::Unsupported { reason } => (
+            "EditUnsupported",
+            Some(reason.clone()),
+            format!("no lossless source edit: {reason}"),
+        ),
+        other => (
+            "EditUnsupported",
+            None,
+            format!("no lossless source edit: {other}"),
+        ),
+    };
+    env.error = error.to_string();
+    env.body = body;
+    env.message = message;
+    env.to_json()
+}
+
+/// Координаты повторяют приватный core error/source.rs::invalid_utf8.
+/// Общий ErrorEnvelope сохраняет честный line_text=null для невалидного UTF-8.
+fn invalid_utf8_error(src: &[u8], err: std::str::Utf8Error) -> ktav::Error {
     let valid_up_to = err.valid_up_to();
     let mut end = valid_up_to + err.error_len().unwrap_or(src.len() - valid_up_to);
     if err.error_len() == Some(1) {
@@ -74,21 +101,29 @@ fn not_utf8_envelope(src: &[u8], err: std::str::Utf8Error) -> String {
             end += 1;
         }
     }
-    let mut env = ktav::ErrorEnvelope::from_error(&ktav::Error::InvalidUtf8 { valid_up_to }, "");
-    // `Span` is u32-based; a >4 GiB document is beyond what `Span` can
-    // address anywhere in this crate, so saturate (same trade-off as the
-    // cabi layer).
-    let start = u32::try_from(valid_up_to).unwrap_or(u32::MAX);
-    let end = u32::try_from(end).unwrap_or(u32::MAX);
-    env.line = Some(line_of_offset(src, valid_up_to));
-    env.span = Some(ktav::Span::new(start, end));
+    ktav::Error::InvalidUtf8 {
+        valid_up_to,
+        // `Span` is u32-based; a >4 GiB document is beyond what `Span`
+        // can address anywhere in this crate, so saturate (same
+        // trade-off as the core).
+        line: line_of_offset(src, valid_up_to),
+        span: ktav::Span::new(
+            u32::try_from(valid_up_to).unwrap_or(u32::MAX),
+            u32::try_from(end).unwrap_or(u32::MAX),
+        ),
+    }
+}
+
+fn not_utf8_envelope(src: &[u8], err: std::str::Utf8Error) -> String {
+    let error = invalid_utf8_error(src, err);
+    let mut env = ktav::ErrorEnvelope::from_error(&error, "");
     env.body = Some(format!("input is not valid UTF-8: {err}"));
     env.to_json()
 }
 
 /// 1-based line number of raw byte offset `pos`, counting each LF, lone
 /// CR and CR LF pair as exactly one terminator (spec § 3.2). Mirrors
-/// `rust/src/cabi/envelope.rs::line_of_offset`; counted over the raw
+/// `rust/src/error/source.rs::line_of_offset`; counted over the raw
 /// bytes, before BOM removal or trimming (§ 6.15).
 fn line_of_offset(bytes: &[u8], pos: usize) -> u32 {
     let mut line: u32 = 1;
@@ -144,6 +179,33 @@ pub fn loads_bytes(bytes: &[u8]) -> Result<JsValue, JsError> {
         std::str::from_utf8(bytes).map_err(|e| JsError::new(&not_utf8_envelope(bytes, e)))?;
     let value = ktav::parse(text).map_err(|e| JsError::new(&envelope_json(&e, text)))?;
     value_to_js(&value)
+}
+
+/// Replace the value at `path` (textual dotted form, `\.` = literal
+/// dot, `\\` = literal backslash) with `replacement`, splicing the
+/// SOURCE text losslessly. Mirrors the napi `editValue` contract; the
+/// source is validated + parsed first so a parser envelope wins.
+#[wasm_bindgen(js_name = editValue)]
+pub fn edit_value(source: &str, path: &str, replacement: JsValue) -> Result<String, JsError> {
+    // Source-first precedence (C ABI contract): parse envelope wins.
+    ktav::parse(source).map_err(|e| JsError::new(&envelope_json(&e, source)))?;
+    let value = js_to_value(&replacement)?;
+    ktav::edit::edit_value(source, path, &value).map_err(|e| JsError::new(&edit_error_envelope(&e)))
+}
+
+/// [`edit_value`] with pre-decoded literal segments (no extra
+/// unescaping); an empty list is `EditNotFound`.
+#[wasm_bindgen(js_name = editValueSegments)]
+pub fn edit_value_segments(
+    source: &str,
+    segments: Vec<String>,
+    replacement: JsValue,
+) -> Result<String, JsError> {
+    // Source-first precedence, same as edit_value.
+    ktav::parse(source).map_err(|e| JsError::new(&envelope_json(&e, source)))?;
+    let value = js_to_value(&replacement)?;
+    ktav::edit::edit_value_segments(source, &segments, &value)
+        .map_err(|e| JsError::new(&edit_error_envelope(&e)))
 }
 
 /// Serialize a JavaScript value as a Ktav document. The top-level value

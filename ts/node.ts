@@ -44,6 +44,29 @@ interface NativeBinding {
     emitCanonical: (obj: unknown) => string;
     canonicalFromSource: (s: string) => string;
     loadsBytes: (bytes: Uint8Array) => unknown;
+    editValue?: (source: string, path: string, replacement: unknown) => string;
+    editValueSegments?: (
+        source: string,
+        segments: string[],
+        replacement: unknown,
+    ) => string;
+}
+
+/** A native binary predating the source-edit 0.9 core simply lacks the
+ *  symbols — report that clearly instead of a confusing TypeError or a
+ *  silent pure fallback (ABI_VERSION 2 adds the two edit symbols). */
+function requireNativeEdit(name: "editValue" | "editValueSegments"): (
+    ...args: unknown[]
+) => string {
+    const fn = native[name];
+    if (typeof fn !== "function") {
+        throw ktavMessageError(
+            `installed ktav native binary does not support ${name} ` +
+                `(source-edit requires ABI_VERSION 2 / ktav 0.9 core; ` +
+                `the loaded binary predates it)`,
+        );
+    }
+    return fn as (...args: unknown[]) => string;
 }
 
 const require_ = createRequire(import.meta.url);
@@ -151,6 +174,26 @@ export function emitCanonical<T extends KtavInput = KtavInput>(obj: T): string {
 export function canonicalFromSource(s: string): string {
     try {
         return native.canonicalFromSource(s);
+    } catch (e) {
+        throw toKtavError(e);
+    }
+}
+
+export function editValue(source: string, path: string, replacement: KtavValue): string {
+    try {
+        return requireNativeEdit("editValue")(source, path, replacement) as string;
+    } catch (e) {
+        throw toKtavError(e);
+    }
+}
+
+export function editValueSegments(
+    source: string,
+    segments: readonly string[],
+    replacement: KtavValue,
+): string {
+    try {
+        return requireNativeEdit("editValueSegments")(source, [...segments], replacement) as string;
     } catch (e) {
         throw toKtavError(e);
     }

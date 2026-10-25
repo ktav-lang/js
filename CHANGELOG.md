@@ -11,6 +11,30 @@ This changelog tracks **package releases**, not changes to the Ktav
 format itself — for the latter see
 [`ktav-lang/spec`](https://github.com/ktav-lang/spec/blob/main/CHANGELOG.md).
 
+## Unreleased (source-edit 0.9)
+
+### Added
+
+- Added lossless source editing on every entrypoint: `editValue(source,
+  textualPath, replacement)` and `editValueSegments(source, segments,
+  replacement)` splice the SOURCE text instead of re-serializing, so
+  comments, whitespace, key spelling/order, the BOM and the CR/LF/CRLF
+  style survive byte-for-byte outside the effective edit. Only
+  replacement of an existing value; typed `EditInvalidPath` (with the
+  UTF-8 byte offset of the fault in the path), `EditNotFound` and
+  `EditUnsupported` envelopes; byte-identical no-op for byte-identical
+  replacements; mandatory post-splice semantic verification. Backed by
+  the new `ktav_edit_value` / `ktav_edit_value_segments` C ABI symbols
+  (ABI_VERSION 2), the new N-API/WASM `editValue` bindings, and a
+  fully standalone pure-TypeScript implementation with no native or
+  package-manager runtime dependencies.
+- Spec 0.9 conformance: the corpus moves to `versions/0.9/tests` (412
+  fixtures) with the new `diagnostics09` invalid fixtures (EOF and
+  malformed-UTF8 raw-byte locations over the original bytes, BOM kept,
+  CRLF one terminator, `line_text` null for invalid UTF-8). The new
+  runner validates the `expected_location` metadata (line / start /
+  end-or-minimum_end) on every backend.
+
 ## 0.8.0
 
 ### Added

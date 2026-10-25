@@ -9,6 +9,8 @@ function stringifyForceStrings<T extends KtavInput = KtavInput>(obj: T): string;
 function format(s: string): string;
 function canonicalFromSource(s: string): string;
 function emitCanonical<T extends KtavInput = KtavInput>(obj: T): string;
+function editValue(source: string, textualPath: string, replacement: KtavValue): string;
+function editValueSegments(source: string, segments: readonly string[], replacement: KtavValue): string;
 
 // web / Deno / browser only; Node + Bun ignore it
 function ready(input?: URL | Response | ArrayBuffer): Promise<void>;
@@ -25,6 +27,8 @@ function stringifyForceStrings<T extends KtavInput = KtavInput>(obj: T): string;
 function format(s: string): string;
 function canonicalFromSource(s: string): string;
 function emitCanonical<T extends KtavInput = KtavInput>(obj: T): string;
+function editValue(source: string, textualPath: string, replacement: KtavValue): string;
+function editValueSegments(source: string, segments: readonly string[], replacement: KtavValue): string;
 
 // web / Deno / browser only; Node + Bun ignore it
 function ready(input?: URL | Response | ArrayBuffer): Promise<void>;
@@ -41,6 +45,8 @@ function stringifyForceStrings<T extends KtavInput = KtavInput>(obj: T): string;
 function format(s: string): string;
 function canonicalFromSource(s: string): string;
 function emitCanonical<T extends KtavInput = KtavInput>(obj: T): string;
+function editValue(source: string, textualPath: string, replacement: KtavValue): string;
+function editValueSegments(source: string, segments: readonly string[], replacement: KtavValue): string;
 
 // web / Deno / browser only; Node + Bun ignore it
 function ready(input?: URL | Response | ArrayBuffer): Promise<void>;

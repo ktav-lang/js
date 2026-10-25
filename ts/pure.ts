@@ -11,6 +11,7 @@ import { jsToV } from "./pure/ktavvalue.js";
 import { renderPretty } from "./pure/writer.js";
 import { emitCanonicalJs, canonicalFromSourceText } from "./pure/canonical.js";
 import { formatText } from "./pure/formatter.js";
+import { editValueSource, editValueSegmentsSource } from "./pure/edit.js";
 
 import { ktavMessageError, toKtavError } from "./internal/api.js";
 import type { KtavInput, KtavValue } from "./internal/api.js";
@@ -93,6 +94,26 @@ export function emitCanonical<T extends KtavInput = KtavInput>(obj: T): string {
 export function canonicalFromSource(s: string): string {
     try {
         return canonicalFromSourceText(s);
+    } catch (e) {
+        throw toKtavError(e);
+    }
+}
+
+export function editValue(source: string, path: string, replacement: KtavValue): string {
+    try {
+        return editValueSource(source, path, replacement);
+    } catch (e) {
+        throw toKtavError(e);
+    }
+}
+
+export function editValueSegments(
+    source: string,
+    segments: readonly string[],
+    replacement: KtavValue,
+): string {
+    try {
+        return editValueSegmentsSource(source, segments, replacement);
     } catch (e) {
         throw toKtavError(e);
     }

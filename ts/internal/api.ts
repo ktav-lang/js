@@ -127,6 +127,28 @@ export interface Ktav {
      *   emitCanonical({ port: 8080, host: "localhost" })
      */
     emitCanonical(obj: KtavInput): string;
+
+    /**
+     * Replace the value at `textual_path` (`key1.key2.0.key4`; `\.` is
+     * a literal dot, `\\` a literal backslash) with `replacement`,
+     * splicing the SOURCE text: comments, whitespace, key spelling and
+     * order, BOM and the CR/LF/CRLF style outside the effective edit
+     * survive byte-for-byte. Only replacement of an existing value —
+     * no create/remove/rename. Throws `KtavError` with
+     * `error === "EditInvalidPath"` (body = UTF-8 byte offset into the
+     * path), `"EditNotFound"` or `"EditUnsupported"` (body = reason);
+     * an invalid SOURCE throws the parser's own envelope.
+     */
+    editValue(source: string, textualPath: string, replacement: KtavValue): string;
+
+    /**
+     * {@link editValue} with pre-decoded literal segments — no extra
+     * unescaping. A numeric segment addresses a string key inside an
+     * Object and a zero-based ASCII-digits index inside an Array
+     * (leading zeros allowed, signs are not). An empty segments list
+     * is `EditNotFound`.
+     */
+    editValueSegments(source: string, segments: readonly string[], replacement: KtavValue): string;
 }
 
 /**

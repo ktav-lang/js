@@ -230,6 +230,8 @@ function stringifyForceStrings<T extends KtavInput = KtavInput>(obj: T): string;
 function format(s: string): string;
 function canonicalFromSource(s: string): string;
 function emitCanonical<T extends KtavInput = KtavInput>(obj: T): string;
+function editValue(source: string, textualPath: string, replacement: KtavValue): string;
+function editValueSegments(source: string, segments: readonly string[], replacement: KtavValue): string;
 
 // web / Deno / browser only; Node + Bun ignore it
 function ready(input?: URL | Response | ArrayBuffer): Promise<void>;
@@ -242,6 +244,58 @@ lossy-формы, принимая при этом формы, которые в
 leaf-скаляр — integer, float, boolean, `null` — в текстовую форму через
 сырой маркер (`::`). Составные значения сохраняют структуру, а результат
 разбирается обратно через `loads` как тот же набор String-скаляров.
+
+> **Ещё не выпущено (подготовка 0.9):** Эти API редактирования и обновлённая диагностика не входят в опубликованные пакеты 0.8.1. Native-backend требует закреплённое ядро 0.9 (C ABI 2 для C-FFI); pure-backend остаётся самостоятельным.
+
+## Редактирование исходника (спека 0.9)
+
+Две операции заменяют значение **внутри существующего документа**,
+сплайся исходный текст: документ не пересериализуется, поэтому
+комментарии, пробелы, написание и порядок ключей, BOM и стиль CR / LF /
+CRLF (а также наличие или отсутствие финального перевода строки)
+сохраняются побайтово вне эффективной правки:
+
+```ts
+function editValue(source: string, textualPath: string, replacement: KtavValue): string;
+function editValueSegments(source: string, segments: readonly string[], replacement: KtavValue): string;
+```
+
+- **Только замена существующего значения.** Создание, удаление и
+  переименование не поддерживаются. Отсутствующий ключ, спуск через
+  скаляр, выходящий за границы или нечисловой индекс массива, пустой
+  список сегментов — `EditNotFound`.
+- **Пути.** `textualPath` — форма с точками `key1.key2.0.key4`; внутри
+  сегмента `\.` — literal точка, `\\` — literal backslash; любой другой
+  escape, хвостовой одиночный `\` или пустой сегмент —
+  `EditInvalidPath`, в `body` — десятичный **UTF-8 байтовый офсет** в
+  аргументе пути. `editValueSegments` принимает уже декодированные
+  литеральные сегменты без повторного unescape. Числовой сегмент — это
+  строковый ключ в Object и zero-based индекс из ASCII-цифр в Array
+  (ведущие нули допустимы, знаки — нет).
+- **Ошибки** — обычный десятиполевой envelope с
+  `error === "EditInvalidPath" | "EditNotFound" | "EditUnsupported"`;
+  все поля позиции null (ошибка правки — не parse-ошибка).
+  `EditUnsupported.body` содержит причину: noncontiguous-цель
+  (dotted-key / reopen), структурная замена, стирающая комментарии
+  внутри контейнера, или многострочная строка со строкой `))` —
+  lossless-формы не существует.
+- **Гарантии.** Байт-идентичная замена — байт-идентичный no-op даже
+  при неканоничном написании. Каждый успешный патч перепарсится и
+  семантически проверяется: заменено ровно целевое значение, остальное
+  дерево равно. Невалидный ИСХОДНИК даёт обычный envelope парсера, а
+  не ошибку правки.
+- **Форма.** Dotted-, inline- и блочные формы сохраняются, включая
+  целые inline-контейнеры и опустошённые (но не схлопнутые) блочные.
+  Inline-обёртки раскрываются минимально: при многострочной строке, при
+  росте строки сверх `max(100 Unicode scalar, прежняя длина)` или при
+  ≥ 4 escapes с накладными расходами ≥ 25 % — только по затронутой
+  ветке. Замена — JS-значение: `bigint` и целые `number` сохраняют
+  точную форму Integer, нецелые — Float.
+
+Доступно на всех бэкендах: `@ktav-lang/ktav` (N-API), `/wasm`,
+`/pure` и субэкспорты `/ffi` (Bun / Deno, асинхронно). Нативные
+бинарники старше ядра 0.9 сообщают понятную ошибку версии, а не
+тихий fallback.
 
 Канонический вывод дают три функции, и они не взаимозаменяемы:
 

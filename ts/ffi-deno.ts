@@ -75,6 +75,16 @@ const FFI_SYMBOLS = {
         parameters: [],
         result: "pointer",
     },
+    // source-edit 0.9 (ABI_VERSION 2): three input buffers, same
+    // out-pointer contract as every other op.
+    ktav_edit_value: {
+        parameters: ["pointer", "usize", "pointer", "usize", "pointer", "usize", "pointer", "pointer", "pointer", "pointer"],
+        result: "i32",
+    },
+    ktav_edit_value_segments: {
+        parameters: ["pointer", "usize", "pointer", "usize", "pointer", "usize", "pointer", "pointer", "pointer", "pointer"],
+        result: "i32",
+    },
 } as const;
 
 let cachedLib: { symbols: Record<string, (...args: unknown[]) => unknown> } | null = null;
@@ -106,6 +116,39 @@ async function getLib() {
         },
     });
     cachedLib = Deno.dlopen(path, FFI_SYMBOLS);
+    // Strict ABI gate — document ops must never run against a foreign
+    // ABI (e.g. an old ABI_VERSION 1 artifact without the edit
+    // symbols). Probe first, close the library on mismatch, and cache
+    // nothing: every later call fails with the same clear error.
+    const EXPECTED_ABI_VERSION = 2;
+    const abiVersion = cachedLib.symbols.ktav_abi_version as (() => number) | undefined;
+    try {
+        if (typeof abiVersion !== "function") {
+            throw new Error(
+                "ktav_cabi ABI_VERSION gate: library reports no ktav_abi_version symbol " +
+                    "(pre-metadata library), this binding requires ABI_VERSION 2 " +
+                    "(source-edit 0.9). All native document operations are refused — " +
+                    "upgrade/rebuild ktav_cabi; no pure fallback is performed.",
+            );
+        }
+        const actual = Number(abiVersion()) >>> 0; // uint32
+        if (actual !== EXPECTED_ABI_VERSION) {
+            throw new Error(
+                `ktav_cabi ABI_VERSION gate: library reports ${actual}, ` +
+                    `this binding requires ${EXPECTED_ABI_VERSION} (source-edit 0.9, ABI_VERSION 2). ` +
+                    `All native document operations are refused — upgrade/rebuild ktav_cabi; ` +
+                    `no pure fallback is performed.`,
+            );
+        }
+    } catch (e) {
+        try {
+            (cachedLib as { close?: () => void }).close?.();
+        } catch {
+            // Best effort — Deno releases the handle on unload anyway.
+        }
+        cachedLib = null;
+        throw e;
+    }
     return cachedLib;
 }
 
@@ -268,6 +311,99 @@ export async function canonicalFromSource(src: string): Promise<string> {
     return new TextDecoder().decode(result);
 }
 
+/** Shared edit call over the 10-arg C ABI (source / path / replacement
+ *  buffers + the standard out-pointer quartet). An old library
+ *  (ABI_VERSION 1) lacks the symbols and fails with a clear error,
+ *  never a pure fallback. */
+async function callEdit(
+    op: "edit_value" | "edit_value_segments",
+    source: string,
+    pathArg: string,
+    replacement: KtavValue,
+): Promise<string> {
+    const lib = await getLib();
+    const symbolName = op === "edit_value" ? "ktav_edit_value" : "ktav_edit_value_segments";
+    const sym = lib.symbols[symbolName] as ((...args: unknown[]) => number) | undefined;
+    if (typeof sym !== "function") {
+        throw ktavMessageError(
+            `installed ktav_cabi library does not export ${symbolName} ` +
+                `(source-edit requires ABI_VERSION 2 / ktav 0.9 core)`,
+        );
+    }
+    let replInput: Uint8Array;
+    try {
+        replInput = encode(replacement);
+    } catch (e) {
+        throw toKtavError(e);
+    }
+    const src = new Uint8Array(new TextEncoder().encode(source));
+    const path = new Uint8Array(new TextEncoder().encode(pathArg));
+    const ktavFree = lib.symbols.ktav_free as (ptr: bigint, len: bigint) => void;
+    const outBuf = new BigUint64Array(1);
+    const outLen = new BigUint64Array(1);
+    const outErr = new BigUint64Array(1);
+    const outErrLen = new BigUint64Array(1);
+    const ptrOf = (input: Uint8Array): unknown =>
+        input.length === 0 ? Deno.UnsafePointer.of(EMPTY_SRC_PLACEHOLDER) : Deno.UnsafePointer.of(input);
+    const rc = sym(
+        ptrOf(src),
+        BigInt(src.length),
+        ptrOf(path),
+        BigInt(path.length),
+        ptrOf(replInput),
+        BigInt(replInput.length),
+        Deno.UnsafePointer.of(outBuf),
+        Deno.UnsafePointer.of(outLen),
+        Deno.UnsafePointer.of(outErr),
+        Deno.UnsafePointer.of(outErrLen),
+    );
+    if (rc !== 0) {
+        const errPtrRaw = outErr[0];
+        const errLen = Number(outErrLen[0]);
+        let msg = `native call failed with code ${rc}`;
+        if (errPtrRaw && errLen > 0) {
+            const errPtr = Deno.UnsafePointer.create(errPtrRaw);
+            if (errPtr) {
+                const view = new Deno.UnsafePointerView(errPtr);
+                msg = new TextDecoder().decode(new Uint8Array(view.getArrayBuffer(errLen)));
+                ktavFree(errPtr as unknown as bigint, BigInt(errLen));
+            }
+        }
+        const okPtrRaw = outBuf[0];
+        const okLen = Number(outLen[0]);
+        if (okPtrRaw && okLen > 0) {
+            const okPtr = Deno.UnsafePointer.create(okPtrRaw);
+            if (okPtr) ktavFree(okPtr as unknown as bigint, BigInt(okLen));
+        }
+        throw toKtavError(new Error(msg));
+    }
+    const okPtrRaw = outBuf[0];
+    const okLen = Number(outLen[0]);
+    if (!okPtrRaw || okLen === 0) return "";
+    const okPtr = Deno.UnsafePointer.create(okPtrRaw);
+    if (!okPtr) return "";
+    const view = new Deno.UnsafePointerView(okPtr);
+    const copy = new Uint8Array(view.getArrayBuffer(okLen)).slice(0);
+    ktavFree(okPtr as unknown as bigint, BigInt(okLen));
+    return new TextDecoder().decode(copy);
+}
+
+export function editValue(
+    source: string,
+    path: string,
+    replacement: KtavValue,
+): Promise<string> {
+    return callEdit("edit_value", source, path, replacement);
+}
+
+export function editValueSegments(
+    source: string,
+    segments: readonly string[],
+    replacement: KtavValue,
+): Promise<string> {
+    return callEdit("edit_value_segments", source, JSON.stringify([...segments]), replacement);
+}
+
 /** Convenience facade matching the synchronous Ktav interface. */
 export const ktav: Pick<Ktav, never> & {
     loads: typeof loads;
@@ -278,4 +414,6 @@ export const ktav: Pick<Ktav, never> & {
     format: typeof format;
     emitCanonical: typeof emitCanonical;
     canonicalFromSource: typeof canonicalFromSource;
-} = { loads, loadsStrict, loadsBytes, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource };
+    editValue: typeof editValue;
+    editValueSegments: typeof editValueSegments;
+} = { loads, loadsStrict, loadsBytes, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource, editValue, editValueSegments };

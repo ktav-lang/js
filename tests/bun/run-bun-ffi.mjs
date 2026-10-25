@@ -10,7 +10,9 @@
 
 import * as testPaths from "../shared/test-paths.mjs";
 import { runFfiCorpus } from "../ffi/corpus.mjs";
-import { loads, loadsStrict, loadsBytes, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource, setLibraryPath } from "../../dist/ts/ffi-bun.js";
+import { runFfiCorpus09 } from "../ffi/corpus09.mjs";
+import { runEditSuite } from "../shared/edit-suite.mjs";
+import { loads, loadsStrict, loadsBytes, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource, editValue, editValueSegments, setLibraryPath } from "../../dist/ts/ffi-bun.js";
 
 if (testPaths.cabiBuilt()) setLibraryPath(testPaths.cabi);
 
@@ -164,6 +166,41 @@ await check("0.7.1: parse error carries structured envelope", async () => {
 });
 
 await runFfiCorpus({ loads, loadsStrict, loadsBytes, dumps, canonicalFromSource, check, label: "bun-ffi" });
+
+// Source-edit 0.9: edit regressions + spec 0.9 corpus through the C
+// ABI. The binding's strict ABI gate refuses ANY library whose
+// ktav_abi_version() != 2 before every native document operation (old
+// ABI_VERSION 1 artifacts included) — with a clear error and no pure
+// fallback. The two checks below regression-test the gate itself.
+await check("ABI2 gate: editValue succeeds or rejects old ABI clearly", async () => {
+    let err = null;
+    let out;
+    try { out = await editValue("a: 1\n", "a", 2); } catch (e) { err = e; }
+    if (err) {
+        const msg = String(err.message || err);
+        if (!/ktav_abi_version|ABI_VERSION|does not export|does not support|symbol/.test(msg)) {
+            throw new Error("unclear ABI1 rejection: " + msg);
+        }
+    } else if (out !== "a: 2\n") {
+        throw new Error("got " + JSON.stringify(out));
+    }
+});
+await check("ABI2 gate: independent ktav_abi_version probe reports 2 (uint32)", async () => {
+    if (!testPaths.cabiBuilt()) throw new Error("cabi artifact missing");
+    const modName = "bun:ffi";
+    const ffi = await import(modName);
+    const probe = ffi.dlopen(testPaths.cabi, {
+        ktav_abi_version: { args: [], returns: ffi.FFIType.u32 },
+    });
+    try {
+        const v = Number(probe.symbols.ktav_abi_version()) >>> 0;
+        if (v !== 2) throw new Error(`ktav_abi_version()=${v}, expected 2`);
+    } finally {
+        try { probe.close?.(); } catch { /* best effort */ }
+    }
+});
+await runEditSuite({ editValue, editValueSegments, loads, label: "edit-bun-ffi", check });
+await runFfiCorpus09({ loads, loadsStrict, loadsBytes, dumps, canonicalFromSource, check, label: "spec09-bun-ffi" });
 
 console.log(`\n[bun-ffi] ${passed}/${passed + failed} passed`);
 process.exit(failed > 0 ? 1 : 0);

@@ -78,3 +78,23 @@ export function canonicalFromSource(s: string): string {
         throw toKtavError(e);
     }
 }
+
+export function editValue(source: string, path: string, replacement: KtavValue): string {
+    try {
+        return wasm.editValue(source, path, replacement) as string;
+    } catch (e) {
+        throw toKtavError(e);
+    }
+}
+
+export function editValueSegments(
+    source: string,
+    segments: readonly string[],
+    replacement: KtavValue,
+): string {
+    try {
+        return wasm.editValueSegments(source, [...segments], replacement) as string;
+    } catch (e) {
+        throw toKtavError(e);
+    }
+}

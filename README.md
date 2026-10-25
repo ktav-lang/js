@@ -230,6 +230,8 @@ function stringifyForceStrings<T extends KtavInput = KtavInput>(obj: T): string;
 function format(s: string): string;
 function canonicalFromSource(s: string): string;
 function emitCanonical<T extends KtavInput = KtavInput>(obj: T): string;
+function editValue(source: string, textualPath: string, replacement: KtavValue): string;
+function editValueSegments(source: string, segments: readonly string[], replacement: KtavValue): string;
 
 // web / Deno / browser only; Node + Bun ignore it
 function ready(input?: URL | Response | ArrayBuffer): Promise<void>;
@@ -242,6 +244,61 @@ spellings while accepting forms emitted by the canonical writer.
 scalar — integer, float, boolean, `null` — to its textual form via the
 raw marker (`::`). Compounds keep their structure, and the result parses
 back through `loads` as the same set of String scalars.
+
+> **Unreleased (0.9 preparation):** These editing APIs and updated diagnostics are not included in published 0.8.1 packages. Native backends require the pinned 0.9 core (C ABI 2 for C-FFI); pure backends remain standalone.
+
+## Source editing (spec 0.9)
+
+Two operations replace a value **inside an existing document** by
+splicing the source text — the document is never re-serialized, so
+comments, whitespace, key spelling and order, the BOM, and the CR / LF /
+CRLF style (and the presence or absence of the final newline) survive
+byte-for-byte outside the effective edit:
+
+```ts
+function editValue(source: string, textualPath: string, replacement: KtavValue): string;
+function editValueSegments(source: string, segments: readonly string[], replacement: KtavValue): string;
+```
+
+- **Only replacement of an existing value.** There is no create,
+  remove, or rename. A missing key, a descent through a scalar, an
+  out-of-bounds or non-numeric array index, or an empty segments list
+  throw `EditNotFound`.
+- **Paths.** `textualPath` is the dotted form `key1.key2.0.key4`;
+  inside a segment `\.` is a literal dot and `\\` a literal backslash;
+  any other escape, a trailing lone backslash, or an empty segment
+  throws `EditInvalidPath` with `body` set to the decimal **UTF-8 byte
+  offset** in the path argument where the problem was detected.
+  `editValueSegments` takes already-decoded literal segments with no
+  extra unescaping. A numeric segment addresses a string key inside an
+  Object and a zero-based ASCII-digits index inside an Array (leading
+  zeros allowed, signs are not indexes).
+- **Errors** are the usual ten-field envelope with
+  `error === "EditInvalidPath" | "EditNotFound" | "EditUnsupported"`;
+  all location fields are null (an edit failure is not a parse error).
+  `EditUnsupported.body` carries the reason: a noncontiguous
+  (dotted-key / reopen) whole target, structural replacement that would
+  erase interior comment lines, or a multiline string containing a line
+  `))` — no lossless form exists.
+- **Guarantees.** A byte-identical replacement is a byte-identical
+  no-op even for noncanonical spelling. Every successful patch is
+  re-parsed and semantically verified: exactly the target replaced, the
+  rest of the tree equal. An invalid SOURCE throws the parser's own
+  envelope, not an edit error.
+- **Layout.** Dotted, inline and block forms are preserved, including
+  whole inline containers and emptied (but not collapsed) block
+  containers. Inline wrappers expand minimally when a multiline string
+  arrives, when the line grows past `max(100 Unicode scalars, its
+  previous length)`, or when a replacement needs ≥ 4 escapes with ≥ 25 %
+  overhead — only along the touched branch, never for untouched
+  siblings. Replacement is a JS value; `bigint` and integral `number`
+  keep the exact Integer wire form, non-integral `number` becomes a
+  Float.
+
+Available on every backend: `@ktav-lang/ktav` (N-API), `/wasm`,
+`/pure`, and the `/ffi` subexports (Bun / Deno, asynchronous). Native
+binaries predating the 0.9 core report a clear unsupported-version
+error instead of a silent fallback.
 
 Three functions produce canonical output and they are not
 interchangeable:
