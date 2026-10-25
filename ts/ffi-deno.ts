@@ -75,6 +75,13 @@ const FFI_SYMBOLS = {
         parameters: [],
         result: "pointer",
     },
+    // Strict gate (uint32): probed before ANY document call. Must be
+    // DECLARED here — Deno's `symbols` proxy only exposes names from
+    // this table; an undeclared name resolves to undefined.
+    ktav_abi_version: {
+        parameters: [],
+        result: "u32",
+    },
     // source-edit 0.9 (ABI_VERSION 2): three input buffers, same
     // out-pointer contract as every other op.
     ktav_edit_value: {
@@ -121,8 +128,11 @@ async function getLib() {
     // symbols). Probe first, close the library on mismatch, and cache
     // nothing: every later call fails with the same clear error.
     const EXPECTED_ABI_VERSION = 2;
-    const abiVersion = cachedLib.symbols.ktav_abi_version as (() => number) | undefined;
     try {
+        // Symbol ACCESS can throw in Deno (resolution failure) — keep
+        // it inside the try so any failure surfaces as the clear gate
+        // error, never a raw TypeError.
+        const abiVersion = cachedLib.symbols.ktav_abi_version as (() => number) | undefined;
         if (typeof abiVersion !== "function") {
             throw new Error(
                 "ktav_cabi ABI_VERSION gate: library reports no ktav_abi_version symbol " +

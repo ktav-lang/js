@@ -146,8 +146,8 @@ async function getLib(): Promise<FFILib> {
     // ABI (e.g. an old ABI_VERSION 1 artifact without the edit
     // symbols). Probe first, close the library on mismatch, and cache
     // nothing: every later call fails with the same clear error.
-    const abiVersion = opened.symbols.ktav_abi_version as (() => number) | undefined;
     try {
+        const abiVersion = opened.symbols.ktav_abi_version as (() => number) | undefined;
         if (typeof abiVersion !== "function") {
             throw abiGateError("no ktav_abi_version symbol (pre-metadata library)");
         }
