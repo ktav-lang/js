@@ -375,12 +375,28 @@ export async function runEditSuite(ops, labelArg) {
             if (!err || err.error !== "EditInvalidPath") throw new Error(`path ${JSON.stringify(p)}: error=${err && err.error}`);
         }
     });
-    await check(`${label}: escaped separators decode (\\\. and \\\\), segments are literal`, async () => {
-        const out = await editValue("a.b: 1\n", "a\\.b", 2);
+    await check(`${label}: escaped separator targets the QUOTED key (\\. = literal dot)`, async () => {
+        // An UNQUOTED dotted key means a nested object — the literal
+        // `a.b` key exists only in its quoted spelling, and the textual
+        // path decodes `a\.b` to exactly that decoded literal name.
+        const source = '"a.b": 1\n';
+        const textualOut = await editValue(source, "a\\.b", 2);
+        if (textualOut !== '"a.b": 2\n') throw new Error(`textual: got ${JSON.stringify(textualOut)}`);
+        // Segments are ALREADY-DECODED literal names — ["a.b"] matches
+        // the same quoted key with no extra unescaping.
+        const segmentsOut = await editValueSegments(source, ["a.b"], 2);
+        if (segmentsOut !== '"a.b": 2\n') throw new Error(`segments: got ${JSON.stringify(segmentsOut)}`);
+    });
+    await check(`${label}: segments stay literal against a nested dotted key`, async () => {
+        // a.b: 1 is a NESTED object; segments ["a", "b"] address the
+        // inner value — decoded segment names, never a joined dotted key.
+        const out = await editValueSegments("a.b: 1\n", ["a", "b"], 2);
         if (out !== "a.b: 2\n") throw new Error(`got ${JSON.stringify(out)}`);
         let err = null;
         try { await editValueSegments("a.b: 1\n", ["a.b"], 2); } catch (e) { err = e; }
-        if (!err || err.error !== "EditNotFound") throw new Error(`segments must not re-unescape: ${err && err.error}`);
+        if (!err || err.error !== "EditNotFound") {
+            throw new Error(`joined segment must not exist: ${err && err.error}`);
+        }
     });
 
     // ── error contract: NotFound family ─────────────────────────────
@@ -413,9 +429,14 @@ export async function runEditSuite(ops, labelArg) {
 
     // ── preservation invariants ─────────────────────────────────────
     await check(`${label}: no-op is byte-identical even for noncanonical spelling`, async () => {
-        const source = "a  :  0007\n";
-        if ((await editValue(source, "a", 7)) !== source) throw new Error("no-op changed the source");
-        if ((await editValueSegments(source, ["a"], 7)) !== source) throw new Error("no-op changed the source");
+        // +1 is a REAL Integer literal (canonical value 1) in a
+        // noncanonical spelling — equal Integer replacement, so the
+        // splice must be a byte-identical no-op. (A redundant-leading-
+        // zero form like 0007 is a STRING, not a numeric spelling — it
+        // must NOT be used as a numeric no-op oracle.)
+        const source = "a  :  +1\n";
+        if ((await editValue(source, "a", 1)) !== source) throw new Error("no-op changed the source");
+        if ((await editValueSegments(source, ["a"], 1)) !== source) throw new Error("no-op changed the source");
     });
     await check(`${label}: CRLF outside the edit is preserved`, async () => {
         const out = await editValue("a: 1\r\nb: 2\r\n", "a", 3);
@@ -426,10 +447,22 @@ export async function runEditSuite(ops, labelArg) {
         await editValue(source, "a", 2);
         if (source !== "a: 1\n") throw new Error("source mutated");
     });
-    await check(`${label}: arbitrary bigints keep exact wire form`, async () => {
-        const out = await editValue("a: 1\n", "a", 123456789012345678901234567890n);
-        if (out !== "a: 123456789012345678901234567890\n") throw new Error(`got ${JSON.stringify(out)}`);
+    await check(`${label}: exact-precision integer above 2^53 stays exact (inside i64)`, async () => {
+        // 9007199254740993 fits the i64 source domain but exceeds the
+        // JS safe-integer range: the wire keeps the exact decimal —
+        // never clamped to a float, never normalised.
+        const out = await editValue("a: 1\n", "a", 9007199254740993n);
+        if (out !== "a: 9007199254740993\n") throw new Error(`got ${JSON.stringify(out)}`);
     });
+    await expectError(
+        "arbitrary bigint outside the i64 source domain",
+        "EditUnsupported",
+        "a: 1\n",
+        ["a"],
+        123456789012345678901234567890n,
+        null,
+        ["textual", "segments"],
+    );
 
     // ── error contract: source-first precedence (native/CABI parity) ─
     await check(`${label}: broken source + bad path -> parser envelope wins`, async () => {

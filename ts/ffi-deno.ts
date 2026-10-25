@@ -385,7 +385,10 @@ async function callEdit(
     const view = new Deno.UnsafePointerView(okPtr);
     const copy = new Uint8Array(view.getArrayBuffer(okLen)).slice(0);
     ktavFree(okPtr as unknown as bigint, BigInt(okLen));
-    return new TextDecoder().decode(copy);
+    // The patched SOURCE bytes may legitimately begin with a BOM the
+    // edit preserved — a default TextDecoder would silently STRIP it.
+    // ignoreBOM:true means "keep U+FEFF" (it does not add one).
+    return new TextDecoder("utf-8", { ignoreBOM: true }).decode(copy);
 }
 
 export function editValue(

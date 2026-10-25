@@ -390,7 +390,10 @@ async function callEdit(
     const buf = ffi.toArrayBuffer(okPtr, 0, okLen);
     const copy = new Uint8Array(buf.slice(0));
     ktavFree(okPtr, BigInt(okLen));
-    return new TextDecoder().decode(copy);
+    // The patched SOURCE bytes may legitimately begin with a BOM the
+    // edit preserved — a default TextDecoder would silently STRIP it.
+    // ignoreBOM:true means "keep U+FEFF" (it does not add one).
+    return new TextDecoder("utf-8", { ignoreBOM: true }).decode(copy);
 }
 
 export function editValue(
