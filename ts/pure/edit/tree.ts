@@ -264,7 +264,7 @@ function positionInline(
     for (const [slo, shi] of scan.segments) {
         const [tlo, thi] = trimWs(bytes, slo, shi);
         if (tlo >= thi) continue;
-        const child =
+        const child: Node =
             bytes[tlo] === 0x7b || bytes[tlo] === 0x5b
                 ? positionInlineTop(bytes, tlo, thi, ctx, bytes[tlo] === 0x7b, depth + 1)
                 : { kind: "scalar", table: null, items: null, inline: true, slot: null };

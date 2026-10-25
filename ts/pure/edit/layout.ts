@@ -43,8 +43,8 @@ export function layoutAdjust(
     const [from, to, inserted] = splice;
     if (candidate === source) return { result: candidate }; // byte-identical no-op
     const owner = inlineOwner(source, root, path, from);
-    if ("err" in owner) return owner;
     if (!owner) return { result: candidate };
+    if ("err" in owner) return owner;
     const [start, end] = owner;
     if (from < start) return { result: candidate };
     const newEnd = end - (to - from) + inserted;
