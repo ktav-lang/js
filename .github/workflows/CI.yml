@@ -126,6 +126,11 @@ jobs:
           submodules: recursive
       - uses: actions/checkout@v6
         with:
+          ref: 81f17cc6f0c3acb7296d7bc44016042d96415a8c
+          path: predecessor
+          submodules: recursive
+      - uses: actions/checkout@v6
+        with:
           ref: ${{ github.sha }}
           path: candidate
           submodules: recursive
@@ -134,7 +139,8 @@ jobs:
           node-version: "18"
       - name: Identify checkouts
         run: |
-          echo "baseline=$(git -C base rev-parse HEAD)"
+          echo "baseline-deb515e=$(git -C base rev-parse HEAD)"
+          echo "predecessor-81f17cc=$(git -C predecessor rev-parse HEAD)"
           echo "candidate=$(git -C candidate rev-parse HEAD)"
       - uses: dtolnay/rust-toolchain@stable
       - run: rustup target add wasm32-unknown-unknown
@@ -150,6 +156,14 @@ jobs:
           npm install
           npm run build:wasm
           npm run build:ts
+      - name: Install and build predecessor
+        working-directory: predecessor
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/predecessor-target
+        run: |
+          npm install
+          npm run build:wasm
+          npm run build:ts
       - name: Install and build candidate
         working-directory: candidate
         env:
@@ -158,8 +172,10 @@ jobs:
           npm install
           npm run build:wasm
           npm run build:ts
-      - name: Compare edit benchmark
+      - name: Compare deb515e baseline vs candidate
         run: node candidate/tests/node/bench-edit-compare.mjs base/dist/ts/pure.js candidate/dist/ts/pure.js
+      - name: Compare 81f17cc predecessor vs candidate
+        run: node candidate/tests/node/bench-edit-compare.mjs predecessor/dist/ts/pure.js candidate/dist/ts/pure.js
 
   # ------------------------------------------------------------------
   # Cross-runtime test matrix. Each job builds the right bits locally
