@@ -70,5 +70,30 @@ for (const [name,fn,expected] of [
     ["rename escaped literal dotted key",()=>renameKey("a\\.b: 1\nc: 2\n", "a\\.b", "m"),"m: 1\nc: 2\n"],
     ["remove does not treat multiline data as comment",()=>removeValue("a: {\n  s: (\n## data\n)\n  x: 1\n}\n","a.x"),"a: {\n  s: (\n## data\n)\n}\n"],
 ]) { total++; try { const out=fn(); if(out!==expected) throw new Error(JSON.stringify(out)); passed++; console.log("✔ "+name); } catch(e) { failed++; console.log("✖ "+name+" — "+(e?.message||e)); } }
+const mutationFixture = "\uFEFFparent: {\r\n    first: 甲\r\n    ## keep middle\r\n    a\\.b: 東京\r\n    last: 終\r\n}\r\n";
+for (const mode of ["textual", "segments"]) for (const operation of ["insert", "remove", "rename"]) {
+    const path = mode === "textual" ? "parent.a\\.b" : ["parent", "a.b"];
+    const insertPath = mode === "textual" ? "parent.added" : ["parent", "added"];
+    const label = `${operation} mixed Unicode BOM CRLF ${mode}`;
+    const expected = operation === "insert"
+        ? "\uFEFFparent: {\r\n    first: 甲\r\n    ## keep middle\r\n    a\\.b: 東京\r\n    last: 終\r\n    added: é\r\n}\r\n"
+        : operation === "remove"
+            ? "\uFEFFparent: {\r\n    first: 甲\r\n    ## keep middle\r\n    last: 終\r\n}\r\n"
+            : "\uFEFFparent: {\r\n    first: 甲\r\n    ## keep middle\r\n    c\\.d: 東京\r\n    last: 終\r\n}\r\n";
+    await check(label, async () => {
+        const fn = operation === "insert" ? (mode === "textual" ? insertValue : insertValueSegments)
+            : operation === "remove" ? (mode === "textual" ? removeValue : removeValueSegments)
+                : (mode === "textual" ? renameKey : renameKeySegments);
+        const output = operation === "insert" ? fn(mutationFixture, insertPath, "é")
+            : operation === "remove" ? fn(mutationFixture, path)
+                : fn(mutationFixture, path, "c.d");
+        if (output !== expected) throw new Error(`exact output: ${JSON.stringify(output)}`);
+        const semantic = operation === "insert"
+            ? { parent: { first: "甲", "a.b": "東京", last: "終", added: "é" } }
+            : operation === "remove" ? { parent: { first: "甲", last: "終" } }
+                : { parent: { first: "甲", "c.d": "東京", last: "終" } };
+        if (JSON.stringify(loads(output)) !== JSON.stringify(semantic)) throw new Error(`semantic oracle: ${JSON.stringify(loads(output))}`);
+    });
+}
 console.log(`\n[edit-pure] ${passed}/${total} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

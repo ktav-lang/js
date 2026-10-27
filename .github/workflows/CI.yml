@@ -115,6 +115,52 @@ jobs:
       - run: npm run build:ts
       - run: node tests/node/bench-edit-mutations.mjs
 
+  bench-edit-compare:
+    name: Benchmark — baseline vs candidate (pure TS)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: deb515e7f0f1ccf8119bfee258c77fe1e7fb2477
+          path: base
+          submodules: recursive
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          path: candidate
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "18"
+      - name: Identify checkouts
+        run: |
+          echo "baseline=$(git -C base rev-parse HEAD)"
+          echo "candidate=$(git -C candidate rev-parse HEAD)"
+      - uses: dtolnay/rust-toolchain@stable
+      - run: rustup target add wasm32-unknown-unknown
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+      - name: Install and build baseline
+        working-directory: base
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/base-target
+        run: |
+          npm install
+          npm run build:wasm
+          npm run build:ts
+      - name: Install and build candidate
+        working-directory: candidate
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/candidate-target
+        run: |
+          npm install
+          npm run build:wasm
+          npm run build:ts
+      - name: Compare edit benchmark
+        run: node candidate/tests/node/bench-edit-compare.mjs base/dist/ts/pure.js candidate/dist/ts/pure.js
+
   # ------------------------------------------------------------------
   # Cross-runtime test matrix. Each job builds the right bits locally
   # and runs the corresponding test:* script. Keeping them in separate
