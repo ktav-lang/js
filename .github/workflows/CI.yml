@@ -88,6 +88,96 @@ jobs:
         run: npx tsc -p tsconfig.json
 
   # ------------------------------------------------------------------
+  # Deterministic edit-mutation performance comparison across native
+  # and pure implementations (timings are reported without thresholds).
+  # ------------------------------------------------------------------
+  bench-edit-mutations:
+    name: Benchmark — edit mutations (native/pure)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "18"
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: rustup target add wasm32-unknown-unknown
+      - run: npm install
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+      - run: npm run build:napi
+      - run: npm run build:wasm
+      - run: npm run build:ts
+      - run: node tests/node/bench-edit-mutations.mjs
+
+  bench-edit-compare:
+    name: Benchmark — baseline vs candidate (pure TS)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: deb515e7f0f1ccf8119bfee258c77fe1e7fb2477
+          path: base
+          submodules: recursive
+      - uses: actions/checkout@v6
+        with:
+          ref: 81f17cc6f0c3acb7296d7bc44016042d96415a8c
+          path: predecessor
+          submodules: recursive
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          path: candidate
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "18"
+      - name: Identify checkouts
+        run: |
+          echo "baseline-deb515e=$(git -C base rev-parse HEAD)"
+          echo "predecessor-81f17cc=$(git -C predecessor rev-parse HEAD)"
+          echo "candidate=$(git -C candidate rev-parse HEAD)"
+      - uses: dtolnay/rust-toolchain@stable
+      - run: rustup target add wasm32-unknown-unknown
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+      - name: Install and build baseline
+        working-directory: base
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/base-target
+        run: |
+          npm install
+          npm run build:wasm
+          npm run build:ts
+      - name: Install and build predecessor
+        working-directory: predecessor
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/predecessor-target
+        run: |
+          npm install
+          npm run build:wasm
+          npm run build:ts
+      - name: Install and build candidate
+        working-directory: candidate
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/candidate-target
+        run: |
+          npm install
+          npm run build:wasm
+          npm run build:ts
+      - name: Compare deb515e baseline vs candidate
+        run: node candidate/tests/node/bench-edit-compare.mjs base/dist/ts/pure.js candidate/dist/ts/pure.js
+      - name: Compare 81f17cc predecessor vs candidate
+        run: node candidate/tests/node/bench-edit-compare.mjs predecessor/dist/ts/pure.js candidate/dist/ts/pure.js
+
+  # ------------------------------------------------------------------
   # Cross-runtime test matrix. Each job builds the right bits locally
   # and runs the corresponding test:* script. Keeping them in separate
   # jobs means a Bun regression doesn't block Deno results and vice
