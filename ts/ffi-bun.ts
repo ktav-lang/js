@@ -350,7 +350,7 @@ async function callEdit(
         );
     }
     const src = new Uint8Array(new TextEncoder().encode(source));
-    let replInput = new Uint8Array();
+    let replInput: Uint8Array = new Uint8Array();
     try {
         if (op.startsWith("edit_") || op.startsWith("insert_")) replInput = encode(replacement);
     } catch (e) {
