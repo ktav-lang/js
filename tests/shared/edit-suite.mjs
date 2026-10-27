@@ -660,12 +660,26 @@ export async function runEditSuite(ops, labelArg) {
             },
         ];
         for (const c of cases) {
-            for (const out of [
-                await insertValue(c.source, c.path, c.replacement),
-                await insertValueSegments(c.source, c.segments, c.replacement),
+            for (const [pathmode, insert] of [
+                ["textual", () => insertValue(c.source, c.path, c.replacement)],
+                ["segments", () => insertValueSegments(c.source, c.segments, c.replacement)],
             ]) {
-                if (out !== c.expected) throw new Error(`${c.name}: bytes ${JSON.stringify(out)} != ${JSON.stringify(c.expected)}`);
-                assertSemanticallyEqual(await loads(out), c.semantic, c.name);
+                let out;
+                try {
+                    out = await insert();
+                } catch (error) {
+                    throw new Error(`${c.name} (${pathmode}) insert failed: ${error.message}`);
+                }
+                try {
+                    if (out !== c.expected) throw new Error(`bytes ${JSON.stringify(out)} != ${JSON.stringify(c.expected)}`);
+                } catch (error) {
+                    throw new Error(`${c.name} (${pathmode}) exact assertion failed: ${error.message}`);
+                }
+                try {
+                    assertSemanticallyEqual(await loads(out), c.semantic, c.name);
+                } catch (error) {
+                    throw new Error(`${c.name} (${pathmode}) semantic assertion failed: ${error.message}`);
+                }
             }
         }
     });
