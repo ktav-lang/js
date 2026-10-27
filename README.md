@@ -249,58 +249,49 @@ back through `loads` as the same set of String scalars.
 
 ## Source editing (spec 0.9)
 
-Two operations replace a value **inside an existing document** by
-splicing the source text — the document is never re-serialized, so
-comments, whitespace, key spelling and order, the BOM, and the CR / LF /
-CRLF style (and the presence or absence of the final newline) survive
-byte-for-byte outside the effective edit:
+Edits splice source text, never re-serialize it. Outside the edit they preserve bytes, comments, whitespace, key spelling/order, BOM, EOL style and final-EOL presence.
 
 ```ts
 function editValue(source: string, textualPath: string, replacement: KtavValue): string;
 function editValueSegments(source: string, segments: readonly string[], replacement: KtavValue): string;
+function insertValue(source: string, textualPath: string, replacement: KtavValue): string;
+function insertValueSegments(source: string, segments: readonly string[], replacement: KtavValue): string;
+function removeValue(source: string, textualPath: string): string;
+function removeValueSegments(source: string, segments: readonly string[]): string;
+function renameKey(source: string, textualPath: string, newKey: string): string;
+function renameKeySegments(source: string, segments: readonly string[], newKey: string): string;
 ```
 
-Bun/Deno FFI accepts the same arguments but returns `Promise<string>`; use `await`. The signatures above describe synchronous exports.
+Bun/Deno FFI returns `Promise<string>`; the signatures above are synchronous exports.
 
-- **Only replacement of an existing value.** There is no create,
-  remove, or rename. A missing key, a descent through a scalar, an
-  out-of-bounds or non-numeric array index, or an empty segments list
-  throw `EditNotFound`.
-- **Paths.** `textualPath` is the dotted form `key1.key2.0.key4`;
-  inside a segment `\.` is a literal dot and `\\` a literal backslash;
-  any other escape, a trailing lone backslash, or an empty segment
-  throws `EditInvalidPath` with `body` set to the decimal **UTF-8 byte
-  offset** in the path argument where the problem was detected.
-  `editValueSegments` takes already-decoded literal segments with no
-  extra unescaping. A numeric segment addresses a string key inside an
-  Object and a zero-based ASCII-digits index inside an Array (leading
-  zeros allowed, signs are not indexes).
-- **Errors** are the usual ten-field envelope with
-  `error === "EditInvalidPath" | "EditNotFound" | "EditUnsupported"`;
-  all location fields are null (an edit failure is not a parse error).
-  `EditUnsupported.body` carries the reason: a noncontiguous
-  (dotted-key / reopen) whole target, structural replacement that would
-  erase interior comment lines, or a replacement without a lossless
-  representation in its target context.
-- **Guarantees.** A byte-identical replacement is a byte-identical
-  no-op even for noncanonical spelling. Every successful patch is
-  re-parsed and semantically verified: exactly the target replaced, the
-  rest of the tree equal. An invalid SOURCE throws the parser's own
-  envelope, not an edit error.
-- **Layout.** Dotted, inline and block forms are preserved, including
-  whole inline containers and emptied (but not collapsed) block
-  containers. Inline wrappers expand minimally when a multiline string
-  arrives, when the line grows past `max(100 Unicode scalars, its
-  previous length)`, or when a replacement needs ≥ 4 escapes with ≥ 25 %
-  overhead — only along the touched branch, never for untouched
-  siblings. Replacement is a JS value; `bigint` and integral `number`
-  keep the exact Integer wire form, non-integral `number` becomes a
-  Float.
+- Paths use `.` as a separator; `\.` encodes a literal dot and `\\` a literal backslash. Other escapes, a trailing backslash, an empty path or empty segment produce `EditInvalidPath`; `body` is the UTF-8 byte offset in the path. Segment APIs take decoded strings. A numeric Object segment is a key; an Array index uses ASCII digits, allows leading zeros, and disallows signs.
 
-Available on every backend: `@ktav-lang/ktav` (N-API), `/wasm`,
-`/pure`, and the `/ffi` subexports (Bun / Deno, asynchronous). Native
-binaries predating the 0.9 core report a clear unsupported-version
-error instead of a silent fallback.
+- `editValue` replaces an existing value; missing keys, scalar descent, invalid indexes and empty segments lists are `EditNotFound`. `insertValue` adds only a new final key to an existing Object (`EditAlreadyExists` on collision); it does not create intermediate parents or insert into Arrays. `removeValue` removes a leaf, subtree or Array item; empty ancestors remain. `renameKey` renames an Object key using the literal `newKey`, preserving order and value; renaming to the same name is byte-identical, and a collision is `EditAlreadyExists`. Removing comments inside a container is unsupported.
+
+- Failures use the ten-field edit envelope:
+  `EditInvalidPath`, `EditNotFound`, `EditAlreadyExists` or
+  `EditUnsupported`; location fields are null. Invalid source
+  uses the parser envelope. `EditUnsupported.body` gives the
+  reason: a noncontiguous whole target (dotted/reopened),
+  erased interior comments, or no lossless representation
+  in context.
+- Byte-identical replacement is a no-op, even for
+  noncanonical spelling. Successful patches are reparsed
+  and verified against the intended semantic tree; only
+  the target changes. Untouched siblings are not expanded.
+  Failed calls return no partial patch and do not change
+  source.
+- Dotted, inline and block layouts are preserved; empty
+  block containers are not collapsed. Inline ancestors
+  expand minimally for multiline replacement, growth past
+  `max(100, original line length)`, or an individual string
+  needing at least 4 escapes and at least 25% encoding
+  overhead. Width is Unicode scalars; expansion affects
+  the touched branch only. `bigint` and integral `number`
+  retain Integer form; non-integral numbers become Float.
+- APIs are available on N-API, WASM, pure and FFI
+  backends. Old native binaries report unsupported-version
+  errors.
 
 ### Source-edit cookbook
 

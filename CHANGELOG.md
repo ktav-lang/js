@@ -15,19 +15,7 @@ format itself — for the latter see
 
 ### Added
 
-- Added lossless source editing on every entrypoint: `editValue(source,
-  textualPath, replacement)` and `editValueSegments(source, segments,
-  replacement)` splice the SOURCE text instead of re-serializing, so
-  comments, whitespace, key spelling/order, the BOM and the CR/LF/CRLF
-  style survive byte-for-byte outside the effective edit. Only
-  replacement of an existing value; typed `EditInvalidPath` (with the
-  UTF-8 byte offset of the fault in the path), `EditNotFound` and
-  `EditUnsupported` envelopes; byte-identical no-op for byte-identical
-  replacements; mandatory post-splice semantic verification. Backed by
-  the new `ktav_edit_value` / `ktav_edit_value_segments` C ABI symbols
-  (ABI_VERSION 2), the new N-API/WASM `editValue` bindings, and a
-  fully standalone pure-TypeScript implementation with no native or
-  package-manager runtime dependencies.
+- Added lossless source editing on every entrypoint: `editValue` replaces an existing value; `insertValue` appends a new Object key without overwriting; `removeValue` removes a value or Array element; and `renameKey` renames an Object key in place. Each operation has a textual-path and literal-segments variant. Operations splice the SOURCE text instead of re-serializing, so comments, whitespace, key spelling/order, the BOM and the CR/LF/CRLF style survive byte-for-byte outside the effective edit. Typed `EditInvalidPath` (with the UTF-8 byte offset of the fault in the path), `EditNotFound`, `EditAlreadyExists` and `EditUnsupported` envelopes; byte-identical no-op for identical replacement and same-name rename; mandatory post-splice semantic verification. Backed by ABI_VERSION 2 C ABI symbols, N-API/WASM bindings, and a standalone pure-TypeScript implementation with no native or package-manager runtime dependencies. Bun/Deno FFI operations are asynchronous.
 - Spec 0.9 conformance: the corpus moves to `versions/0.9/tests` (412
   fixtures) with the new `diagnostics09` invalid fixtures (EOF and
   malformed-UTF8 raw-byte locations over the original bytes, BOM kept,

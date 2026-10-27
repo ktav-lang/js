@@ -33,7 +33,7 @@ import { parseIndexSegment, type ErrCtxInternal } from "./shared.js";
 // ---------------------------------------------------------------------------
 
 export type Slot =
-    | { k: "pair"; colon: number; b0: number; b1: number }
+    | { k: "pair"; colon: number; keyStart: number; b0: number; b1: number }
     | { k: "item"; start: number; b0: number; b1: number }
     | { k: "block"; anchor: number | null; start: number; end: number };
 
@@ -239,7 +239,7 @@ function positionInline(
                     table: null,
                     items: null,
                     inline: true,
-                    slot: { k: "pair", colon: colonAbs, b0: vlo, b1: thi },
+                    slot: { k: "pair", colon: colonAbs, keyStart: tlo, b0: vlo, b1: thi },
                 };
             } else {
                 const vlo = trimWsStart(bytes, colon + 1, thi);
@@ -247,7 +247,7 @@ function positionInline(
                     bytes[vlo] === 0x7b || bytes[vlo] === 0x5b
                         ? positionInlineTop(bytes, vlo, thi, ctx, bytes[vlo] === 0x7b, depth + 1)
                         : { kind: "scalar", table: null, items: null, inline: true, slot: null };
-                child.slot = { k: "pair", colon: colonAbs, b0: vlo, b1: thi };
+                child.slot = { k: "pair", colon: colonAbs, keyStart: tlo, b0: vlo, b1: thi };
             }
             const err = insertNode(table, bytes, tlo, colon, child, ctx, {
                 start: tlo,
@@ -409,7 +409,7 @@ export function buildTree(bytes: Uint8Array): TreeMeta {
             const [blo, bhi] = trimWs(bytes, sep.lo, sep.hi);
             insertPair(
                 { klo: tlo, khi },
-                scalarNode({ k: "pair", colon: colonOff, b0: blo, b1: bhi }),
+                scalarNode({ k: "pair", colon: colonOff, keyStart: tlo, b0: blo, b1: bhi }),
             );
         } else {
             requireSepEnd(bytes, sep.lo, sep.hi, ctx, colonOff + 1, ctx.span);
@@ -420,19 +420,19 @@ export function buildTree(bytes: Uint8Array): TreeMeta {
                 case "emptyString":
                     insertPair(
                         { klo: tlo, khi },
-                        scalarNode({ k: "pair", colon: colonOff, b0: vlo, b1: thi }),
+                        scalarNode({ k: "pair", colon: colonOff, keyStart: tlo, b0: vlo, b1: thi }),
                     );
                     break;
                 case "emptyObject":
                     insertPair(
                         { klo: tlo, khi },
-                        emptyObjectNode({ k: "pair", colon: colonOff, b0: vlo, b1: thi }),
+                        emptyObjectNode({ k: "pair", colon: colonOff, keyStart: tlo, b0: vlo, b1: thi }),
                     );
                     break;
                 case "emptyArray":
                     insertPair(
                         { klo: tlo, khi },
-                        emptyArrayNode({ k: "pair", colon: colonOff, b0: vlo, b1: thi }),
+                        emptyArrayNode({ k: "pair", colon: colonOff, keyStart: tlo, b0: vlo, b1: thi }),
                     );
                     break;
                 case "openObject":
@@ -461,7 +461,7 @@ export function buildTree(bytes: Uint8Array): TreeMeta {
                 case "inline": {
                     const node = positionInlineTop(bytes, vs.start, thi, ctx, bytes[vs.start] === 0x7b, 0);
                     node.inline = false; // the CONTAINER lives on the pair's line
-                    node.slot = { k: "pair", colon: colonOff, b0: vlo, b1: thi };
+                    node.slot = { k: "pair", colon: colonOff, keyStart: tlo, b0: vlo, b1: thi };
                     insertPair({ klo: tlo, khi }, node);
                     break;
                 }

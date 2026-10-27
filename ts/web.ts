@@ -127,6 +127,13 @@ export function canonicalFromSource(s: string): string {
     }
 }
 
+export function insertValue(source: string, path: string, value: KtavValue): string { try { return wasm.insertValue(source,path,value) as string; } catch(e) { throw toKtavError(e); } }
+export function insertValueSegments(source: string, path: readonly string[], value: KtavValue): string { try { return wasm.insertValueSegments(source,[...path],value) as string; } catch(e) { throw toKtavError(e); } }
+export function removeValue(source: string, path: string): string { try { return wasm.removeValue(source,path) as string; } catch(e) { throw toKtavError(e); } }
+export function removeValueSegments(source: string, path: readonly string[]): string { try { return wasm.removeValueSegments(source,[...path]) as string; } catch(e) { throw toKtavError(e); } }
+export function renameKey(source: string, path: string, key: string): string { try { return wasm.renameKey(source,path,key) as string; } catch(e) { throw toKtavError(e); } }
+export function renameKeySegments(source: string, path: readonly string[], key: string): string { try { return wasm.renameKeySegments(source,[...path],key) as string; } catch(e) { throw toKtavError(e); } }
+
 export function editValue(source: string, path: string, replacement: KtavValue): string {
     try {
         return wasm.editValue(source, path, replacement) as string;

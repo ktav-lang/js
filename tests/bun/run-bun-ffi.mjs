@@ -12,7 +12,7 @@ import * as testPaths from "../shared/test-paths.mjs";
 import { runFfiCorpus } from "../ffi/corpus.mjs";
 import { runFfiCorpus09 } from "../ffi/corpus09.mjs";
 import { runEditSuite } from "../shared/edit-suite.mjs";
-import { loads, loadsStrict, loadsBytes, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource, editValue, editValueSegments, setLibraryPath } from "../../dist/ts/ffi-bun.js";
+import { loads, loadsStrict, loadsBytes, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource, editValue, editValueSegments, insertValue, insertValueSegments, removeValue, removeValueSegments, renameKey, renameKeySegments, setLibraryPath } from "../../dist/ts/ffi-bun.js";
 
 if (testPaths.cabiBuilt()) setLibraryPath(testPaths.cabi);
 
@@ -199,7 +199,7 @@ await check("ABI2 gate: independent ktav_abi_version probe reports 2 (uint32)", 
         try { probe.close?.(); } catch { /* best effort */ }
     }
 });
-await runEditSuite({ editValue, editValueSegments, loads, label: "edit-bun-ffi", check });
+await runEditSuite({ editValue, editValueSegments, insertValue, insertValueSegments, removeValue, removeValueSegments, renameKey, renameKeySegments, loads, label: "edit-bun-ffi", check });
 await runFfiCorpus09({ loads, loadsStrict, loadsBytes, dumps, canonicalFromSource, check, label: "spec09-bun-ffi" });
 
 console.log(`\n[bun-ffi] ${passed}/${passed + failed} passed`);

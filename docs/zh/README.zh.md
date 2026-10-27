@@ -237,43 +237,29 @@ integer、float、boolean、`null` —— 通过原始标记（`::`）压平为�
 
 ## 源码编辑（spec 0.9）
 
-两个操作在**现有文档内部**替换一个值，方式是对源文本做拼接（splice）
-而不是重新序列化：注释、空白、键的拼写与顺序、BOM、CR / LF / CRLF 风格
-（以及末尾换行符的有无）在有效编辑范围之外逐字节保留：
+编辑直接拼接源码，不重新序列化。编辑范围外逐字节保留注释、空白、键的拼写/顺序、BOM、EOL 风格及末尾 EOL 是否存在。
 
 ```ts
 function editValue(source: string, textualPath: string, replacement: KtavValue): string;
 function editValueSegments(source: string, segments: readonly string[], replacement: KtavValue): string;
+function insertValue(source: string, textualPath: string, replacement: KtavValue): string;
+function insertValueSegments(source: string, segments: readonly string[], replacement: KtavValue): string;
+function removeValue(source: string, textualPath: string): string;
+function removeValueSegments(source: string, segments: readonly string[]): string;
+function renameKey(source: string, textualPath: string, newKey: string): string;
+function renameKeySegments(source: string, segments: readonly string[], newKey: string): string;
 ```
 
-Bun/Deno FFI 接收相同参数，但返回 `Promise<string>`，需要 `await`。以上签名描述同步导出。
+Bun/Deno FFI 返回 `Promise<string>`；以上签名为同步导出。
 
-- **只替换已存在的值。** 不支持创建、删除或重命名。缺失的键、穿过标量的
-  下行、越界或非数字的数组索引、空段列表都会抛出 `EditNotFound`。
-- **路径。** `textualPath` 是点分形式 `key1.key2.0.key4`；段内 `\.` 表示
-  字面点号，`\\` 表示字面反斜杠；任何其他转义、结尾孤立的反斜杠或空段
-  都会抛出 `EditInvalidPath`，`body` 是路径参数中出错位置的十进制
-  **UTF-8 字节偏移**。`editValueSegments` 接收已解码的字面段，不做额外
-  反转义。数字段在 Object 中是字符串键，在 Array 中是从零开始的
-  ASCII 数字索引（允许前导零，不允许符号）。
-- **错误**是通常的十字段 envelope，
-  `error === "EditInvalidPath" | "EditNotFound" | "EditUnsupported"`；
-  所有位置字段为 null（编辑失败不是解析错误）。`EditUnsupported.body`
-  携带原因：非连续（dotted-key / reopen）的整体目标、会删除容器内部
-  注释的结构性替换、或无法在目标上下文中无损表示的替换值。
-- **保证。** 字节相同的替换是字节相同的 no-op，即使拼写非规范亦然。
-  每个成功的补丁都会重新解析并做语义校验：恰好替换目标值，其余树相等。
-  无效的源文本抛出解析器自己的 envelope，而不是编辑错误。
-- **版式。** dotted、inline 与块形态均被保留，包括完整的 inline 容器和
-  被清空（但不折叠）的块容器。当出现多行字符串、行宽超过
-  `max(100 个 Unicode 标量, 原行宽)`，或替换需要 ≥ 4 个转义且开销
-  ≥ 25 % 时，inline 包装沿被触及的分支最小展开。替换值是 JS 值：
-  `bigint` 与整数 `number` 保持精确的 Integer 形式，非整数则成为
-  Float。
+- 路径使用 `.` 分隔；`\.` 表示字面点，`\\` 表示字面反斜杠。其他转义、末尾反斜杠、空路径或空段均产生 `EditInvalidPath`；`body` 是路径中的 UTF-8 字节偏移。段 API 接受已解码的字符串。Object 的数字段是键；Array 索引使用 ASCII 数字，允许前导零，不允许正负号。
 
-所有后端均可用：`@ktav-lang/ktav`（N-API）、`/wasm`、`/pure` 以及
-`/ffi` 子导出（Bun / Deno，异步）。早于 0.9 内核的原生二进制会报告
-清晰的版本不支持错误，而不是静默回退。
+- `editValue` 替换已有值；缺失键、穿过标量、无效索引和空段列表为 `EditNotFound`。`insertValue` 只向已有 Object 添加新的最后一个键（冲突时为 `EditAlreadyExists`）；不会创建中间祖先，也不向 Array 插入。`removeValue` 删除叶值、子树或 Array 元素；空祖先保留。`renameKey` 使用字面 `newKey` 重命名 Object 键，保留顺序和值；重命名为同名时逐字节不变，与现有键冲突时为 `EditAlreadyExists`。删除容器内注释不受支持。
+
+- 失败使用十字段编辑信封：`EditInvalidPath`、`EditNotFound`、`EditAlreadyExists` 或 `EditUnsupported`；位置字段为 null。无效源码使用解析器信封。`EditUnsupported.body` 给出原因：非连续整体目标（dotted/reopened）、删除内部注释，或上下文中无法无损表示。
+- 字节相同的替换是 no-op，即使拼写非规范。成功补丁会重新解析，并根据预期语义树验证；仅目标发生变化。未触及的兄弟节点不会展开。失败不返回部分补丁，也不修改源码。
+- 保留 dotted、inline 与块布局；空块容器不折叠。多行替换、行长增长超过 `max(100, 原始行长)`，或单个字符串至少 4 个转义且编码开销至少 25% 时，inline 祖先才最小展开。宽度按 Unicode 标量计算；只展开受影响分支。`bigint` 和整数 `number` 保持 Integer；非整数成为 Float。
+- N-API、WASM、pure 和 FFI 后端均提供 API。旧原生二进制报告版本不受支持。
 
 ### 源文本编辑示例
 

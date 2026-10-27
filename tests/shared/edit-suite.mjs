@@ -34,6 +34,11 @@ function textualPath(segments) {
  */
 export async function runEditSuite(ops, labelArg) {
     const { editValue, editValueSegments, loads, check } = ops;
+    const mutationApis = ["insertValue", "insertValueSegments", "removeValue", "removeValueSegments", "renameKey", "renameKeySegments"];
+    for (const name of mutationApis) {
+        if (typeof ops[name] !== "function") throw new Error(`${labelArg ?? ops.label ?? "edit"}: mandatory mutation API ${name} is unavailable`);
+    }
+    const { insertValue, insertValueSegments, removeValue, removeValueSegments, renameKey, renameKeySegments } = ops;
     const label = labelArg ?? ops.label ?? "edit";
 
     const s = (v) => v;
@@ -387,6 +392,11 @@ export async function runEditSuite(ops, labelArg) {
         const segmentsOut = await editValueSegments(source, ["a.b"], 2);
         if (segmentsOut !== '"a.b": 2\n') throw new Error(`segments: got ${JSON.stringify(segmentsOut)}`);
     });
+    await check(`${label}: escaped-key path addresses escaped source spelling`, async () => {
+        const source = "a\\\\.b: 1\nc: 2\n";
+        const out = await editValue(source, "a\\\\.b", 2);
+        if (out !== "a\\\\.b: 2\nc: 2\n") throw new Error(JSON.stringify(out));
+    });
     await check(`${label}: segments stay literal against a nested dotted key`, async () => {
         // a.b: 1 is a NESTED object; segments ["a", "b"] address the
         // inner value — decoded segment names, never a joined dotted key.
@@ -447,13 +457,13 @@ export async function runEditSuite(ops, labelArg) {
         await editValue(source, "a", 2);
         if (source !== "a: 1\n") throw new Error("source mutated");
     });
-    await check(`${label}: exact-precision integer above 2^53 stays exact (inside i64)`, async () => {
-        // 9007199254740993 fits the i64 source domain but exceeds the
-        // JS safe-integer range: the wire keeps the exact decimal —
-        // never clamped to a float, never normalised.
-        const out = await editValue("a: 1\n", "a", 9007199254740993n);
-        if (out !== "a: 9007199254740993\n") throw new Error(`got ${JSON.stringify(out)}`);
-    });
+    await checkBoth(
+        "exact-precision integer above 2^53 stays exact (inside i64)",
+        "a: 1\n",
+        ["a"],
+        9007199254740993n,
+        "a: 9007199254740993\n",
+    );
     await expectError(
         "arbitrary bigint outside the i64 source domain",
         "EditUnsupported",
@@ -472,10 +482,9 @@ export async function runEditSuite(ops, labelArg) {
         if (String(err.error).startsWith("Edit")) {
             throw new Error(`Edit* error ${err.error} leaked before source parse`);
         }
-        // The parser's own class (UnclosedCompound for "a: [") — never
-        // rewritten to EditUnsupported.
+        // Verify parser precedence by asserting its exact Rust error code.
         if (err.error !== "UnclosedCompound") {
-            throw new Error(`error=${err.error}, expected the parser's UnclosedCompound`);
+            throw new Error(`error=${err.error}, expected parser's UnclosedCompound`);
         }
     });
     await check(`${label}: broken source + empty segments -> parser envelope wins`, async () => {
@@ -497,6 +506,284 @@ export async function runEditSuite(ops, labelArg) {
             throw new Error(`Edit* error ${err.error} leaked before source parse`);
         }
     });
+
+    for (const name of mutationApis) {
+        if (typeof ops[name] !== "function") throw new Error(`${label}: mutation API ${name} is unavailable`);
+    }
+    await check(`${label}: insert object inside array exact and semantic`, async () => {
+        const source = "a: [{x: 1}, {z: 3}]\n";
+        const expected = "a: [{x: 1, y: 2}, {z: 3}]\n";
+        for (const out of [await insertValue(source, "a.0.y", 2), await insertValueSegments(source, ["a", "0", "y"], 2)]) {
+            if (out !== expected) throw new Error(`bytes: ${JSON.stringify(out)}`);
+            assertSemanticallyEqual(await loads(out), { a: [{ x: 1, y: 2 }, { z: 3 }] }, "array object insertion");
+        }
+    });
+    await check(`${label}: comments survive insert/remove braces`, async () => {
+        const source = "## lead {\n{x: 1}\n## tail }\n";
+        const inserted = await insertValue(source, "y", 2);
+        const expectedInserted = "## lead {\n{x: 1, y: 2}\n## tail }\n";
+        if (inserted !== expectedInserted) throw new Error(`insert: ${JSON.stringify(inserted)}`);
+        assertSemanticallyEqual(await loads(inserted), { x: 1, y: 2 }, "commented root insert");
+        const removed = await removeValue(source, "x");
+        const expectedRemoved = "## lead {\n{}\n## tail }\n";
+        if (removed !== expectedRemoved) throw new Error(`remove: ${JSON.stringify(removed)}`);
+        assertSemanticallyEqual(await loads(removed), {}, "commented root remove");
+    });
+    await check(`${label}: rename key preserves sibling order`, async () => {
+        const source = "a: {first: 1, old: 2, last: 3}\n";
+        const out = await renameKey(source, "a.old", "new");
+        if (out !== "a: {first: 1, new: 2, last: 3}\n") throw new Error(`bytes: ${JSON.stringify(out)}`);
+        const loaded = await loads(out);
+        assertSemanticallyEqual(loaded, { a: { first: 1, new: 2, last: 3 } }, "renamed sibling order");
+        const keys = Object.keys(loaded.a);
+        if (JSON.stringify(keys) !== JSON.stringify(["first", "new", "last"])) throw new Error(`key order: ${JSON.stringify(keys)}`);
+    });
+    await check(`${label}: no-op rename preserves BOM CRLF and semantic order`, async () => {
+        const source = "\uFEFFa: {first: 1, old: 2, last: 3}\r\n";
+        const out = await renameKey(source, "a.old", "old");
+        if (out !== source) throw new Error(`bytes: ${JSON.stringify(out)}`);
+        const loaded = await loads(out);
+        assertSemanticallyEqual(loaded, { a: { first: 1, old: 2, last: 3 } }, "no-op rename value");
+        const keys = Object.keys(loaded.a);
+        if (JSON.stringify(keys) !== JSON.stringify(["first", "old", "last"])) throw new Error(`key order: ${JSON.stringify(keys)}`);
+    });
+
+    await check(`${label}: invalid UTF-8 path reports insert error`, async () => {
+        let err; try { await insertValue("é: 1\n", "é\\q", 2); } catch (e) { err = e; }
+        if (!err || err.error !== "EditInvalidPath" || err.body !== "2") throw new Error(`error=${err?.error}, body=${JSON.stringify(err?.body)}`);
+    });
+    await check(`${label}: insert bigint uses wire contract and rejects >i64`, async () => {
+        const out = await insertValue("a: {}\n", "a.big", 9007199254740993n);
+        if (out !== "a: {big: 9007199254740993}\n") throw new Error(`bigint bytes: ${JSON.stringify(out)}`);
+        assertSemanticallyEqual(await loads(out), { a: { big: 9007199254740993n } }, "insert bigint semantic value");
+        let err; try { await insertValue("a: {}\n", "a.big", 9223372036854775808n); } catch (e) { err = e; }
+        if (!err || err.error !== "EditUnsupported") throw new Error(`textual: ${err?.error}`);
+        err = undefined;
+        try { await insertValueSegments("a: {}\n", ["a", "big"], 9223372036854775808n); } catch (e) { err = e; }
+        if (!err || err.error !== "EditUnsupported") throw new Error(`segments: ${err?.error}`);
+    });
+    await check(`${label}: cyclic replacement loses to invalid source in both paths`, async () => {
+        const cyclic = {}; cyclic.self = cyclic;
+        for (const mode of ["textual", "segments"]) {
+            let err; try { if (mode === "textual") await insertValue("a: [", "a\\q", cyclic); else await insertValueSegments("a: [", [], cyclic); } catch (e) { err = e; }
+            if (!err || err.error !== "UnclosedCompound") throw new Error(`${mode}: ${err?.error}`);
+        }
+    });
+
+    await check(`${label}: mixed EOL block insertion follows Rust and preserves surrounding bytes`, async () => {
+        const source = "first: yes\na: {\r\n    x: 1\r\n}\r\ntail: keep\n";
+        const expected = "first: yes\na: {\r\n    x: 1\r\n    y: ((\r\np\r\nq\r\n    ))\r\n}\r\ntail: keep\n";
+        for (const out of [
+            await insertValue(source, "a.y", "p\nq"),
+            await insertValueSegments(source, ["a", "y"], "p\nq"),
+        ]) {
+            if (out !== expected) throw new Error(`bytes: ${JSON.stringify(out)} != ${JSON.stringify(expected)}`);
+            assertSemanticallyEqual(await loads(out), { first: "yes", a: { x: 1, y: "p\nq" }, tail: "keep" }, "mixed EOL block insertion");
+        }
+    });
+    await check(`${label}: mixed EOL implicit root EOF insertion follows Rust`, async () => {
+        const source = "first: yes\na: 1\r\n";
+        const expected = "first: yes\na: 1\r\nb: ((\r\np\r\nq\r\n))\r\n";
+        for (const out of [
+            await insertValue(source, "b", "p\nq"),
+            await insertValueSegments(source, ["b"], "p\nq"),
+        ]) {
+            if (out !== expected) throw new Error(`bytes: ${JSON.stringify(out)} != ${JSON.stringify(expected)}`);
+            assertSemanticallyEqual(await loads(out), { first: "yes", a: 1, b: "p\nq" }, "mixed EOL root EOF insertion");
+        }
+    });
+
+    await check(`${label}: mutation layout regressions exact and independent semantic values`, async () => {
+        const cases = [
+            {
+                name: "long inline growth unfolds",
+                source: `a: {x: ${"x".repeat(120)}, keep: 2}\nb: 3\n`,
+                path: "a.y", segments: ["a", "y"], replacement: "z".repeat(20),
+                expected: `a: {\n    x: ${"x".repeat(120)}\n    keep: 2\n    y: ${"z".repeat(20)}\n}\nb: 3\n`,
+                semantic: { a: { x: "x".repeat(120), keep: 2, y: "z".repeat(20) }, b: 3 },
+            },
+            {
+                name: "escape density boundary unfolds only when dense",
+                source: "a: {keep: value}\n",
+                path: "a.new", segments: ["a", "new"], replacement: "a,b,c,d,e",
+                expected: "a: {\n    keep: value\n    new: a,b,c,d,e\n}\n",
+                semantic: { a: { keep: "value", new: "a,b,c,d,e" } },
+            },
+            {
+                name: "sparse escape density stays inline",
+                source: "a: {keep: value}\n",
+                path: "a.new", segments: ["a", "new"], replacement: "a,b,c,d",
+                expected: "a: {keep: value, new: a\\,b\\,c\\,d}\n",
+                semantic: { a: { keep: "value", new: "a,b,c,d" } },
+            },
+            {
+                name: "multiline insertion expands minimal inline chain and preserves siblings",
+                source: "o: {i: {x: 1, n: {deep: [2, 3]}}, sibling: {nested: [4, 5]}}\n",
+                path: "o.i.k", segments: ["o", "i", "k"], replacement: "p\nq",
+                expected: "o: {\n    i: {\n        x: 1\n        n: {deep: [2, 3]}\n        k: ((\np\nq\n        ))\n    }\n    sibling: {nested: [4, 5]}\n}\n",
+                semantic: { o: { i: { x: 1, n: { deep: [2, 3] }, k: "p\nq" }, sibling: { nested: [4, 5] } } },
+            },
+            {
+                name: "empty inline whitespace is preserved",
+                source: "a: {   \u00a0\u2003}\n",
+                path: "a.x", segments: ["a", "x"], replacement: 1,
+                expected: "a: {x: 1}\n",
+                semantic: { a: { x: 1 } },
+            },
+            {
+                name: "Unicode before trailing comma and after it is preserved",
+                source: "a: {x: \u00e9\u2003,\u00a0}\n",
+                path: "a.y", segments: ["a", "y"], replacement: 2,
+                expected: "a: {x: \u00e9\u2003, y: 2,\u00a0}\n",
+                semantic: { a: { x: "\u00e9", y: 2 } },
+            },
+            {
+                name: "CR insertion stays inline with raw marker",
+                source: "a: {x: 1}\n",
+                path: "a.k", segments: ["a", "k"], replacement: "a\rb",
+                expected: "a: {x: 1, k: a\\rb}\n",
+                semantic: { a: { x: 1, k: "a\rb" } },
+            },
+            {
+                name: "closing marker fallback stays inline",
+                source: "a: {x: 1}\n",
+                path: "a.k", segments: ["a", "k"], replacement: "a\n))\nb",
+                expected: "a: {x: 1, k: a\\n))\\nb}\n",
+                semantic: { a: { x: 1, k: "a\n))\nb" } },
+            },
+            {
+                name: "Unicode whitespace and trailing comma preserve offsets",
+                source: "\uFEFF\u00A0\n## { untouched }\n{x: p\\,q,}\u2003\r\n",
+                path: "y", segments: ["y"], replacement: 2,
+                expected: "\uFEFF\u00A0\n## { untouched }\n{x: p\\,q, y: 2,}\u2003\r\n",
+                semantic: { x: "p,q", y: 2 },
+            },
+        ];
+        for (const c of cases) {
+            for (const out of [
+                await insertValue(c.source, c.path, c.replacement),
+                await insertValueSegments(c.source, c.segments, c.replacement),
+            ]) {
+                if (out !== c.expected) throw new Error(`${c.name}: bytes ${JSON.stringify(out)} != ${JSON.stringify(c.expected)}`);
+                assertSemanticallyEqual(await loads(out), c.semantic, c.name);
+            }
+        }
+    });
+
+    await check(`${label}: mutation empty-source/BOM/EOF/EOL exact and semantic`, async () => {
+        const cases = [
+            ["empty source", "", "b: v", { b: "v" }],
+            ["BOM-only source", "\uFEFF", "\uFEFF\nb: v", { b: "v" }],
+            ["no final EOL", "a: 1", "a: 1\nb: v", { a: 1, b: "v" }],
+            ["CRLF", "a: 1\r\n", "a: 1\r\nb: v\r\n", { a: 1, b: "v" }],
+        ];
+        for (const [name, source, expected, semantic] of cases) {
+            const out = await insertValue(source, "b", "v");
+            if (out !== expected) throw new Error(`${name}: bytes ${JSON.stringify(out)} != ${JSON.stringify(expected)}`);
+            assertSemanticallyEqual(await loads(out), semantic, name);
+        }
+    });
+
+    await check(`${label}: insert/remove/rename preserve independently expected semantics`, async () => {
+        const inserted = await insertValue("a: {x: 1}\n", "a.y", 2);
+        if (inserted !== "a: {x: 1, y: 2}\n") throw new Error(`insert bytes: ${JSON.stringify(inserted)}`);
+        assertSemanticallyEqual(await loads(inserted), { a: { x: 1, y: 2 } }, "insert semantic value");
+
+        const removed = await removeValue("a: [1, 2, 3]\n", "a.1");
+        if (removed !== "a: [1, 3]\n") throw new Error(`remove bytes: ${JSON.stringify(removed)}`);
+        assertSemanticallyEqual(await loads(removed), { a: [1, 3] }, "remove semantic value");
+
+        const renamed = await renameKey("a: {old: 9007199254740993}\n", "a.old", "new");
+        if (renamed !== "a: {new: 9007199254740993}\n") throw new Error(`rename bytes: ${JSON.stringify(renamed)}`);
+        assertSemanticallyEqual(await loads(renamed), { a: { new: 9007199254740993n } }, "rename semantic value");
+    });
+    await check(`${label}: insert segment API has independent semantic and trailing-comma success`, async () => {
+        const out = await insertValueSegments("a: {x: 1,}\n", ["a", "y"], 2);
+        if (out !== "a: {x: 1, y: 2,}\n") throw new Error(`trailing comma: ${JSON.stringify(out)}`);
+        assertSemanticallyEqual(await loads(out), { a: { x: 1, y: 2 } }, "trailing comma insertion semantic value");
+    });
+    await check(`${label}: explicit root, dotted EOL, inline encoding and trailing comma match Rust`, async () => {
+        const cases = [
+            ["explicit empty root", "{\n}\n", "k", "v", "{\n    k: v\n}\n"],
+            ["explicit inline root", "{}\n", "k", 1, "{k: 1}\n"],
+            ["dotted root with lone CR", "a.b: 1\rb: 2", "c", "v", "a.b: 1\rb: 2\rc: v"],
+            ["inline comma encoding", "a: {x: 1}\n", "a.k", "p,q", "a: {x: 1, k: p\\,q}\n"],
+        ];
+        for (const [name, source, path, replacement, expected] of cases) {
+            const out = await insertValue(source, path, replacement);
+            if (out !== expected) throw new Error(`${name}: ${JSON.stringify(out)} != ${JSON.stringify(expected)}`);
+        }
+        const trailingCommaSource = "a: {x: 1,}\n";
+        const trailingCommaOut = await insertValue(trailingCommaSource, "a.y", 2);
+        if (trailingCommaOut !== "a: {x: 1, y: 2,}\n") throw new Error(`trailing comma insertion: ${JSON.stringify(trailingCommaOut)}`);
+        const escapedCommaOut = await removeValue("a: [x\\,y, z]\n", "a.0");
+        if (escapedCommaOut !== "a: [z]\n") throw new Error(`escaped comma removal: ${JSON.stringify(escapedCommaOut)}`);
+    });
+    await check(`${label}: dotted leaf removal materializes empty parent`, async () => {
+        const cases = [
+            [`x: 0${"\n"}a.b: 1`, `x: 0${"\n"}a: {}`, { x: 0, a: {} }],
+            ["a.b: 1", "a: {}", { a: {} }],
+            [`a.b: 1${"\r"}`, `a: {}${"\r"}`, { a: {} }],
+            [`a.b: 1${"\r\n"}`, `a: {}${"\r\n"}`, { a: {} }],
+        ];
+        for (const [source, expected, semantic] of cases) {
+            const textual = await removeValue(source, "a.b");
+            const segments = await removeValueSegments(source, ["a", "b"]);
+            for (const out of [textual, segments]) {
+                if (out !== expected) throw new Error(`${JSON.stringify(out)} != ${JSON.stringify(expected)}`);
+                assertSemanticallyEqual(await loads(out), semantic, "dotted removal semantic value");
+            }
+        }
+    });
+    await check(`${label}: standalone insertion preserves string value`, async () => {
+        const source = "a: 1";
+        const expected = "a: 1\nb:: 123";
+        const textual = await insertValue(source, "b", "123");
+        const segments = await insertValueSegments(source, ["b"], "123");
+        for (const out of [textual, segments]) {
+            if (out !== expected) throw new Error(`got ${JSON.stringify(out)}, expected ${JSON.stringify(expected)}`);
+            assertSemanticallyEqual(await loads(out), { a: 1, b: "123" }, "string insertion semantic value");
+        }
+    });
+    await check(`${label}: insert textual/segments append without overwriting`, async () => {
+            const textual = await insertValue("a: 1\n", "b", 2);
+            const segments = await insertValueSegments("a: {}\n", ["a", "b"], 2);
+            if (textual !== "a: 1\nb: 2\n" || segments !== "a: {b: 2}\n") throw new Error(JSON.stringify([textual, segments]));
+            for (const fn of [() => insertValue("a: 1\n", "a", 9), () => insertValueSegments("a: 1\n", ["a"], 9)]) {
+                let err; try { await fn(); } catch (e) { err = e; }
+                if (!err || err.error !== "EditAlreadyExists" || err.body !== null || err.span !== null) throw new Error(`bad collision envelope: ${JSON.stringify(err)}`);
+            }
+        });
+        await check(`${label}: trailing-comma removal follows Rust splice range`, async () => {
+            const out = await removeValue("a: {x: 1, y: 2,}\n", "a.y");
+            if (out !== "a: {x: 1,}\n") throw new Error(`got ${JSON.stringify(out)}`);
+            const only = await removeValue("a: {x: 1,}\n", "a.x");
+            if (only !== "a: {}\n") throw new Error(`sole member: ${JSON.stringify(only)}`);
+        });
+        await check(`${label}: dotted root edits preserve each source EOL`, async () => {
+            const out = await insertValue("a.b: 1\r\nb.c: 2\r\n", "z", 3);
+            if (out !== "a.b: 1\r\nb.c: 2\r\nz: 3\r\n") throw new Error(JSON.stringify(out));
+        });
+        await check(`${label}: remove and rename segment APIs preserve error contract`, async () => {
+            if (await removeValue("a: [1, 2]\n", "a.0") !== "a: [2]\n") throw new Error("array removal mismatch");
+            if (await removeValueSegments("a: {b: 1}\n", ["a", "b"]) !== "a: {}\n") throw new Error("segment removal mismatch");
+            if (await renameKey("a: 1\n", "a", "ключ") !== "ключ: 1\n") throw new Error("unicode rename mismatch");
+            if (await renameKeySegments("a: {x: 1}\n", ["a", "x"], "y") !== "a: {y: 1}\n") throw new Error("segment rename mismatch");
+            for (const [fn, expected] of [[() => removeValue("a: 1\n", "missing"), "EditNotFound"], [() => removeValueSegments("a: 1\n", []), "EditNotFound"], [() => renameKey("a: 1\nb: 2\n", "a", "b"), "EditAlreadyExists"]]) {
+                let err; try { await fn(); } catch (e) { err = e; }
+                if (!err || err.error !== expected || err.line !== null || err.span !== null || err.path !== null) throw new Error(`bad ${expected} envelope: ${JSON.stringify(err)}`);
+            }
+        });
+        await check(`${label}: mutation failures have all-null source locations and source wins`, async () => {
+            let err; try { await insertValue("a: [", "a\\q", 1); } catch (e) { err = e; }
+            if (!err || err.error !== "UnclosedCompound") throw new Error(`source precedence: ${err?.error}`);
+            err = undefined; try { await insertValue("a: 1\n", "a\\q", 1); } catch (e) { err = e; }
+            if (!err || err.error !== "EditInvalidPath" || err.body !== "1" || err.line !== null || err.span !== null) throw new Error(`path validation: ${JSON.stringify(err)}`);
+            err = undefined; try { await renameKey("a: 1\n", "a", "b"); } catch (e) { err = e; }
+            if (err) throw new Error(`rename unexpectedly failed: ${err.error}`);
+            err = undefined; try { await insertValueSegments("a: 1\n", [], 1); } catch (e) { err = e; }
+            if (!err || err.error !== "EditNotFound" || err.body !== null || err.line !== null || err.span !== null || err.path !== null) throw new Error(`bad EditNotFound envelope: ${JSON.stringify(err)}`);
+        });
 
     console.log(`[${label}] edit suite complete`);
 }

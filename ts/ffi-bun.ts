@@ -117,8 +117,6 @@ async function getLib(): Promise<FFILib> {
             args: [ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr],
             returns: ffi.FFIType.i32,
         },
-        // source-edit 0.9 (ABI_VERSION 2): three input buffers, same
-        // output/error out-pointer contract as every other op.
         ktav_edit_value: {
             args: [ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr],
             returns: ffi.FFIType.i32,
@@ -127,6 +125,12 @@ async function getLib(): Promise<FFILib> {
             args: [ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr],
             returns: ffi.FFIType.i32,
         },
+        ktav_insert_value: { args: [ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr], returns: ffi.FFIType.i32 },
+        ktav_insert_value_segments: { args: [ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr], returns: ffi.FFIType.i32 },
+        ktav_remove_value: { args: [ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr], returns: ffi.FFIType.i32 },
+        ktav_remove_value_segments: { args: [ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr], returns: ffi.FFIType.i32 },
+        ktav_rename_key: { args: [ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr], returns: ffi.FFIType.i32 },
+        ktav_rename_key_segments: { args: [ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.u64, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr, ffi.FFIType.ptr], returns: ffi.FFIType.i32 },
         ktav_free: {
             args: [ffi.FFIType.ptr, ffi.FFIType.u64],
             returns: ffi.FFIType.void,
@@ -330,13 +334,14 @@ export async function canonicalFromSource(src: string): Promise<string> {
  *  in getLib() refuses any library whose ABI_VERSION differs from 2
  *  BEFORE any operation runs — clear error, no pure fallback. */
 async function callEdit(
-    op: "edit_value" | "edit_value_segments",
+    op: "edit_value" | "edit_value_segments" | "insert_value" | "insert_value_segments" | "remove_value" | "remove_value_segments" | "rename_key" | "rename_key_segments",
     source: string,
     pathArg: string,
-    replacement: KtavValue,
+    replacement: KtavValue = null,
+    renameKey = "",
 ): Promise<string> {
     const { ffi, symbols } = await getLib();
-    const symbolName = op === "edit_value" ? "ktav_edit_value" : "ktav_edit_value_segments";
+    const symbolName = `ktav_${op}`;
     const sym = symbols[symbolName] as ((...args: unknown[]) => number) | undefined;
     if (typeof sym !== "function") {
         throw ktavMessageError(
@@ -344,30 +349,30 @@ async function callEdit(
                 `(source-edit requires ABI_VERSION 2 / ktav 0.9 core)`,
         );
     }
-    let replInput: Uint8Array;
+    const src = new Uint8Array(new TextEncoder().encode(source));
+    let replInput = new Uint8Array();
     try {
-        replInput = encode(replacement);
+        if (op.startsWith("edit_") || op.startsWith("insert_")) replInput = encode(replacement);
     } catch (e) {
+        // ABI source operations parse before decoding replacement transport.
+        // Preserve that precedence even when host-side encoding fails.
+        await callNative("loads", src);
         throw toKtavError(e);
     }
-    const src = new Uint8Array(new TextEncoder().encode(source));
     const path = new Uint8Array(new TextEncoder().encode(pathArg));
+    const key = new TextEncoder().encode(renameKey);
     const outBuf = new BigUint64Array(1);
     const outLen = new BigUint64Array(1);
     const outErr = new BigUint64Array(1);
     const outErrLen = new BigUint64Array(1);
-    const rc = sym(
-        src.length === 0 ? EMPTY_SRC_PLACEHOLDER : src,
-        BigInt(src.length),
-        path.length === 0 ? EMPTY_SRC_PLACEHOLDER : path,
-        BigInt(path.length),
-        replInput.length === 0 ? EMPTY_SRC_PLACEHOLDER : replInput,
-        BigInt(replInput.length),
-        outBuf,
-        outLen,
-        outErr,
-        outErrLen,
-    );
+    const pathArgBytes = path.length === 0 ? EMPTY_SRC_PLACEHOLDER : path;
+    const replacementArg = replInput.length === 0 ? EMPTY_SRC_PLACEHOLDER : replInput;
+    const keyArg = key.length === 0 ? EMPTY_SRC_PLACEHOLDER : key;
+    const common = [src.length === 0 ? EMPTY_SRC_PLACEHOLDER : src, BigInt(src.length), pathArgBytes, BigInt(path.length)];
+    const inputs = op.startsWith("remove_") ? common : op.startsWith("rename_")
+        ? [...common, keyArg, BigInt(key.length)]
+        : [...common, replacementArg, BigInt(replInput.length)];
+    const rc = sym(...inputs, outBuf, outLen, outErr, outErrLen);
     const ktavFree = symbols.ktav_free as (ptr: number, len: bigint) => void;
     const readPtr = (b: BigUint64Array): number => Number(b[0]);
     if (rc !== 0) {
@@ -413,6 +418,12 @@ export function editValueSegments(
     return callEdit("edit_value_segments", source, pathArg, replacement);
 }
 
+export function insertValue(source: string, path: string, replacement: KtavValue): Promise<string> { return callEdit("insert_value", source, path, replacement); }
+export function insertValueSegments(source: string, segments: readonly string[], replacement: KtavValue): Promise<string> { return callEdit("insert_value_segments", source, JSON.stringify([...segments]), replacement); }
+export function removeValue(source: string, path: string): Promise<string> { return callEdit("remove_value", source, path); }
+export function removeValueSegments(source: string, segments: readonly string[]): Promise<string> { return callEdit("remove_value_segments", source, JSON.stringify([...segments])); }
+export function renameKey(source: string, path: string, newKey: string): Promise<string> { return callEdit("rename_key", source, path, undefined, newKey); }
+export function renameKeySegments(source: string, segments: readonly string[], newKey: string): Promise<string> { return callEdit("rename_key_segments", source, JSON.stringify([...segments]), undefined, newKey); }
 export const ktav: Pick<Ktav, never> & {
     loads: typeof loads;
     loadsStrict: typeof loadsStrict;
@@ -424,4 +435,10 @@ export const ktav: Pick<Ktav, never> & {
     canonicalFromSource: typeof canonicalFromSource;
     editValue: typeof editValue;
     editValueSegments: typeof editValueSegments;
-} = { loads, loadsStrict, loadsBytes, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource, editValue, editValueSegments };
+    insertValue: typeof insertValue;
+    insertValueSegments: typeof insertValueSegments;
+    removeValue: typeof removeValue;
+    removeValueSegments: typeof removeValueSegments;
+    renameKey: typeof renameKey;
+    renameKeySegments: typeof renameKeySegments;
+} = { loads, loadsStrict, loadsBytes, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource, editValue, editValueSegments, insertValue, insertValueSegments, removeValue, removeValueSegments, renameKey, renameKeySegments };

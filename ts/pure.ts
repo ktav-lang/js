@@ -12,6 +12,7 @@ import { renderPretty } from "./pure/writer.js";
 import { emitCanonicalJs, canonicalFromSourceText } from "./pure/canonical.js";
 import { formatText } from "./pure/formatter.js";
 import { editValueSource, editValueSegmentsSource } from "./pure/edit.js";
+import { insertValueSource, insertValueSegmentsSource, removeValueSource, removeValueSegmentsSource, renameKeySource, renameKeySegmentsSource } from "./pure/edit/mutate.js";
 
 import { ktavMessageError, toKtavError } from "./internal/api.js";
 import type { KtavInput, KtavValue } from "./internal/api.js";
@@ -98,6 +99,13 @@ export function canonicalFromSource(s: string): string {
         throw toKtavError(e);
     }
 }
+
+export function insertValue(source: string, path: string, value: KtavValue): string { try { return insertValueSource(source,path,value); } catch(e) { throw toKtavError(e); } }
+export function insertValueSegments(source: string, segments: readonly string[], value: KtavValue): string { try { return insertValueSegmentsSource(source,segments,value); } catch(e) { throw toKtavError(e); } }
+export function removeValue(source: string, path: string): string { try { return removeValueSource(source,path); } catch(e) { throw toKtavError(e); } }
+export function removeValueSegments(source: string, segments: readonly string[]): string { try { return removeValueSegmentsSource(source,segments); } catch(e) { throw toKtavError(e); } }
+export function renameKey(source: string, path: string, newKey: string): string { try { return renameKeySource(source,path,newKey); } catch(e) { throw toKtavError(e); } }
+export function renameKeySegments(source: string, segments: readonly string[], newKey: string): string { try { return renameKeySegmentsSource(source,segments,newKey); } catch(e) { throw toKtavError(e); } }
 
 export function editValue(source: string, path: string, replacement: KtavValue): string {
     try {
