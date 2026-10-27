@@ -88,6 +88,34 @@ jobs:
         run: npx tsc -p tsconfig.json
 
   # ------------------------------------------------------------------
+  # Deterministic edit-mutation performance comparison across native
+  # and pure implementations (timings are reported without thresholds).
+  # ------------------------------------------------------------------
+  bench-edit-mutations:
+    name: Benchmark — edit mutations (native/pure)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "18"
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: rustup target add wasm32-unknown-unknown
+      - run: npm install
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+      - run: npm run build:napi
+      - run: npm run build:wasm
+      - run: npm run build:ts
+      - run: node tests/node/bench-edit-mutations.mjs
+
+  # ------------------------------------------------------------------
   # Cross-runtime test matrix. Each job builds the right bits locally
   # and runs the corresponding test:* script. Keeping them in separate
   # jobs means a Bun regression doesn't block Deno results and vice
