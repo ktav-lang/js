@@ -3,19 +3,7 @@
 
 ### Added
 
-- Added lossless source editing on every entrypoint: `editValue(source,
-  textualPath, replacement)` and `editValueSegments(source, segments,
-  replacement)` splice the SOURCE text instead of re-serializing, so
-  comments, whitespace, key spelling/order, the BOM and the CR/LF/CRLF
-  style survive byte-for-byte outside the effective edit. Only
-  replacement of an existing value; typed `EditInvalidPath` (with the
-  UTF-8 byte offset of the fault in the path), `EditNotFound` and
-  `EditUnsupported` envelopes; byte-identical no-op for byte-identical
-  replacements; mandatory post-splice semantic verification. Backed by
-  the new `ktav_edit_value` / `ktav_edit_value_segments` C ABI symbols
-  (ABI_VERSION 2), the new N-API/WASM `editValue` bindings, and a
-  fully standalone pure-TypeScript implementation with no native or
-  package-manager runtime dependencies.
+- Added lossless source editing on every entrypoint: `editValue` replaces an existing value; `insertValue` appends a new Object key without overwriting; `removeValue` removes a value or Array element; and `renameKey` renames an Object key in place. Each operation has a textual-path and literal-segments variant. Operations splice the SOURCE text instead of re-serializing, so comments, whitespace, key spelling/order, the BOM and the CR/LF/CRLF style survive byte-for-byte outside the effective edit. Typed `EditInvalidPath` (with the UTF-8 byte offset of the fault in the path), `EditNotFound`, `EditAlreadyExists` and `EditUnsupported` envelopes; byte-identical no-op for identical replacement and same-name rename; mandatory post-splice semantic verification. Backed by ABI_VERSION 2 C ABI symbols, N-API/WASM bindings, and a standalone pure-TypeScript implementation with no native or package-manager runtime dependencies. Bun/Deno FFI operations are asynchronous.
 - Spec 0.9 conformance: the corpus moves to `versions/0.9/tests` (412
   fixtures) with the new `diagnostics09` invalid fixtures (EOF and
   malformed-UTF8 raw-byte locations over the original bytes, BOM kept,
@@ -32,20 +20,7 @@
 
 ### Добавлено
 
-- Добавлено lossless-редактирование исходника на каждом входе:
-  `editValue(source, textualPath, replacement)` и
-  `editValueSegments(source, segments, replacement)` сплайсят ИСХОДНЫЙ
-  текст вместо пересериализации, поэтому комментарии, пробелы,
-  написание/порядок ключей, BOM и стиль CR/LF/CRLF сохраняются
-  побайтово вне эффективной правки. Только замена существующего
-  значения; типизированные envelope'ы `EditInvalidPath` (с UTF-8
-  байтовым офсетом проблемы в пути), `EditNotFound` и
-  `EditUnsupported`; байт-идентичный no-op для байт-идентичной замены;
-  обязательная семантическая верификация после сплайса. Основа — новые
-  символы C ABI `ktav_edit_value` / `ktav_edit_value_segments`
-  (ABI_VERSION 2), новые биндинги `editValue` в N-API/WASM и полностью
-  самостоятельная pure-TypeScript реализация без нативных и
-  пакетно-менеджерных runtime-зависимостей.
+- Добавлено lossless-редактирование исходника на каждом входе: `editValue` заменяет существующее значение; `insertValue` добавляет новый ключ Object без перезаписи; `removeValue` удаляет значение или элемент Array; `renameKey` переименовывает ключ Object на месте. У каждой операции есть вариант с текстовым путём и вариант с буквальными сегментами. Операции сплайсят ИСХОДНЫЙ текст вместо пересериализации, поэтому комментарии, пробелы, написание/порядок ключей, BOM и стиль CR/LF/CRLF сохраняются побайтово вне эффективной правки. Типизированные envelope'ы `EditInvalidPath` (с UTF-8 байтовым офсетом проблемы в пути), `EditNotFound`, `EditAlreadyExists` и `EditUnsupported`; байт-идентичный no-op для идентичной замены и переименования в то же имя; обязательная семантическая верификация после сплайса. Основа — символы C ABI ABI_VERSION 2, биндинги N-API/WASM и самостоятельная реализация pure TypeScript без нативных и пакетно-менеджерных runtime-зависимостей. Операции FFI Bun/Deno асинхронны.
 - Конформанс спеки 0.9: корпус переезжает на `versions/0.9/tests`
   (412 фикстур) с новыми invalid-фикстурами `diagnostics09` (EOF и
   raw-byte позиции malformed-UTF8 по исходным байтам, BOM сохранён,
@@ -62,16 +37,7 @@
 
 ### 新增
 
-- 每个入口新增无损源码编辑：`editValue(source, textualPath,
-  replacement)` 与 `editValueSegments(source, segments, replacement)`
-  对源文本做拼接而不是重新序列化，注释、空白、键的拼写与顺序、BOM 以
-  及 CR/LF/CRLF 风格在有效编辑范围之外逐字节保留。仅替换已存在的值；
-  类型化的 `EditInvalidPath`（携带路径中出错位置的 UTF-8 字节偏移）、
-  `EditNotFound` 与 `EditUnsupported` envelope；字节相同的替换产生字节
-  相同的 no-op；拼接后强制进行语义校验。底层是新的 C ABI 符号
-  `ktav_edit_value` / `ktav_edit_value_segments`（ABI_VERSION 2）、新的
-  N-API/WASM `editValue` 绑定，以及完全不依赖原生库和包管理器运行时
-  依赖的纯 TypeScript 实现。
+- 每个入口新增无损源码编辑：`editValue` 替换已有值；`insertValue` 在 Object 末尾添加新键且不覆盖；`removeValue` 删除值或 Array 元素；`renameKey` 原位重命名 Object 键。每种操作均提供文本路径和字面段变体。操作直接拼接源文本而非重新序列化，因此注释、空白、键的拼写/顺序、BOM 以及 CR/LF/CRLF 风格在有效编辑范围之外逐字节保留。提供类型化的 `EditInvalidPath`（携带路径中错误位置的 UTF-8 字节偏移）、`EditNotFound`、`EditAlreadyExists` 与 `EditUnsupported` envelope；相同替换及同名重命名产生逐字节相同的 no-op；拼接后强制进行语义校验。底层使用 ABI_VERSION 2 C ABI 符号、N-API/WASM 绑定，以及不依赖原生库和包管理器运行时依赖的独立纯 TypeScript 实现。Bun/Deno FFI 操作为异步。
 - Spec 0.9 conformance：语料库迁至 `versions/0.9/tests`（412 个
   fixture），新增 `diagnostics09` 无效 fixture（EOF 与 malformed-UTF8
   的原始字节位置，保留 BOM，CRLF 算一个终止符，无效 UTF-8 时

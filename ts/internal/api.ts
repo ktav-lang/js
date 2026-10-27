@@ -149,6 +149,13 @@ export interface Ktav {
      * is `EditNotFound`.
      */
     editValueSegments(source: string, segments: readonly string[], replacement: KtavValue): string;
+
+    insertValue(source: string, textualPath: string, value: KtavValue): string;
+    insertValueSegments(source: string, segments: readonly string[], value: KtavValue): string;
+    removeValue(source: string, textualPath: string): string;
+    removeValueSegments(source: string, segments: readonly string[]): string;
+    renameKey(source: string, textualPath: string, newKey: string): string;
+    renameKeySegments(source: string, segments: readonly string[], newKey: string): string;
 }
 
 /**

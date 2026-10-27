@@ -74,6 +74,11 @@ fn edit_error_envelope(e: &ktav::edit::EditError) -> String {
             None,
             "edit path does not address an existing value".to_string(),
         ),
+        ktav::edit::EditError::AlreadyExists => (
+            "EditAlreadyExists",
+            None,
+            "edit target already exists; insertion never overwrites".to_string(),
+        ),
         ktav::edit::EditError::Unsupported { reason } => (
             "EditUnsupported",
             Some(reason.clone()),
@@ -208,6 +213,56 @@ pub fn edit_value_segments(
         .map_err(|e| JsError::new(&edit_error_envelope(&e)))
 }
 
+#[wasm_bindgen(js_name = insertValue)]
+pub fn insert_value(source: &str, path: &str, replacement: JsValue) -> Result<String, JsError> {
+    ktav::parse(source).map_err(|e| JsError::new(&envelope_json(&e, source)))?;
+    let value = js_to_value(&replacement)?;
+    ktav::edit::insert_value(source, path, &value)
+        .map_err(|e| JsError::new(&edit_error_envelope(&e)))
+}
+
+#[wasm_bindgen(js_name = insertValueSegments)]
+pub fn insert_value_segments(
+    source: &str,
+    segments: Vec<String>,
+    replacement: JsValue,
+) -> Result<String, JsError> {
+    ktav::parse(source).map_err(|e| JsError::new(&envelope_json(&e, source)))?;
+    let value = js_to_value(&replacement)?;
+    ktav::edit::insert_value_segments(source, &segments, &value)
+        .map_err(|e| JsError::new(&edit_error_envelope(&e)))
+}
+
+#[wasm_bindgen(js_name = removeValue)]
+pub fn remove_value(source: &str, path: &str) -> Result<String, JsError> {
+    ktav::parse(source).map_err(|e| JsError::new(&envelope_json(&e, source)))?;
+    ktav::edit::remove_value(source, path).map_err(|e| JsError::new(&edit_error_envelope(&e)))
+}
+
+#[wasm_bindgen(js_name = removeValueSegments)]
+pub fn remove_value_segments(source: &str, segments: Vec<String>) -> Result<String, JsError> {
+    ktav::parse(source).map_err(|e| JsError::new(&envelope_json(&e, source)))?;
+    ktav::edit::remove_value_segments(source, &segments)
+        .map_err(|e| JsError::new(&edit_error_envelope(&e)))
+}
+
+#[wasm_bindgen(js_name = renameKey)]
+pub fn rename_key(source: &str, path: &str, new_key: &str) -> Result<String, JsError> {
+    ktav::parse(source).map_err(|e| JsError::new(&envelope_json(&e, source)))?;
+    ktav::edit::rename_key(source, path, new_key)
+        .map_err(|e| JsError::new(&edit_error_envelope(&e)))
+}
+
+#[wasm_bindgen(js_name = renameKeySegments)]
+pub fn rename_key_segments(
+    source: &str,
+    segments: Vec<String>,
+    new_key: &str,
+) -> Result<String, JsError> {
+    ktav::parse(source).map_err(|e| JsError::new(&envelope_json(&e, source)))?;
+    ktav::edit::rename_key_segments(source, &segments, new_key)
+        .map_err(|e| JsError::new(&edit_error_envelope(&e)))
+}
 /// Serialize a JavaScript value as a Ktav document. The top-level value
 /// must be a plain object or an array — both are valid Ktav root kinds
 /// since spec 0.1.1 (top-level Arrays render bare, item-per-line, with

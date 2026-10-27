@@ -26,6 +26,7 @@ export function byteLen(s: string): number {
 export type EditError =
     | { k: "InvalidPath"; offset: number }
     | { k: "NotFound" }
+    | { k: "AlreadyExists" }
     | { k: "Unsupported"; reason: string };
 
 export function unsupported(reason: string): EditError {
@@ -53,6 +54,10 @@ export function editErrorToKtav(e: EditError): KtavError {
         case "NotFound":
             error = "EditNotFound";
             message = "edit path does not address an existing value";
+            break;
+        case "AlreadyExists":
+            error = "EditAlreadyExists";
+            message = "edit target already exists; insertion never overwrites";
             break;
         case "Unsupported":
             error = "EditUnsupported";

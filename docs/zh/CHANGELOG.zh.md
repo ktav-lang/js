@@ -14,16 +14,7 @@ MINOR 版本升级视为破坏性。
 
 ### 新增
 
-- 每个入口新增无损源码编辑：`editValue(source, textualPath,
-  replacement)` 与 `editValueSegments(source, segments, replacement)`
-  对源文本做拼接而不是重新序列化，注释、空白、键的拼写与顺序、BOM 以
-  及 CR/LF/CRLF 风格在有效编辑范围之外逐字节保留。仅替换已存在的值；
-  类型化的 `EditInvalidPath`（携带路径中出错位置的 UTF-8 字节偏移）、
-  `EditNotFound` 与 `EditUnsupported` envelope；字节相同的替换产生字节
-  相同的 no-op；拼接后强制进行语义校验。底层是新的 C ABI 符号
-  `ktav_edit_value` / `ktav_edit_value_segments`（ABI_VERSION 2）、新的
-  N-API/WASM `editValue` 绑定，以及完全不依赖原生库和包管理器运行时
-  依赖的纯 TypeScript 实现。
+- 每个入口新增无损源码编辑：`editValue` 替换已有值；`insertValue` 在 Object 末尾添加新键且不覆盖；`removeValue` 删除值或 Array 元素；`renameKey` 原位重命名 Object 键。每种操作均提供文本路径和字面段变体。操作直接拼接源文本而非重新序列化，因此注释、空白、键的拼写/顺序、BOM 以及 CR/LF/CRLF 风格在有效编辑范围之外逐字节保留。提供类型化的 `EditInvalidPath`（携带路径中错误位置的 UTF-8 字节偏移）、`EditNotFound`、`EditAlreadyExists` 与 `EditUnsupported` envelope；相同替换及同名重命名产生逐字节相同的 no-op；拼接后强制进行语义校验。底层使用 ABI_VERSION 2 C ABI 符号、N-API/WASM 绑定，以及不依赖原生库和包管理器运行时依赖的独立纯 TypeScript 实现。Bun/Deno FFI 操作为异步。
 - Spec 0.9 conformance：语料库迁至 `versions/0.9/tests`（412 个
   fixture），新增 `diagnostics09` 无效 fixture（EOF 与 malformed-UTF8
   的原始字节位置，保留 BOM，CRLF 算一个终止符，无效 UTF-8 时

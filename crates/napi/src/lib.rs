@@ -66,6 +66,11 @@ fn edit_error_envelope(e: &ktav::edit::EditError) -> String {
             None,
             "edit path does not address an existing value".to_string(),
         ),
+        ktav::edit::EditError::AlreadyExists => (
+            "EditAlreadyExists",
+            None,
+            "edit target already exists; insertion never overwrites".to_string(),
+        ),
         ktav::edit::EditError::Unsupported { reason } => (
             "EditUnsupported",
             Some(reason.clone()),
@@ -209,6 +214,65 @@ pub fn edit_value_segments(
     ktav::parse(&source).map_err(|e| Error::from_reason(envelope_json(&e, &source)))?;
     let value = js_to_value(env, &replacement)?;
     ktav::edit::edit_value_segments(&source, &segments, &value)
+        .map_err(|e| Error::from_reason(edit_error_envelope(&e)))
+}
+
+/// Insert a new Object key at `path`; an existing key is rejected and never overwritten.
+#[napi(js_name = "insertValue")]
+pub fn insert_value(
+    env: &Env,
+    source: String,
+    path: String,
+    replacement: Unknown,
+) -> Result<String> {
+    ktav::parse(&source).map_err(|e| Error::from_reason(envelope_json(&e, &source)))?;
+    let value = js_to_value(env, &replacement)?;
+    ktav::edit::insert_value(&source, &path, &value)
+        .map_err(|e| Error::from_reason(edit_error_envelope(&e)))
+}
+
+#[napi(js_name = "insertValueSegments")]
+pub fn insert_value_segments(
+    env: &Env,
+    source: String,
+    segments: Vec<String>,
+    replacement: Unknown,
+) -> Result<String> {
+    ktav::parse(&source).map_err(|e| Error::from_reason(envelope_json(&e, &source)))?;
+    let value = js_to_value(env, &replacement)?;
+    ktav::edit::insert_value_segments(&source, &segments, &value)
+        .map_err(|e| Error::from_reason(edit_error_envelope(&e)))
+}
+
+#[napi(js_name = "removeValue")]
+pub fn remove_value(source: String, path: String) -> Result<String> {
+    ktav::parse(&source).map_err(|e| Error::from_reason(envelope_json(&e, &source)))?;
+    ktav::edit::remove_value(&source, &path)
+        .map_err(|e| Error::from_reason(edit_error_envelope(&e)))
+}
+
+#[napi(js_name = "removeValueSegments")]
+pub fn remove_value_segments(source: String, segments: Vec<String>) -> Result<String> {
+    ktav::parse(&source).map_err(|e| Error::from_reason(envelope_json(&e, &source)))?;
+    ktav::edit::remove_value_segments(&source, &segments)
+        .map_err(|e| Error::from_reason(edit_error_envelope(&e)))
+}
+
+#[napi(js_name = "renameKey")]
+pub fn rename_key(source: String, path: String, new_key: String) -> Result<String> {
+    ktav::parse(&source).map_err(|e| Error::from_reason(envelope_json(&e, &source)))?;
+    ktav::edit::rename_key(&source, &path, &new_key)
+        .map_err(|e| Error::from_reason(edit_error_envelope(&e)))
+}
+
+#[napi(js_name = "renameKeySegments")]
+pub fn rename_key_segments(
+    source: String,
+    segments: Vec<String>,
+    new_key: String,
+) -> Result<String> {
+    ktav::parse(&source).map_err(|e| Error::from_reason(envelope_json(&e, &source)))?;
+    ktav::edit::rename_key_segments(&source, &segments, &new_key)
         .map_err(|e| Error::from_reason(edit_error_envelope(&e)))
 }
 

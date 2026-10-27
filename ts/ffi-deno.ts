@@ -75,25 +75,16 @@ const FFI_SYMBOLS = {
         parameters: [],
         result: "pointer",
     },
-    // Strict gate (uint32): probed before ANY document call. Must be
-    // DECLARED here — Deno's `symbols` proxy only exposes names from
-    // this table; an undeclared name resolves to undefined.
-    ktav_abi_version: {
-        parameters: [],
-        result: "u32",
-    },
-    // source-edit 0.9 (ABI_VERSION 2): three input buffers, same
-    // out-pointer contract as every other op.
-    ktav_edit_value: {
-        parameters: ["pointer", "usize", "pointer", "usize", "pointer", "usize", "pointer", "pointer", "pointer", "pointer"],
-        result: "i32",
-    },
-    ktav_edit_value_segments: {
-        parameters: ["pointer", "usize", "pointer", "usize", "pointer", "usize", "pointer", "pointer", "pointer", "pointer"],
-        result: "i32",
-    },
+    ktav_abi_version: { parameters: [], result: "u32" },
+    ktav_edit_value: { parameters: ["pointer", "usize", "pointer", "usize", "pointer", "usize", "pointer", "pointer", "pointer", "pointer"], result: "i32" },
+    ktav_edit_value_segments: { parameters: ["pointer", "usize", "pointer", "usize", "pointer", "usize", "pointer", "pointer", "pointer", "pointer"], result: "i32" },
+    ktav_insert_value: { parameters: ["pointer", "usize", "pointer", "usize", "pointer", "usize", "pointer", "pointer", "pointer", "pointer"], result: "i32" },
+    ktav_insert_value_segments: { parameters: ["pointer", "usize", "pointer", "usize", "pointer", "usize", "pointer", "pointer", "pointer", "pointer"], result: "i32" },
+    ktav_remove_value: { parameters: ["pointer", "usize", "pointer", "usize", "pointer", "pointer", "pointer", "pointer"], result: "i32" },
+    ktav_remove_value_segments: { parameters: ["pointer", "usize", "pointer", "usize", "pointer", "pointer", "pointer", "pointer"], result: "i32" },
+    ktav_rename_key: { parameters: ["pointer", "usize", "pointer", "usize", "pointer", "usize", "pointer", "pointer", "pointer", "pointer"], result: "i32" },
+    ktav_rename_key_segments: { parameters: ["pointer", "usize", "pointer", "usize", "pointer", "usize", "pointer", "pointer", "pointer", "pointer"], result: "i32" },
 } as const;
-
 let cachedLib: { symbols: Record<string, (...args: unknown[]) => unknown> } | null = null;
 
 // Rust требует ненулевой указатель даже при длине 0. Буфер живёт весь вызов.
@@ -326,13 +317,11 @@ export async function canonicalFromSource(src: string): Promise<string> {
  *  (ABI_VERSION 1) lacks the symbols and fails with a clear error,
  *  never a pure fallback. */
 async function callEdit(
-    op: "edit_value" | "edit_value_segments",
-    source: string,
-    pathArg: string,
-    replacement: KtavValue,
+    op: "edit_value" | "edit_value_segments" | "insert_value" | "insert_value_segments" | "remove_value" | "remove_value_segments" | "rename_key" | "rename_key_segments",
+    source: string, pathArg: string, replacement: KtavValue = null, renameKey = "",
 ): Promise<string> {
     const lib = await getLib();
-    const symbolName = op === "edit_value" ? "ktav_edit_value" : "ktav_edit_value_segments";
+    const symbolName = `ktav_${op}`;
     const sym = lib.symbols[symbolName] as ((...args: unknown[]) => number) | undefined;
     if (typeof sym !== "function") {
         throw ktavMessageError(
@@ -340,33 +329,26 @@ async function callEdit(
                 `(source-edit requires ABI_VERSION 2 / ktav 0.9 core)`,
         );
     }
-    let replInput: Uint8Array;
-    try {
-        replInput = encode(replacement);
-    } catch (e) {
+    const src = new Uint8Array(new TextEncoder().encode(source));
+    let replInput: Uint8Array = new Uint8Array();
+    try { if (op.startsWith("edit_") || op.startsWith("insert_")) replInput = encode(replacement); }
+    catch (e) {
+        // ABI source operations parse before decoding replacement transport.
+        // Preserve that precedence even when host-side encoding fails.
+        await callNative("loads", src);
         throw toKtavError(e);
     }
-    const src = new Uint8Array(new TextEncoder().encode(source));
     const path = new Uint8Array(new TextEncoder().encode(pathArg));
+    const key = new TextEncoder().encode(renameKey);
     const ktavFree = lib.symbols.ktav_free as (ptr: bigint, len: bigint) => void;
     const outBuf = new BigUint64Array(1);
     const outLen = new BigUint64Array(1);
     const outErr = new BigUint64Array(1);
     const outErrLen = new BigUint64Array(1);
-    const ptrOf = (input: Uint8Array): unknown =>
-        input.length === 0 ? Deno.UnsafePointer.of(EMPTY_SRC_PLACEHOLDER) : Deno.UnsafePointer.of(input);
-    const rc = sym(
-        ptrOf(src),
-        BigInt(src.length),
-        ptrOf(path),
-        BigInt(path.length),
-        ptrOf(replInput),
-        BigInt(replInput.length),
-        Deno.UnsafePointer.of(outBuf),
-        Deno.UnsafePointer.of(outLen),
-        Deno.UnsafePointer.of(outErr),
-        Deno.UnsafePointer.of(outErrLen),
-    );
+    const ptrOf = (input: Uint8Array): unknown => input.length === 0 ? Deno.UnsafePointer.of(EMPTY_SRC_PLACEHOLDER) : Deno.UnsafePointer.of(input);
+    const common = [ptrOf(src), BigInt(src.length), ptrOf(path), BigInt(path.length)];
+    const extra = op.startsWith("remove_") ? [] : op.startsWith("rename_") ? [ptrOf(key), BigInt(key.length)] : [ptrOf(replInput), BigInt(replInput.length)];
+    const rc = sym(...common, ...extra, Deno.UnsafePointer.of(outBuf), Deno.UnsafePointer.of(outLen), Deno.UnsafePointer.of(outErr), Deno.UnsafePointer.of(outErrLen));
     if (rc !== 0) {
         const errPtrRaw = outErr[0];
         const errLen = Number(outErrLen[0]);
@@ -417,7 +399,14 @@ export function editValueSegments(
     return callEdit("edit_value_segments", source, JSON.stringify([...segments]), replacement);
 }
 
-/** Convenience facade matching the synchronous Ktav interface. */
+export function insertValue(source: string, path: string, replacement: KtavValue): Promise<string> { return callEdit("insert_value", source, path, replacement); }
+export function insertValueSegments(source: string, segments: readonly string[], replacement: KtavValue): Promise<string> { return callEdit("insert_value_segments", source, JSON.stringify([...segments]), replacement); }
+export function removeValue(source: string, path: string): Promise<string> { return callEdit("remove_value", source, path); }
+export function removeValueSegments(source: string, segments: readonly string[]): Promise<string> { return callEdit("remove_value_segments", source, JSON.stringify([...segments])); }
+export function renameKey(source: string, path: string, newKey: string): Promise<string> { return callEdit("rename_key", source, path, undefined, newKey); }
+export function renameKeySegments(source: string, segments: readonly string[], newKey: string): Promise<string> { return callEdit("rename_key_segments", source, JSON.stringify([...segments]), undefined, newKey); }
+
+
 export const ktav: Pick<Ktav, never> & {
     loads: typeof loads;
     loadsStrict: typeof loadsStrict;
@@ -429,4 +418,10 @@ export const ktav: Pick<Ktav, never> & {
     canonicalFromSource: typeof canonicalFromSource;
     editValue: typeof editValue;
     editValueSegments: typeof editValueSegments;
-} = { loads, loadsStrict, loadsBytes, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource, editValue, editValueSegments };
+    insertValue: typeof insertValue;
+    insertValueSegments: typeof insertValueSegments;
+    removeValue: typeof removeValue;
+    removeValueSegments: typeof removeValueSegments;
+    renameKey: typeof renameKey;
+    renameKeySegments: typeof renameKeySegments;
+} = { loads, loadsStrict, loadsBytes, dumps, stringifyForceStrings, format, emitCanonical, canonicalFromSource, editValue, editValueSegments, insertValue, insertValueSegments, removeValue, removeValueSegments, renameKey, renameKeySegments };

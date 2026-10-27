@@ -50,12 +50,18 @@ interface NativeBinding {
         segments: string[],
         replacement: unknown,
     ) => string;
+    insertValue?: (source: string, path: string, replacement: unknown) => string;
+    insertValueSegments?: (source: string, segments: string[], replacement: unknown) => string;
+    removeValue?: (source: string, path: string) => string;
+    removeValueSegments?: (source: string, segments: string[]) => string;
+    renameKey?: (source: string, path: string, newKey: string) => string;
+    renameKeySegments?: (source: string, segments: string[], newKey: string) => string;
 }
 
 /** A native binary predating the source-edit 0.9 core simply lacks the
  *  symbols — report that clearly instead of a confusing TypeError or a
  *  silent pure fallback (ABI_VERSION 2 adds the two edit symbols). */
-function requireNativeEdit(name: "editValue" | "editValueSegments"): (
+function requireNativeEdit(name: "editValue" | "editValueSegments" | "insertValue" | "insertValueSegments" | "removeValue" | "removeValueSegments" | "renameKey" | "renameKeySegments"): (
     ...args: unknown[]
 ) => string {
     const fn = native[name];
@@ -178,6 +184,13 @@ export function canonicalFromSource(s: string): string {
         throw toKtavError(e);
     }
 }
+
+export function insertValue(source: string, path: string, value: KtavValue): string { try { return requireNativeEdit("insertValue")(source,path,value) as string; } catch(e) { throw toKtavError(e); } }
+export function insertValueSegments(source: string, path: readonly string[], value: KtavValue): string { try { return requireNativeEdit("insertValueSegments")(source,[...path],value) as string; } catch(e) { throw toKtavError(e); } }
+export function removeValue(source: string, path: string): string { try { return requireNativeEdit("removeValue")(source,path) as string; } catch(e) { throw toKtavError(e); } }
+export function removeValueSegments(source: string, path: readonly string[]): string { try { return requireNativeEdit("removeValueSegments")(source,[...path]) as string; } catch(e) { throw toKtavError(e); } }
+export function renameKey(source: string, path: string, key: string): string { try { return requireNativeEdit("renameKey")(source,path,key) as string; } catch(e) { throw toKtavError(e); } }
+export function renameKeySegments(source: string, path: readonly string[], key: string): string { try { return requireNativeEdit("renameKeySegments")(source,[...path],key) as string; } catch(e) { throw toKtavError(e); } }
 
 export function editValue(source: string, path: string, replacement: KtavValue): string {
     try {

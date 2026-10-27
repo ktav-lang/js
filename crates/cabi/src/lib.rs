@@ -22,4 +22,6 @@
 //! the error-envelope encoding are owned by the `ktav` crate's `cabi`
 //! module and documented there.
 
+//! The pinned ABI also exports insert/remove/rename operations, each with
+//! textual-path and literal-segments variants.
 ktav::declare_cabi!();
