@@ -624,11 +624,25 @@ export async function runEditSuite(ops, labelArg) {
                 semantic: { o: { i: { x: 1, n: { deep: [2, 3] }, k: "p\nq" }, sibling: { nested: [4, 5] } } },
             },
             {
-                name: "empty inline whitespace is preserved",
+                name: "empty inline whitespace is replaced",
                 source: "a: {   \u00a0\u2003}\n",
                 path: "a.x", segments: ["a", "x"], replacement: 1,
                 expected: "a: {x: 1}\n",
                 semantic: { a: { x: 1 } },
+            },
+            {
+                name: "empty root Unicode whitespace is replaced",
+                source: "﻿  {     }\r\n",
+                path: "x", segments: ["x"], replacement: 1,
+                expected: "﻿  {x: 1}\r\n",
+                semantic: { x: 1 },
+            },
+            {
+                name: "empty Array-item Object whitespace is replaced",
+                source: "items: [\n    {     }\n]\n",
+                path: "items.0.x", segments: ["items", "0", "x"], replacement: 1,
+                expected: "items: [\n    {x: 1}\n]\n",
+                semantic: { items: [{ x: 1 }] },
             },
             {
                 name: "Unicode before trailing comma and after it is preserved",
