@@ -79,7 +79,7 @@ for (const mode of ["textual", "segments"]) for (const operation of ["insert", "
         ? "\uFEFFparent: {\r\n    first: 甲\r\n    ## keep middle\r\n    a\\.b: 東京\r\n    last: 終\r\n    added: é\r\n}\r\n"
         : operation === "remove"
             ? "\uFEFFparent: {\r\n    first: 甲\r\n    ## keep middle\r\n    last: 終\r\n}\r\n"
-            : "\uFEFFparent: {\r\n    first: 甲\r\n    ## keep middle\r\n    c\\.d: 東京\r\n    last: 終\r\n}\r\n";
+            : "\uFEFFparent: {\r\n    first: 甲\r\n    ## keep middle\r\n    \"c.d\": 東京\r\n    last: 終\r\n}\r\n";
     await check(label, async () => {
         const fn = operation === "insert" ? (mode === "textual" ? insertValue : insertValueSegments)
             : operation === "remove" ? (mode === "textual" ? removeValue : removeValueSegments)
