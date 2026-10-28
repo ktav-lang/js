@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const allowed = new Set(['MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', '0BSD', 'MIT OR Apache-2.0', 'Apache-2.0 OR MIT']);
@@ -51,12 +51,13 @@ export function checkPlatform(expected, local, published) {
 }
 
 async function main() {
-  const lock = JSON.parse(await readFile('package-lock.json', 'utf8'));
-  const root = JSON.parse(await readFile('package.json', 'utf8'));
+  const base = process.argv[2] || '.';
+  const lock = JSON.parse(await readFile(join(base, 'package-lock.json'), 'utf8'));
+  const root = JSON.parse(await readFile(join(base, 'package.json'), 'utf8'));
   const { failures, platforms } = checkLock(lock, root);
   for (const expected of platforms) {
     try {
-      const local = JSON.parse(await readFile(`npm/${expected.suffix}/package.json`, 'utf8'));
+      const local = JSON.parse(await readFile(join(base, 'npm', expected.suffix, 'package.json'), 'utf8'));
       const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(expected.name)}/${encodeURIComponent(expected.version)}`);
       if (!response.ok) throw new Error(`registry HTTP ${response.status}`);
       failures.push(...checkPlatform(expected, local, await response.json()));

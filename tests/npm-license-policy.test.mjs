@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { checkLock, checkPlatform } from '../scripts/check-npm-licenses.mjs';
 
@@ -39,6 +43,16 @@ test('requires reviewed optional packages to match registry and local metadata',
   assert.notEqual(checkPlatform(expected, pkg, { ...pkg, version: '0.8.2' }).length, 0);
   assert.notEqual(checkLock(lock({}), root).failures.length, 0);
   assert.notEqual(checkLock(lock({ [entry]: { optional: true } }), { optionalDependencies: { [name]: '^0.8.1' } }).failures.length, 0);
+});
+
+test('checks an independent npm project from a specified directory', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ktav-license-test-'));
+  writeFileSync(join(dir, 'package.json'), '{}');
+  writeFileSync(join(dir, 'package-lock.json'), JSON.stringify(lock({ 'node_modules/x': { license: 'MIT' } })));
+  const script = resolve('scripts/check-npm-licenses.mjs');
+  assert.equal(spawnSync(process.execPath, [script, dir]).status, 0);
+  writeFileSync(join(dir, 'package-lock.json'), JSON.stringify(lock({ 'node_modules/x': { license: 'UNKNOWN' } })));
+  assert.equal(spawnSync(process.execPath, [script, dir]).status, 1);
 });
 
 test('rejects malformed lockfiles', () => {
