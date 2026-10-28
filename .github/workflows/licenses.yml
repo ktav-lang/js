@@ -26,6 +26,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: npm ci --ignore-scripts
       - run: node --test tests/npm-license-policy.test.mjs
-      - run: node scripts/check-npm-licenses.mjs
+      - name: Check committed npm lockfile
+        run: node scripts/check-npm-licenses.mjs
+      - name: Resolve npm graph without lifecycle scripts
+        run: npm install --ignore-scripts
+      - name: Check resolved npm graph
+        run: node scripts/check-npm-licenses.mjs
