@@ -21,7 +21,7 @@ if not machine or machine.group(1).strip() != expected_machine:
     raise SystemExit(f'{path}: unexpected ELF machine')
 dynamic = subprocess.check_output(['readelf', '-d', path], text=True)
 needed = re.findall(r'Shared library: \[([^]]+)\]', dynamic)
-if any(name != 'libc.so' for name in needed):
+if needed != ['libc.so']:
     raise SystemExit(f'{path}: unexpected shared libraries: {needed!r}')
 versions = subprocess.check_output(['readelf', '--version-info', path], text=True)
 if re.search(r'\bGLIBC_[0-9]', versions):
