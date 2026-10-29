@@ -79,7 +79,7 @@ jobs:
             target: aarch64-unknown-linux-gnu
             build: npx napi build --release -p ktav-napi --target aarch64-unknown-linux-gnu --platform --js false --output-dir . --use-napi-cross
 
-          # Both musl targets use Zig and verify their ELF dependencies.
+          # Оба musl target используют Zig и проверяют ELF.
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
             build: bash scripts/build-musl-addon.sh x86_64-unknown-linux-musl
