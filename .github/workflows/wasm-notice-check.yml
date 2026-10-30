@@ -55,7 +55,10 @@ jobs:
           if original.count(anchor) != 1:
               raise SystemExit('WASM inline boundary changed')
           hook = b'for (const subdir of ["web", "bundler"]) addNoticeFile(resolve(outRoot, subdir, "ktav_bg.wasm"), process.env.KTAV_NATIVE_NOTICES);'
-          packaged = b'import { addNoticeFile } from "./wasm-notice-resource.mjs";' + bytes([10]) + original.replace(anchor, hook + bytes([10, 10]) + anchor)
+          shebang, body = original.split(bytes([10]), 1)
+          if shebang != b'#!/usr/bin/env node':
+              raise SystemExit('WASM build script interpreter changed')
+          packaged = shebang + bytes([10]) + b'import { addNoticeFile } from "./wasm-notice-resource.mjs";' + bytes([10]) + body.replace(anchor, hook + bytes([10, 10]) + anchor)
           script.write_bytes(packaged)
           record = {'source_ref': os.environ['SOURCE_REF'], 'tooling_ref': os.environ['GITHUB_SHA'], 'original_build_script_sha256': hashlib.sha256(original).hexdigest(), 'packaged_build_script_sha256': hashlib.sha256(packaged).hexdigest(), 'coverage': 'Audit-only Cargo/std prototype, not historical npm or non-Cargo runtime compliance.'}
           (Path(os.environ['RUNNER_TEMP']) / 'wasm-source-provenance.json').write_text(json.dumps(record, sort_keys=True, indent=2))
@@ -63,6 +66,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Verify notice-only build overlay syntax
+        run: node --check scripts/build-wasm.mjs
       - uses: dtolnay/rust-toolchain@1.99.1
         with:
           targets: wasm32-unknown-unknown
