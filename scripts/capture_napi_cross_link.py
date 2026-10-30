@@ -31,7 +31,7 @@ def command(arguments, environment, home):
             raise ValueError('NAPI linker evidence must already exist')
         name = uuid.uuid4().hex
         link_map = evidence / (name + '.map')
-        record = {'target': target, 'compiler': str(compiler), 'output': str(output), 'map': link_map.name, 'arguments': args}
+        record = {'target': target, 'compiler': str(compiler), 'output': str(output), 'map': link_map.name, 'arguments': list(args)}
         with (evidence / (name + '.json')).open('x', encoding='utf-8') as destination:
             json.dump(record, destination, sort_keys=True, indent=2)
         args.append('-Wl,-Map=' + str(link_map))
