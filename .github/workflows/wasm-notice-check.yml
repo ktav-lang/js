@@ -23,7 +23,7 @@ jobs:
           from pathlib import Path
           stage = Path(os.environ['RUNNER_TEMP']) / 'wasm-notice-tools'
           stage.mkdir()
-          for name in ['scripts/wasm-notice-resource.mjs', 'tests/wasm-notice-resource.test.mjs', 'tests/test_wasm_npm.py', 'scripts/prepare_js_notices.py', 'scripts/check_wasm_npm.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/check_embedded_notices.py', 'ci/about.toml']:
+          for name in ['scripts/wasm-notice-resource.mjs', 'tests/wasm-notice-resource.test.mjs', 'tests/test_wasm_npm.py', 'scripts/prepare_js_notices.py', 'scripts/check_wasm_npm.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/check_embedded_notices.py', 'ci/about.toml', 'scripts/source_license_supplements.py', 'ci/test_js_source_supplements.py', 'ci/licenses/js-source-supplements.json']:
               target = stage / name
               target.parent.mkdir(parents=True, exist_ok=True)
               shutil.copyfile(name, target)
@@ -74,6 +74,7 @@ jobs:
         run: |
           node --test tests/wasm-notice-resource.test.mjs
           python3 -I -m unittest discover -s tests -p test_wasm_npm.py -v
+          python3 -I -m unittest discover -s ci -p test_js_source_supplements.py -v
       - name: Prepare source-backed locked notices
         shell: bash
         run: |

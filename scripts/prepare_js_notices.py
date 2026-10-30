@@ -9,6 +9,7 @@ import sys
 import tomllib
 
 from cargo_notice_bundle import _build
+from source_license_supplements import supplement_fallbacks
 
 
 def prepare(evidence):
@@ -47,8 +48,13 @@ def prepare(evidence):
     sysroot = subprocess.check_output(['rustc', '--print', 'sysroot'], text=True).strip()
     shutil.copyfile(Path(sysroot) / 'share/doc/rust/COPYRIGHT-library.html', evidence / 'COPYRIGHT-library.html')
     report = subprocess.check_output(['cargo', 'about', 'generate', '--locked', '--all-features', '--fail', '--config', 'ci/about.toml', '--format', 'json'])
-    (evidence / 'licenses.json').write_bytes(report)
+    (evidence / 'licenses-cargo-about.json').write_bytes(report)
+    combined, provenance = supplement_fallbacks(metadata, json.loads(report), original,
+                                                root / 'ci/licenses/js-source-supplements.json')
+    combined['source_license_supplements'] = provenance
+    (evidence / 'licenses.json').write_text(json.dumps(combined, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     bundle = json.loads(_build(evidence))
+    bundle['source_license_supplements'] = provenance
     bundle['resolution_origin'] = 'Fresh CI resolution for published JS source 0.8.1; not historical published dependency evidence.'
     data = (json.dumps(bundle, ensure_ascii=False, sort_keys=True, indent=2) + '\n').encode()
     payload = gzip.compress(data, mtime=0)
