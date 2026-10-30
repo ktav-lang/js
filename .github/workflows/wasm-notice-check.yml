@@ -23,7 +23,7 @@ jobs:
           from pathlib import Path
           stage = Path(os.environ['RUNNER_TEMP']) / 'wasm-notice-tools'
           stage.mkdir()
-          for name in ['scripts/wasm-notice-resource.mjs', 'tests/wasm-notice-resource.test.mjs', 'tests/test_wasm_npm.py', 'scripts/prepare_js_notices.py', 'scripts/check_wasm_npm.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/check_embedded_notices.py', 'ci/about.toml', 'scripts/source_license_supplements.py', 'ci/test_js_source_supplements.py', 'ci/licenses/js-source-supplements.json']:
+          for name in ['scripts/wasm-notice-resource.mjs', 'tests/wasm-notice-resource.test.mjs', 'tests/test_wasm_npm.py', 'scripts/prepare_js_notices.py', 'scripts/check_wasm_npm.py', 'scripts/check-npm-licenses.mjs', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/check_embedded_notices.py', 'ci/about.toml', 'scripts/source_license_supplements.py', 'ci/test_js_source_supplements.py', 'ci/licenses/js-source-supplements.json']:
               target = stage / name
               target.parent.mkdir(parents=True, exist_ok=True)
               shutil.copyfile(name, target)
@@ -83,7 +83,15 @@ jobs:
           cp "$RUNNER_TEMP/wasm-source-provenance.json" "$RUNNER_TEMP/wasm-notices/source-provenance.json"
           printf 'KTAV_NATIVE_NOTICES=%s\n' "$RUNNER_TEMP/wasm-notices/NOTICE.json.gz" >> "$GITHUB_ENV"
           wasm-pack --version > "$RUNNER_TEMP/wasm-notices/wasm-pack-version.txt"
-      - run: npm ci --ignore-scripts
+      - name: Resolve original npm release graph without lifecycle scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp package-lock.json "$RUNNER_TEMP/wasm-notices/npm-lock-source.json"
+          npm install --ignore-scripts --no-audit --no-fund
+          git diff --exit-code -- package.json
+          cp package-lock.json "$RUNNER_TEMP/wasm-notices/npm-lock-resolved.json"
+          node scripts/check-npm-licenses.mjs
       - name: Build final WASM before inline generation
         env:
           CARGO_NET_OFFLINE: 'true'
