@@ -1,5 +1,6 @@
 """Связать actual addon с GNU map и compiler/sysroot evidence."""
 
+import base64
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
@@ -19,6 +20,16 @@ def sha(path):
         for chunk in iter(lambda: source.read(1024 * 1024), b''):
             checksum.update(chunk)
     return checksum.hexdigest()
+
+
+def notice_record(name, data):
+    try:
+        text = data.decode('utf-8')
+    except UnicodeDecodeError:
+        text = None
+    return {'path': name, 'sha256': hashlib.sha256(data).hexdigest(),
+            'raw_bytes_base64': base64.b64encode(data).decode('ascii'),
+            'utf8_text': text, 'requires_encoding_review': text is None}
 
 
 def collect(binary, evidence, target):
@@ -69,11 +80,11 @@ def collect(binary, evidence, target):
             raise ValueError('SDK notice size limit exceeded')
         data = path.read_bytes()
         total += len(data)
-        notices.append({'path': path.relative_to(sdk).as_posix(), 'sha256': hashlib.sha256(data).hexdigest(), 'text': data.decode('utf-8')})
+        notices.append(notice_record(path.relative_to(sdk).as_posix(), data))
     (evidence / 'sdk-notice-files.json').write_text(json.dumps(notices, ensure_ascii=False, indent=2), encoding='utf-8')
     members = sorted({(PurePosixPath(archive).name, PurePosixPath(member).name) for archive, member in re.findall(r'([^\s()]+[.]a)\(([^()\n]+)\)', text)})
     objects = sorted({PurePosixPath(path).name for path in re.findall(r'^LOAD\s+([^\n]+[.]o)\s*$', text, re.M)})
-    result = {'target': target, 'binary_sha256': binary_sha, 'compiler_sha256': sha(compiler), 'cross_toolchain_version': '1.0.3', 'archive_members': members, 'loaded_objects': objects, 'sdk_notice_files': len(notices), 'coverage': 'Observed GNU link inputs only; package MIT metadata is not a license conclusion for GNU runtime objects.'}
+    result = {'target': target, 'binary_sha256': binary_sha, 'compiler_sha256': sha(compiler), 'cross_toolchain_version': '1.0.3', 'archive_members': members, 'loaded_objects': objects, 'sdk_notice_files': len(notices), 'notice_files_requiring_encoding_review': [item['path'] for item in notices if item['requires_encoding_review']], 'coverage': 'Observed GNU link inputs only; package MIT metadata is not a license conclusion for GNU runtime objects.'}
     (evidence / 'native-link-inputs.json').write_text(json.dumps(result, sort_keys=True, indent=2), encoding='utf-8')
     print(json.dumps(result, sort_keys=True))
 

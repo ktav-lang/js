@@ -1,5 +1,7 @@
 """Проверить прозрачность и границы NAPI GNU map capture."""
 
+import base64
+import hashlib
 import importlib.util
 import json
 import os
@@ -58,6 +60,34 @@ class CaptureTests(unittest.TestCase):
         compiler.chmod(0o755)
         result = subprocess.run([sys.executable, str(SCRIPT), '--version'], env={**os.environ, **self.environment, 'HOME': str(self.root)}, capture_output=True)
         self.assertEqual(result.returncode, 23)
+
+
+COLLECT_SPEC = importlib.util.spec_from_file_location('collector', SCRIPT.with_name('collect_napi_link_evidence.py'))
+COLLECT = importlib.util.module_from_spec(COLLECT_SPEC)
+COLLECT_SPEC.loader.exec_module(COLLECT)
+
+
+class NoticeByteTests(unittest.TestCase):
+    def test_utf8_notice_is_preserved_exactly(self):
+        data = 'Copyright © fixture'.encode('utf-8')
+        record = COLLECT.notice_record('LICENSE', data)
+        self.assertEqual(record['utf8_text'].encode('utf-8'), data)
+        self.assertEqual(base64.b64decode(record['raw_bytes_base64']), data)
+        self.assertFalse(record['requires_encoding_review'])
+
+    def test_non_utf8_notice_is_not_lossily_decoded(self):
+        data = b'Copyright \xa9 fixture'
+        record = COLLECT.notice_record('COPYING', data)
+        self.assertIsNone(record['utf8_text'])
+        self.assertTrue(record['requires_encoding_review'])
+        self.assertEqual(base64.b64decode(record['raw_bytes_base64']), data)
+        self.assertEqual(record['sha256'], hashlib.sha256(data).hexdigest())
+
+    def test_binary_notice_bytes_remain_uninterpreted(self):
+        data = bytes([31, 139, 255, 0])
+        record = COLLECT.notice_record('COPYING.gz', data)
+        self.assertEqual(base64.b64decode(record['raw_bytes_base64']), data)
+        self.assertTrue(record['requires_encoding_review'])
 
 
 if __name__ == '__main__':
