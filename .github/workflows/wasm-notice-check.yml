@@ -23,7 +23,7 @@ jobs:
           from pathlib import Path
           stage = Path(os.environ['RUNNER_TEMP']) / 'wasm-notice-tools'
           stage.mkdir()
-          for name in ['scripts/wasm-notice-resource.mjs', 'tests/wasm-notice-resource.test.mjs', 'tests/test_wasm_npm.py', 'scripts/prepare_js_notices.py', 'scripts/check_wasm_npm.py', 'scripts/check-npm-licenses.mjs', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/check_embedded_notices.py', 'ci/about.toml', 'scripts/source_license_supplements.py', 'ci/test_js_source_supplements.py', 'ci/licenses/js-source-supplements.json']:
+          for name in ['Cargo.lock', 'ci/js-build-lock.json', 'ci/test_js_build_lock.py', 'scripts/wasm-notice-resource.mjs', 'tests/wasm-notice-resource.test.mjs', 'tests/test_wasm_npm.py', 'scripts/prepare_js_notices.py', 'scripts/check_wasm_npm.py', 'scripts/check-npm-licenses.mjs', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/check_embedded_notices.py', 'ci/about.toml', 'scripts/source_license_supplements.py', 'ci/test_js_source_supplements.py', 'ci/licenses/js-source-supplements.json']:
               target = stage / name
               target.parent.mkdir(parents=True, exist_ok=True)
               shutil.copyfile(name, target)
@@ -60,7 +60,7 @@ jobs:
               raise SystemExit('WASM build script interpreter changed')
           packaged = shebang + bytes([10]) + b'import { addNoticeFile } from "./wasm-notice-resource.mjs";' + bytes([10]) + body.replace(anchor, hook + bytes([10, 10]) + anchor)
           script.write_bytes(packaged)
-          record = {'source_ref': os.environ['SOURCE_REF'], 'tooling_ref': os.environ['GITHUB_SHA'], 'original_build_script_sha256': hashlib.sha256(original).hexdigest(), 'packaged_build_script_sha256': hashlib.sha256(packaged).hexdigest(), 'coverage': 'Audit-only Cargo/std prototype, not historical npm or non-Cargo runtime compliance.'}
+          record = {'source_ref': os.environ['SOURCE_REF'], 'tooling_ref': os.environ['GITHUB_SHA'], 'original_build_script_sha256': hashlib.sha256(original).hexdigest(), 'packaged_build_script_sha256': hashlib.sha256(packaged).hexdigest(), 'reviewed_lock_sha256': hashlib.sha256(Path('Cargo.lock').read_bytes()).hexdigest(), 'coverage': 'Audit-only Cargo/std prototype, not historical npm or non-Cargo runtime compliance.'}
           (Path(os.environ['RUNNER_TEMP']) / 'wasm-source-provenance.json').write_text(json.dumps(record, sort_keys=True, indent=2))
           subprocess.run(['git', 'diff', '--exit-code', '--', 'Cargo.toml', 'crates', 'tests/node', 'root-docs', 'package.json', 'package-lock.json'], check=True)
       - uses: actions/setup-node@v4
@@ -80,6 +80,7 @@ jobs:
           node --test tests/wasm-notice-resource.test.mjs
           python3 -I -m unittest discover -s tests -p test_wasm_npm.py -v
           python3 -I -m unittest discover -s ci -p test_js_source_supplements.py -v
+          python3 -I -m unittest discover -s ci -p test_js_build_lock.py -v
       - name: Prepare source-backed locked notices
         shell: bash
         run: |
