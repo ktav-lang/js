@@ -1,0 +1,114 @@
+name: WASM notice evidence
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_REF: 562deb3fde092d63a78f359be095e5079929d0d1
+
+jobs:
+  wasm-notices:
+    name: WASM notice / actual npm package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preserve notice tools
+        shell: python
+        run: |
+          import os
+          import shutil
+          from pathlib import Path
+          stage = Path(os.environ['RUNNER_TEMP']) / 'wasm-notice-tools'
+          stage.mkdir()
+          for name in ['scripts/wasm-notice-resource.mjs', 'tests/wasm-notice-resource.test.mjs', 'tests/test_wasm_npm.py', 'scripts/prepare_js_notices.py', 'scripts/check_wasm_npm.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/check_embedded_notices.py', 'ci/about.toml']:
+              target = stage / name
+              target.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(name, target)
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_REF }}
+          submodules: recursive
+          persist-credentials: false
+      - name: Apply notice-only build overlay
+        shell: python
+        run: |
+          import hashlib
+          import json
+          import os
+          import shutil
+          import subprocess
+          from pathlib import Path
+          if subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() != os.environ['SOURCE_REF']:
+              raise SystemExit('unexpected WASM source revision')
+          stage = Path(os.environ['RUNNER_TEMP']) / 'wasm-notice-tools'
+          for path in stage.rglob('*'):
+              if path.is_file():
+                  target = Path(path.relative_to(stage))
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copyfile(path, target)
+          script = Path('scripts/build-wasm.mjs')
+          original = script.read_bytes()
+          anchor = b'buildWebInline();'
+          if original.count(anchor) != 1:
+              raise SystemExit('WASM inline boundary changed')
+          hook = b'for (const subdir of ["web", "bundler"]) addNoticeFile(resolve(outRoot, subdir, "ktav_bg.wasm"), process.env.KTAV_NATIVE_NOTICES);'
+          packaged = b'import { addNoticeFile } from "./wasm-notice-resource.mjs";' + bytes([10]) + original.replace(anchor, hook + bytes([10, 10]) + anchor)
+          script.write_bytes(packaged)
+          record = {'source_ref': os.environ['SOURCE_REF'], 'tooling_ref': os.environ['GITHUB_SHA'], 'original_build_script_sha256': hashlib.sha256(original).hexdigest(), 'packaged_build_script_sha256': hashlib.sha256(packaged).hexdigest(), 'coverage': 'Audit-only Cargo/std prototype, not historical npm or non-Cargo runtime compliance.'}
+          (Path(os.environ['RUNNER_TEMP']) / 'wasm-source-provenance.json').write_text(json.dumps(record, sort_keys=True, indent=2))
+          subprocess.run(['git', 'diff', '--exit-code', '--', 'Cargo.toml', 'crates', 'tests/node', 'root-docs', 'package.json', 'package-lock.json'], check=True)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          targets: wasm32-unknown-unknown
+          components: rust-docs
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about@0.9.3,wasm-pack
+      - name: Verify notice section and tarball guards
+        run: |
+          node --test tests/wasm-notice-resource.test.mjs
+          python3 -I -m unittest discover -s tests -p test_wasm_npm.py -v
+      - name: Prepare source-backed locked notices
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/prepare_js_notices.py "$RUNNER_TEMP/wasm-notices"
+          cp "$RUNNER_TEMP/wasm-source-provenance.json" "$RUNNER_TEMP/wasm-notices/source-provenance.json"
+          printf 'KTAV_NATIVE_NOTICES=%s\n' "$RUNNER_TEMP/wasm-notices/NOTICE.json.gz" >> "$GITHUB_ENV"
+          wasm-pack --version > "$RUNNER_TEMP/wasm-notices/wasm-pack-version.txt"
+      - run: npm ci --ignore-scripts
+      - name: Build final WASM before inline generation
+        env:
+          CARGO_NET_OFFLINE: 'true'
+        run: node scripts/build-wasm.mjs
+      - name: Verify final WASM resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmp Cargo.lock "$RUNNER_TEMP/wasm-notices/Cargo.lock"
+          for target in web bundler; do
+            node --input-type=module -e 'import {readFileSync} from "node:fs"; import {verifyNotice} from "./scripts/wasm-notice-resource.mjs"; verifyNotice(readFileSync(process.argv[1]),readFileSync(process.env.KTAV_NATIVE_NOTICES));' "dist/wasm/$target/ktav_bg.wasm"
+            python3 -I scripts/check_embedded_notices.py "dist/wasm/$target/ktav_bg.wasm" "$RUNNER_TEMP/wasm-notices/NOTICE.json" > "$RUNNER_TEMP/wasm-notices/resource-$target.json"
+          done
+          cp "$RUNNER_TEMP/wasm-notices/NOTICE.json" dist/wasm/NOTICE.json
+      - run: npm run build:ts
+      - name: Verify host WASM consumer
+        run: npm run test:node-wasm
+      - name: Inspect actual packed main package
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm pack --ignore-scripts --json --pack-destination "$RUNNER_TEMP" > "$RUNNER_TEMP/wasm-notices/npm-pack.json"
+          python3 -c 'import json,os,subprocess,sys; from pathlib import Path; e=Path(os.environ["RUNNER_TEMP"])/"wasm-notices"; p=json.loads((e/"npm-pack.json").read_text()); assert len(p)==1; name=p[0]["filename"]; assert Path(name).name==name; output=subprocess.check_output([sys.executable,"scripts/check_wasm_npm.py",str(e.parent/name),str(e),"."]); (e/"npm-verification.json").write_bytes(output)'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wasm-license-evidence
+          path: ${{ runner.temp }}/wasm-notices/
+          if-no-files-found: warn
