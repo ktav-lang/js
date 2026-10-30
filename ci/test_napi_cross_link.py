@@ -90,5 +90,83 @@ class NoticeByteTests(unittest.TestCase):
         self.assertTrue(record['requires_encoding_review'])
 
 
+class SdkInputTests(unittest.TestCase):
+    def fixture(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        sdk = root / 'sdk'
+        entries = {}
+        for name, data in [('bin/compiler', b'compiler'), ('bin/config', b'config'), ('lib/runtime.o', b'runtime')]:
+            path = sdk / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+            entries[name] = {'path': name, 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
+        catalog = {'repository_revision': 'a' * 40, 'targets': {'x86_64-unknown-linux-gnu': {'compiler': entries['bin/compiler'], 'configuration': entries['bin/config'], 'runtime_inputs': [entries['lib/runtime.o']]}}}
+        return sdk, catalog, 'LOAD ' + (sdk / 'lib/runtime.o').as_posix() + '\n'
+
+    def test_exact_compiler_config_and_loaded_runtime_are_bound(self):
+        sdk, catalog, link_map = self.fixture()
+        report = COLLECT.sdk_inputs(sdk, link_map, 'x86_64-unknown-linux-gnu', catalog)
+        self.assertEqual(len(report['inputs']), 3)
+        self.assertEqual([item['path'] for item in report['inputs'] if item['role'] == 'runtime'], ['lib/runtime.o'])
+
+    def test_changed_runtime_bytes_are_rejected(self):
+        sdk, catalog, link_map = self.fixture()
+        (sdk / 'lib/runtime.o').write_bytes(b'changed')
+        with self.assertRaisesRegex(ValueError, 'pinned repository bytes'):
+            COLLECT.sdk_inputs(sdk, link_map, 'x86_64-unknown-linux-gnu', catalog)
+
+    def test_changed_compiler_bytes_are_rejected(self):
+        sdk, catalog, link_map = self.fixture()
+        (sdk / 'bin/compiler').write_bytes(b'altered!')
+        with self.assertRaisesRegex(ValueError, 'pinned repository bytes'):
+            COLLECT.sdk_inputs(sdk, link_map, 'x86_64-unknown-linux-gnu', catalog)
+
+    def test_missing_loaded_runtime_is_rejected(self):
+        sdk, catalog, _ = self.fixture()
+        with self.assertRaisesRegex(ValueError, 'static input inventory'):
+            COLLECT.sdk_inputs(sdk, '', 'x86_64-unknown-linux-gnu', catalog)
+
+    def test_unknown_loaded_sdk_archive_is_rejected(self):
+        sdk, catalog, link_map = self.fixture()
+        (sdk / 'lib/unknown.a').write_bytes(b'archive')
+        link_map += 'LOAD ' + (sdk / 'lib/unknown.a').as_posix() + '\n'
+        with self.assertRaisesRegex(ValueError, 'static input inventory'):
+            COLLECT.sdk_inputs(sdk, link_map, 'x86_64-unknown-linux-gnu', catalog)
+
+    def test_inside_sdk_alias_is_normalized(self):
+        sdk, catalog, _ = self.fixture()
+        alias = sdk / 'lib/alias.o'
+        alias.symlink_to(sdk / 'lib/runtime.o')
+        report = COLLECT.sdk_inputs(sdk, 'LOAD ' + alias.as_posix() + '\n', 'x86_64-unknown-linux-gnu', catalog)
+        self.assertEqual(report['inputs'][-1]['path'], 'lib/runtime.o')
+
+    def test_sdk_symlink_escape_is_rejected(self):
+        sdk, catalog, link_map = self.fixture()
+        outside = sdk.parent / 'outside.o'
+        outside.write_bytes(b'runtime')
+        path = sdk / 'lib/runtime.o'
+        path.unlink()
+        path.symlink_to(outside)
+        with self.assertRaisesRegex(ValueError, 'escapes selected SDK'):
+            COLLECT.sdk_inputs(sdk, link_map, 'x86_64-unknown-linux-gnu', catalog)
+
+    def test_extra_mapped_sdk_symlink_escape_is_not_ignored(self):
+        sdk, catalog, link_map = self.fixture()
+        outside = sdk.parent / 'outside.a'
+        outside.write_bytes(b'archive')
+        alias = sdk / 'lib/escape.a'
+        alias.symlink_to(outside)
+        with self.assertRaisesRegex(ValueError, 'mapped SDK static input escapes'):
+            COLLECT.sdk_inputs(sdk, link_map + 'LOAD ' + alias.as_posix() + '\n', 'x86_64-unknown-linux-gnu', catalog)
+
+    def test_catalog_path_traversal_is_rejected(self):
+        sdk, catalog, link_map = self.fixture()
+        catalog['targets']['x86_64-unknown-linux-gnu']['runtime_inputs'][0]['path'] = '../outside.o'
+        with self.assertRaisesRegex(ValueError, 'unsafe reviewed SDK input path'):
+            COLLECT.sdk_inputs(sdk, link_map, 'x86_64-unknown-linux-gnu', catalog)
+
+
 if __name__ == '__main__':
     unittest.main()

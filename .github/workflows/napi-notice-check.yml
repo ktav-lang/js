@@ -31,7 +31,7 @@ jobs:
           from pathlib import Path
           stage = Path(os.environ['RUNNER_TEMP']) / 'napi-notice-tools'
           stage.mkdir()
-          for name in ['scripts/capture_napi_cross_link.py', 'scripts/collect_napi_link_evidence.py', 'ci/test_napi_cross_link.py', 'scripts/prepare_js_notices.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/source_license_supplements.py', 'scripts/check-npm-licenses.mjs', 'ci/about.toml', 'ci/licenses/js-source-supplements.json']:
+          for name in ['scripts/capture_napi_cross_link.py', 'scripts/collect_napi_link_evidence.py', 'ci/test_napi_cross_link.py', 'ci/napi-gnu-sdk-inputs.json', 'scripts/prepare_js_notices.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/source_license_supplements.py', 'scripts/check-npm-licenses.mjs', 'ci/about.toml', 'ci/licenses/js-source-supplements.json']:
               target = stage / name
               target.parent.mkdir(parents=True, exist_ok=True)
               shutil.copyfile(name, target)
@@ -85,6 +85,7 @@ jobs:
           evidence = Path(os.environ['RUNNER_TEMP']) / 'napi-notices'
           subprocess.run([sys.executable, 'scripts/prepare_js_notices.py', str(evidence)], check=True)
           shutil.copyfile(Path(os.environ['RUNNER_TEMP']) / 'napi-source-provenance.json', evidence / 'source-provenance.json')
+          shutil.copyfile('ci/napi-gnu-sdk-inputs.json', evidence / 'napi-gnu-sdk-inputs.json')
           maps = evidence / 'link-maps'
           maps.mkdir()
           key = 'CARGO_TARGET_' + os.environ['NAPI_TARGET'].upper().replace('-', '_') + '_LINKER'

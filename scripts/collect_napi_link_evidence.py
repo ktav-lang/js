@@ -32,6 +32,37 @@ def notice_record(name, data):
             'utf8_text': text, 'requires_encoding_review': text is None}
 
 
+def sdk_inputs(sdk, link_map, target, catalog):
+    boundary = sdk.resolve()
+    selected = catalog['targets'][target]
+    records = []
+    for role, entries in [('compiler', [selected['compiler']]), ('configuration', [selected['configuration']]), ('runtime', selected['runtime_inputs'])]:
+        for entry in entries:
+            relative = PurePosixPath(entry['path'])
+            if relative.is_absolute() or '..' in relative.parts or '\\' in entry['path']:
+                raise ValueError('unsafe reviewed SDK input path')
+            path = sdk / entry['path']
+            if not path.resolve().is_relative_to(boundary) or not path.is_file():
+                raise ValueError('SDK input escapes selected SDK or is missing')
+            with path.open('rb') as source:
+                data = source.read(4 * 1024 * 1024 + 1)
+            if len(data) > 4 * 1024 * 1024 or len(data) != entry['bytes'] or hashlib.sha256(data).hexdigest() != entry['sha256']:
+                raise ValueError('SDK input differs from pinned repository bytes')
+            records.append({'role': role, 'path': path.resolve().relative_to(boundary).as_posix(), 'bytes': len(data), 'sha256': entry['sha256']})
+    expected = {item['path'] for item in records if item['role'] == 'runtime'}
+    observed = set()
+    for value in re.findall(r'^LOAD\s+([^\n]+\.(?:o|a))\s*$', link_map, re.M):
+        public_path = Path(value)
+        path = public_path.resolve()
+        if public_path.is_relative_to(sdk.absolute()) and not path.is_relative_to(boundary):
+            raise ValueError('mapped SDK static input escapes selected SDK')
+        if path.is_relative_to(boundary):
+            observed.add(path.relative_to(boundary).as_posix())
+    if observed != expected:
+        raise ValueError('actual SDK static input inventory differs from reviewed profile')
+    return {'repository_revision': catalog['repository_revision'], 'inputs': records, 'coverage': 'Exact SDK compiler/configuration and loaded static-input bytes; not a claim of reproducible GNU source compilation or complete runtime license clearance.'}
+
+
 def collect(binary, evidence, target):
     if target not in TARGETS or not binary.is_file() or binary.stat().st_size > 128 * 1024 * 1024:
         raise ValueError('invalid NAPI target or binary')
@@ -63,6 +94,15 @@ def collect(binary, evidence, target):
     compiler = sdk / 'bin' / (target + '-gcc')
     if Path(record['compiler']) != compiler or not compiler.resolve().is_relative_to(sdk.resolve()):
         raise ValueError('captured compiler differs from selected SDK')
+    catalog_path = Path(__file__).resolve().parents[1] / 'ci/napi-gnu-sdk-inputs.json'
+    with catalog_path.open('rb') as source:
+        catalog_bytes = source.read(1024 * 1024 + 1)
+    if len(catalog_bytes) > 1024 * 1024:
+        raise ValueError('SDK input catalogue exceeds bound')
+    catalog = json.loads(catalog_bytes)
+    if catalog.get('schema_version') != 1 or catalog.get('sdk_version') != '1.0.3' or set(catalog['targets']) != set(TARGETS):
+        raise ValueError('unreviewed SDK input catalogue')
+    input_profile = sdk_inputs(sdk, text, target, catalog)
     for name, args in [('compiler-version.txt', [str(compiler), '--version']), ('elf-header.txt', ['readelf', '-h', str(binary)]), ('elf-dynamic.txt', ['readelf', '-d', str(binary)]), ('elf-versions.txt', ['readelf', '--version-info', str(binary)])]:
         (evidence / name).write_bytes(subprocess.check_output(args))
     configuration = sdk / 'bin' / (target + '-ct-ng.config')
@@ -84,7 +124,7 @@ def collect(binary, evidence, target):
     (evidence / 'sdk-notice-files.json').write_text(json.dumps(notices, ensure_ascii=False, indent=2), encoding='utf-8')
     members = sorted({(PurePosixPath(archive).name, PurePosixPath(member).name) for archive, member in re.findall(r'([^\s()]+[.]a)\(([^()\n]+)\)', text)})
     objects = sorted({PurePosixPath(path).name for path in re.findall(r'^LOAD\s+([^\n]+[.]o)\s*$', text, re.M)})
-    result = {'target': target, 'binary_sha256': binary_sha, 'compiler_sha256': sha(compiler), 'cross_toolchain_version': '1.0.3', 'archive_members': members, 'loaded_objects': objects, 'sdk_notice_files': len(notices), 'notice_files_requiring_encoding_review': [item['path'] for item in notices if item['requires_encoding_review']], 'coverage': 'Observed GNU link inputs only; package MIT metadata is not a license conclusion for GNU runtime objects.'}
+    result = {'target': target, 'binary_sha256': binary_sha, 'compiler_sha256': sha(compiler), 'cross_toolchain_version': '1.0.3', 'sdk_input_profile': input_profile, 'sdk_input_catalog_sha256': hashlib.sha256(catalog_bytes).hexdigest(), 'archive_members': members, 'loaded_objects': objects, 'sdk_notice_files': len(notices), 'notice_files_requiring_encoding_review': [item['path'] for item in notices if item['requires_encoding_review']], 'coverage': 'Observed GNU link inputs only; package MIT metadata is not a license conclusion for GNU runtime objects.'}
     (evidence / 'native-link-inputs.json').write_text(json.dumps(result, sort_keys=True, indent=2), encoding='utf-8')
     print(json.dumps(result, sort_keys=True))
 
