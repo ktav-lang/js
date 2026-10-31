@@ -98,6 +98,17 @@ def collect(evidence, binary, original, sdk_info, reproduction, target):
                     raise ValueError('SDK legal path enumeration exceeds bound')
                 if path.is_file() and len(path.relative_to(parent).parts) <= 5:
                     candidates.append((role, root, path))
+    legal_index = []
+    indexed = set()
+    for role, root, path in candidates:
+        if path.suffix.lower() not in {'.txt', '.html', '.htm', '.rtf', '.md'} or not re.search(r'license|licence|eula|notice|copyright|redist', path.name, re.I):
+            continue
+        key = role + '/' + path.relative_to(root).as_posix()
+        if key.casefold() in indexed:
+            continue
+        indexed.add(key.casefold())
+        legal_index.append({'path': key, 'bytes': path.lstat().st_size, 'symlink': path.is_symlink()})
+    (evidence / 'sdk-legal-index.json').write_text(json.dumps(legal_index, sort_keys=True, indent=2) + '\n', encoding='utf-8')
     legal = []
     seen = set()
     total = 0
@@ -110,6 +121,8 @@ def collect(evidence, binary, original, sdk_info, reproduction, target):
         seen.add(key.casefold())
         if not path.resolve().is_relative_to(root.resolve()):
             raise ValueError('SDK legal document escapes selected installation')
+        if path.stat().st_size > 4 * 1024 * 1024:
+            raise ValueError(f'SDK legal original exceeds 4 MiB: {key}; bytes={path.stat().st_size}')
         raw = read(path, 4 * 1024 * 1024)
         total += len(raw)
         if total > 32 * 1024 * 1024 or len(legal) >= 1024:
