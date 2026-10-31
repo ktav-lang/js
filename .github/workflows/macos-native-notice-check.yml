@@ -120,7 +120,10 @@ jobs:
           commands = [('napi', ['npx', '--no-install', 'napi', 'build', '--release', '-p', 'ktav-napi', '--target', target, '--platform', '--js', 'false', '--output-dir', '.']), ('cabi', ['cargo', 'build', '--locked', '--release', '-p', 'ktav-cabi', '--target', target])]
           for role, command in commands:
               link_map = evidence / (role + '-native-link.map')
-              environment = {**os.environ, 'CARGO_ENCODED_RUSTFLAGS': '-C' + chr(31) + 'link-arg=-Wl,-map,' + str(link_map), 'KTAV_NAPI_NOTICES_GZIP': str(evidence / 'NOTICE.json.gz'), 'RUSTC_LOG': 'rustc_codegen_ssa::back::link=info'}
+              flags = '-C' + chr(31) + 'link-arg=-Wl,-map,' + str(link_map)
+              if role == 'napi':
+                  flags += chr(31) + '-C' + chr(31) + 'link-arg=-Wl,-dead_strip_dylibs'
+              environment = {**os.environ, 'CARGO_ENCODED_RUSTFLAGS': flags, 'KTAV_NAPI_NOTICES_GZIP': str(evidence / 'NOTICE.json.gz'), 'RUSTC_LOG': 'rustc_codegen_ssa::back::link=info'}
               result = subprocess.run(command, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
               (evidence / (role + '-linker-trace.txt')).write_bytes(result.stderr)
               sys.stdout.buffer.write(result.stdout)

@@ -58,6 +58,25 @@ class MachoTests(unittest.TestCase):
             MACOS.macho(data)
 
 
+class RuntimeImportTests(unittest.TestCase):
+    def test_only_system_library_passes(self):
+        MACOS.verify_runtime_imports(MACOS.macho(library()))
+
+    def test_unused_iconv_dependency_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'unused or unreviewed'):
+            MACOS.verify_runtime_imports(MACOS.macho(library(dependency='/usr/lib/libiconv.2.dylib')))
+
+    def test_iconv_symbol_is_rejected_even_with_system_library(self):
+        with self.assertRaisesRegex(ValueError, 'unused or unreviewed'):
+            MACOS.verify_runtime_imports(MACOS.macho(library('_iconv_open')))
+
+    def test_duplicate_system_dependency_is_rejected(self):
+        machine = MACOS.macho(library())
+        machine['dynamic_libraries'] *= 2
+        with self.assertRaisesRegex(ValueError, 'unused or unreviewed'):
+            MACOS.verify_runtime_imports(machine)
+
+
 class MapTests(unittest.TestCase):
     def fixture(self):
         temporary = tempfile.TemporaryDirectory()

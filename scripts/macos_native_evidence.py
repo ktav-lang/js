@@ -132,6 +132,11 @@ def macho(data):
     return {'cpu': cpu, 'mach_o_filetype': kind, 'install_name': identities[0] if identities else None, 'dynamic_libraries': libraries, 'iconv_charset_undefined_symbols': imported, 'symbol_table_present': True}
 
 
+def verify_runtime_imports(machine):
+    if machine['dynamic_libraries'] != ['/usr/lib/libSystem.B.dylib'] or machine['iconv_charset_undefined_symbols']:
+        raise ValueError('unused or unreviewed macOS dynamic dependency')
+
+
 def collect(binary, original, link_map, evidence, target, role):
     if target not in TARGETS or role not in {'napi', 'cabi'}:
         raise ValueError('unreviewed macOS target or role')
@@ -141,8 +146,7 @@ def collect(binary, original, link_map, evidence, target, role):
     machine = macho(data)
     if machine['cpu'] != TARGETS[target]:
         raise ValueError('macOS CPU differs from target')
-    if not machine['dynamic_libraries'] or set(machine['dynamic_libraries']) - {'/usr/lib/libSystem.B.dylib', '/usr/lib/libiconv.2.dylib'}:
-        raise ValueError('unreviewed macOS system dynamic dependency')
+    verify_runtime_imports(machine)
     contents = read(link_map, 32 * 1024 * 1024)
     paths = re.findall(rb'^# Path:\s*(.+)$', contents, re.M)
     if len(paths) != 1:
