@@ -34,7 +34,7 @@ jobs:
           from pathlib import Path
           stage = Path(os.environ['RUNNER_TEMP']) / 'macos-native-tools'
           stage.mkdir()
-          names = ['Cargo.lock', 'ci/js-build-lock.json', 'crates/napi/build.rs', 'scripts/patch_napi_notice_source.py', 'scripts/macos_native_evidence.py', 'ci/test_macos_native_evidence.py', 'scripts/prepare_js_notices.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/source_license_supplements.py', 'scripts/check_embedded_notices.py', 'scripts/check-npm-licenses.mjs', 'ci/about.toml', 'ci/licenses/js-source-supplements.json']
+          names = ['Cargo.lock', 'ci/js-build-lock.json', 'crates/napi/build.rs', 'crates/cabi/build.rs', 'scripts/patch_napi_notice_source.py', 'scripts/patch_cabi_notice_source.py', 'ci/test_cabi_notice_overlay.py', 'scripts/macos_native_evidence.py', 'ci/test_macos_native_evidence.py', 'scripts/prepare_js_notices.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/source_license_supplements.py', 'scripts/check_embedded_notices.py', 'scripts/check-npm-licenses.mjs', 'ci/about.toml', 'ci/licenses/js-source-supplements.json']
           for name in names:
               destination = stage / name
               destination.parent.mkdir(parents=True, exist_ok=True)
@@ -44,7 +44,7 @@ jobs:
           ref: ${{ env.SOURCE_REF }}
           submodules: recursive
           persist-credentials: false
-      - name: Restore tools and graft only private NAPI metadata
+      - name: Restore tools and graft only native notice metadata
         shell: python
         run: |
           import hashlib
@@ -56,8 +56,8 @@ jobs:
           from pathlib import Path
           if subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() != os.environ['SOURCE_REF']:
               raise SystemExit('unexpected macOS source revision')
-          overlay = ['crates/napi/build.rs', 'crates/napi/src/lib.rs']
-          baseline = {name: hashlib.sha256(Path(name).read_bytes()).hexdigest() for name in overlay}
+          overlay = ['crates/napi/build.rs', 'crates/napi/src/lib.rs', 'crates/cabi/build.rs', 'crates/cabi/src/lib.rs']
+          baseline = {name: hashlib.sha256(Path(name).read_bytes()).hexdigest() if Path(name).is_file() else None for name in overlay}
           stage = Path(os.environ['RUNNER_TEMP']) / 'macos-native-tools'
           for path in stage.rglob('*'):
               if path.is_file():
@@ -65,10 +65,13 @@ jobs:
                   destination.parent.mkdir(parents=True, exist_ok=True)
                   shutil.copyfile(path, destination)
           subprocess.run([sys.executable, '-I', 'scripts/patch_napi_notice_source.py', 'crates/napi/src/lib.rs'], check=True)
-          changed = subprocess.check_output(['git', 'diff', '--name-only', '--', 'Cargo.toml', 'crates', 'tests/node', 'root-docs', 'package.json', 'package-lock.json'], text=True).splitlines()
-          if set(changed) != set(overlay):
-              raise SystemExit('macOS source overlay changed more than the two private resource files')
-          record = {'source_ref': os.environ['SOURCE_REF'], 'tooling_ref': os.environ['GITHUB_SHA'], 'binding_overlay': {name: {'baseline_sha256': baseline[name], 'compiled_sha256': hashlib.sha256(Path(name).read_bytes()).hexdigest()} for name in overlay}, 'scope': 'Original 0.8.1 source with private NAPI Cargo/std resource only; CABI source remains unchanged.'}
+          subprocess.run([sys.executable, '-I', 'scripts/patch_cabi_notice_source.py', 'crates/cabi/src/lib.rs'], check=True)
+          protected = ['Cargo.toml', 'crates', 'tests/node', 'root-docs', 'package.json', 'package-lock.json']
+          changed = set(subprocess.check_output(['git', 'diff', '--name-only', '--', *protected], text=True).splitlines())
+          changed.update(subprocess.check_output(['git', 'ls-files', '--others', '--exclude-standard', '--', *protected], text=True).splitlines())
+          if changed != set(overlay):
+              raise SystemExit('macOS source overlay changed more than the four native notice files')
+          record = {'source_ref': os.environ['SOURCE_REF'], 'tooling_ref': os.environ['GITHUB_SHA'], 'binding_overlay': {name: {'baseline_sha256': baseline[name], 'compiled_sha256': hashlib.sha256(Path(name).read_bytes()).hexdigest()} for name in overlay}, 'scope': 'Original 0.8.1 parser APIs with NAPI/CABI Cargo/std notice metadata only; not historical dependency evidence.'}
           (Path(os.environ['RUNNER_TEMP']) / 'macos-native-source.json').write_text(json.dumps(record, sort_keys=True, indent=2) + '\n', encoding='utf-8')
       - uses: actions/setup-node@v4
         with:
@@ -82,6 +85,17 @@ jobs:
           tool: cargo-about@0.9.3
       - name: Verify Mach-O and SDK-boundary regressions
         run: python3 -I -m unittest discover -s ci -p test_macos_native_evidence.py -v
+      - name: Verify source-preserving C ABI overlay and resource encoder
+        shell: python
+        run: |
+          import os
+          import subprocess
+          import sys
+          from pathlib import Path
+          subprocess.run([sys.executable, '-I', '-m', 'unittest', 'discover', '-s', 'ci', '-p', 'test_cabi_notice_overlay.py', '-v'], check=True)
+          encoder = Path(os.environ['RUNNER_TEMP']) / 'cabi-notice-encoder-tests'
+          subprocess.run(['rustc', '--test', '--edition=2021', 'crates/cabi/build.rs', '-o', str(encoder)], check=True)
+          subprocess.run([str(encoder)], check=True)
       - name: Prepare reviewed Cargo/std notices and source evidence
         shell: python
         run: |
@@ -123,7 +137,7 @@ jobs:
               flags = '-C' + chr(31) + 'link-arg=-Wl,-map,' + str(link_map)
               if role == 'napi':
                   flags += chr(31) + '-C' + chr(31) + 'link-arg=-Wl,-dead_strip_dylibs'
-              environment = {**os.environ, 'CARGO_ENCODED_RUSTFLAGS': flags, 'KTAV_NAPI_NOTICES_GZIP': str(evidence / 'NOTICE.json.gz'), 'RUSTC_LOG': 'rustc_codegen_ssa::back::link=info'}
+              environment = {**os.environ, 'CARGO_ENCODED_RUSTFLAGS': flags, 'KTAV_NAPI_NOTICES_GZIP': str(evidence / 'NOTICE.json.gz'), 'KTAV_CABI_NOTICES_GZIP': str(evidence / 'NOTICE.json.gz'), 'RUSTC_LOG': 'rustc_codegen_ssa::back::link=info'}
               result = subprocess.run(command, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
               (evidence / (role + '-linker-trace.txt')).write_bytes(result.stderr)
               sys.stdout.buffer.write(result.stdout)
@@ -135,9 +149,8 @@ jobs:
               staged = evidence / binary.name
               shutil.copyfile(binary, staged)
               subprocess.run([sys.executable, '-I', 'scripts/macos_native_evidence.py', str(staged), str(original), str(link_map), str(evidence), target, role], check=True)
-              if role == 'napi':
-                  report = subprocess.check_output([sys.executable, '-I', 'scripts/check_embedded_notices.py', str(staged), str(evidence / 'NOTICE.json')])
-                  (evidence / 'napi-embedded-verification.json').write_bytes(report)
+              report = subprocess.check_output([sys.executable, '-I', 'scripts/check_embedded_notices.py', str(staged), str(evidence / 'NOTICE.json')])
+              (evidence / (role + '-embedded-verification.json')).write_bytes(report)
           if Path('Cargo.lock').read_bytes() != (evidence / 'Cargo.lock').read_bytes():
               raise SystemExit('macOS build changed the reviewed Cargo lock')
           for name, command in [('clang-version.txt', ['clang', '--version']), ('sdk-version.txt', ['xcrun', '--show-sdk-version']), ('xcode-version.txt', ['xcodebuild', '-version'])]:
