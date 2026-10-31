@@ -1,0 +1,192 @@
+name: Linux GNU C ABI notice evidence
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_REF: 562deb3fde092d63a78f359be095e5079929d0d1
+  LC_ALL: C
+
+jobs:
+  gnu-cabi:
+    name: GNU C ABI notices / ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64-unknown-linux-gnu, aarch64-unknown-linux-gnu]
+    env:
+      CABI_TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preserve reviewed source overlay and notice tools
+        shell: python
+        run: |
+          import os
+          import shutil
+          from pathlib import Path
+          stage = Path(os.environ['RUNNER_TEMP']) / 'gnu-cabi-tools'
+          stage.mkdir()
+          names = ['Cargo.lock', 'ci/js-build-lock.json', 'crates/cabi/build.rs', 'scripts/patch_cabi_notice_source.py', 'ci/test_cabi_notice_overlay.py', 'scripts/prepare_js_notices.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/source_license_supplements.py', 'scripts/check_embedded_notices.py', 'scripts/check-npm-licenses.mjs', 'ci/about.toml', 'ci/licenses/js-source-supplements.json', 'scripts/zig_runtime_notices.py', 'scripts/capture-zig-link.sh', 'scripts/check_gnu_cabi_evidence.py', 'ci/zig-runtime-catalog.json', 'ci/test_gnu_cabi_notices.py']
+          for name in names:
+              path = stage / name
+              path.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(name, path)
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_REF }}
+          submodules: recursive
+          persist-credentials: false
+      - name: Restore only the original C ABI notice hook and include
+        shell: python
+        run: |
+          import hashlib
+          import json
+          import os
+          import shutil
+          import subprocess
+          import sys
+          from pathlib import Path
+          if subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() != os.environ['SOURCE_REF']:
+              raise SystemExit('unexpected GNU C ABI source')
+          overlay = ['crates/cabi/build.rs', 'crates/cabi/src/lib.rs']
+          baseline = {name: hashlib.sha256(Path(name).read_bytes()).hexdigest() if Path(name).is_file() else None for name in overlay}
+          stage = Path(os.environ['RUNNER_TEMP']) / 'gnu-cabi-tools'
+          for path in stage.rglob('*'):
+              if path.is_file():
+                  destination = Path(path.relative_to(stage))
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copyfile(path, destination)
+          subprocess.run([sys.executable, '-I', 'scripts/patch_cabi_notice_source.py', 'crates/cabi/src/lib.rs'], check=True)
+          protected = ['Cargo.toml', 'crates', 'tests', 'root-docs', 'package.json', 'package-lock.json']
+          changed = set(subprocess.check_output(['git', 'diff', '--name-only', '--', *protected], text=True).splitlines())
+          changed.update(subprocess.check_output(['git', 'ls-files', '--others', '--exclude-standard', '--', *protected], text=True).splitlines())
+          if changed != set(overlay):
+              raise SystemExit('GNU source changed beyond its notice hook/include')
+          record = {'source_ref': os.environ['SOURCE_REF'], 'tooling_ref': os.environ['GITHUB_SHA'], 'target': os.environ['CABI_TARGET'], 'notice_overlay': {name: {'baseline_sha256': baseline[name], 'compiled_sha256': hashlib.sha256(Path(name).read_bytes()).hexdigest()} for name in overlay}, 'scope': 'Original 0.8.1 parser APIs and reviewed dependency graph with C ABI notice metadata only; not historical published dependency evidence.'}
+          (Path(os.environ['RUNNER_TEMP']) / 'gnu-cabi-source.json').write_text(json.dumps(record, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          targets: ${{ matrix.target }}
+          components: rust-docs
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.14.0
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild@0.24.0
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about@0.9.3
+      - name: Verify source, archive, notice and ELF regression guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -I -m unittest discover -s ci -p test_cabi_notice_overlay.py -v
+          python3 -I -m unittest discover -s ci -p test_gnu_cabi_notices.py -v
+      - name: Prepare full reviewed Cargo/std and Zig runtime notices
+        shell: python
+        run: |
+          import os
+          import shutil
+          import subprocess
+          import sys
+          from pathlib import Path
+          evidence = Path(os.environ['RUNNER_TEMP']) / 'gnu-cabi-evidence'
+          subprocess.run([sys.executable, 'scripts/prepare_js_notices.py', str(evidence)], check=True)
+          subprocess.run([sys.executable, '-I', 'scripts/zig_runtime_notices.py', 'prepare', str(evidence)], check=True)
+          shutil.copyfile(Path(os.environ['RUNNER_TEMP']) / 'gnu-cabi-source.json', evidence / 'source-provenance.json')
+          for name in ['LICENSE-MIT', 'LICENSE-APACHE']:
+              shutil.copyfile(name, evidence / name)
+      - name: Build original C ABI with exact Zig map and command capture
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${RUSTFLAGS:-}" || -n "${CARGO_ENCODED_RUSTFLAGS:-}" ]]; then
+            printf '%s\n' 'Preexisting GNU linker flags require review' >&2
+            exit 1
+          fi
+          evidence="$RUNNER_TEMP/gnu-cabi-evidence"
+          zig version > "$evidence/zig-version.txt"
+          zig env > "$evidence/zig-env.json"
+          cargo zigbuild --version > "$evidence/cargo-zigbuild-version.txt"
+          sha256sum "$(command -v cargo-zigbuild)" > "$evidence/cargo-zigbuild.sha256"
+          sha256sum "$(command -v zig)" > "$evidence/zig.sha256"
+          export ZIG_GLOBAL_CACHE_DIR="$RUNNER_TEMP/gnu-cabi-zig-cache"
+          mkdir "$ZIG_GLOBAL_CACHE_DIR"
+          export KTAV_REAL_ZIG="$(command -v zig)"
+          export KTAV_LINK_MAP="$evidence/native-link.map"
+          export KTAV_LINK_COMMAND="$evidence/native-link-command.json"
+          export CARGO_ZIGBUILD_ZIG_COMMAND="$PWD/scripts/capture-zig-link.sh"
+          unset CARGO_ZIGBUILD_ZIG_COMMAND_ARGS
+          chmod +x "$CARGO_ZIGBUILD_ZIG_COMMAND"
+          export KTAV_CABI_NOTICES_GZIP="$evidence/NOTICE.json.gz"
+          RUSTFLAGS='-C link-arg=-Wl,--print-map' cargo zigbuild --locked --release -p ktav-cabi --target "$CABI_TARGET.2.17"
+          python3 -I scripts/zig_runtime_notices.py verify "$evidence"
+          cp "target/$CABI_TARGET/release/libktav_cabi.so" "$evidence/libktav_cabi.so"
+          python3 -I scripts/check_gnu_cabi_evidence.py "$evidence/libktav_cabi.so" "$evidence" "$CABI_TARGET"
+          python3 -I scripts/check_embedded_notices.py "$evidence/libktav_cabi.so" "$evidence/NOTICE.json" > "$evidence/embedded-verification.json"
+          cmp Cargo.lock "$evidence/Cargo.lock"
+      - uses: actions/setup-node@v4
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        with:
+          node-version: '24'
+      - uses: oven-sh/setup-bun@v2
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+      - uses: denoland/setup-deno@v2
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        with:
+          deno-version: v2.x
+      - name: Run actual x64 Bun and Deno FFI corpus consumers
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        shell: python
+        run: |
+          import hashlib
+          import json
+          import os
+          import shutil
+          import subprocess
+          import sys
+          from pathlib import Path
+          evidence = Path(os.environ['RUNNER_TEMP']) / 'gnu-cabi-evidence'
+          sdk = Path(json.loads((evidence / 'zig-env.json').read_bytes())['lib_dir']).resolve().parent
+          consumer = Path(os.environ['RUNNER_TEMP']) / 'gnu-cabi-consumer'
+          (consumer / 'release').mkdir(parents=True)
+          binary = consumer / 'release/libktav_cabi.so'
+          shutil.copyfile(evidence / binary.name, binary)
+          environment = {**os.environ, 'CARGO_TARGET_DIR': str(consumer), 'EXPECTED_CABI': str(binary)}
+          for key in ['PATH', 'LD_LIBRARY_PATH']:
+              environment[key] = os.pathsep.join(part for part in environment.get(key, '').split(os.pathsep) if part and not Path(part).resolve().is_relative_to(sdk))
+          shutil.copyfile('package-lock.json', evidence / 'consumer-npm-lock-source.json')
+          subprocess.run(['npm', 'install', '--ignore-scripts', '--no-audit', '--no-fund'], env=environment, check=True)
+          subprocess.run(['git', 'diff', '--exit-code', '--', 'package.json'], check=True)
+          shutil.copyfile('package-lock.json', evidence / 'consumer-npm-lock-resolved.json')
+          subprocess.run(['node', 'scripts/check-npm-licenses.mjs'], env=environment, check=True)
+          subprocess.run(['npm', 'run', 'build:ts'], env=environment, check=True)
+          preflight = 'import assert from "node:assert/strict";import {realpathSync} from "node:fs";import * as paths from "./tests/shared/test-paths.mjs";assert.ok(paths.cabiBuilt());assert.equal(realpathSync(paths.cabi),realpathSync(process.env.EXPECTED_CABI));'
+          subprocess.run(['node', '--input-type=module', '-e', preflight], env=environment, check=True)
+          for role, command in [('bun', ['bun', 'run', 'tests/bun/run-bun-ffi.mjs']), ('deno', ['deno', 'run', '--allow-ffi', '--allow-env', '--allow-read', 'tests/deno/run-deno-ffi.ts'])]:
+              result = subprocess.run(command, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+              (evidence / (role + '-consumer-stdout.txt')).write_bytes(result.stdout)
+              (evidence / (role + '-consumer-stderr.txt')).write_bytes(result.stderr)
+              sys.stdout.buffer.write(result.stdout)
+              sys.stderr.buffer.write(result.stderr)
+              if result.returncode or b'passed' not in result.stdout or b'skipping' in result.stdout.lower():
+                  raise SystemExit(role + ' actual GNU C ABI corpus failed or skipped')
+          if binary.read_bytes() != (evidence / 'libktav_cabi.so').read_bytes():
+              raise SystemExit('actual consumer library bytes changed')
+          record = {'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(), 'target': os.environ['CABI_TARGET'], 'actual_bun_corpus': True, 'actual_deno_corpus': True, 'sdk_paths_removed': True, 'scope': 'Matching-x64 C ABI corpus only; ARM cross binary inspected, not executed.'}
+          (evidence / 'consumer-verification.json').write_text(json.dumps(record, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gnu-cabi-evidence-${{ matrix.target }}
+          path: ${{ runner.temp }}/gnu-cabi-evidence/
+          if-no-files-found: warn
