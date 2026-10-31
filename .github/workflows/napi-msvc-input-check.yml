@@ -1,0 +1,211 @@
+name: NAPI MSVC runtime input evidence
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_REF: 562deb3fde092d63a78f359be095e5079929d0d1
+
+jobs:
+  napi-msvc:
+    name: NAPI MSVC inputs / ${{ matrix.target }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-pc-windows-msvc
+            arch: x64
+            addon: ktav.win32-x64-msvc.node
+          - target: aarch64-pc-windows-msvc
+            arch: arm64
+            addon: ktav.win32-arm64-msvc.node
+    env:
+      MSVC_TARGET: ${{ matrix.target }}
+      MSVC_ARCH: ${{ matrix.arch }}
+      MSVC_ADDON: ${{ matrix.addon }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preserve reviewed source overlay and notice tools
+        shell: python
+        run: |
+          import os
+          import shutil
+          from pathlib import Path
+          stage = Path(os.environ['RUNNER_TEMP']) / 'napi-msvc-tools'
+          stage.mkdir()
+          names = ['Cargo.lock', 'ci/js-build-lock.json', 'crates/napi/build.rs', 'scripts/patch_napi_notice_source.py', 'scripts/prepare_js_notices.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/source_license_supplements.py', 'scripts/check_embedded_notices.py', 'scripts/check-npm-licenses.mjs', 'scripts/collect_msvc_napi_evidence.py', 'ci/test_msvc_napi_evidence.py', 'ci/about.toml', 'ci/licenses/js-source-supplements.json']
+          for name in names:
+              path = stage / name
+              path.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(name, path)
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_REF }}
+          persist-credentials: false
+      - name: Restore tools and the two private resource changes only
+        shell: python
+        run: |
+          import hashlib
+          import json
+          import os
+          import shutil
+          import subprocess
+          import sys
+          from pathlib import Path
+          if subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() != os.environ['SOURCE_REF']:
+              raise SystemExit('unexpected MSVC NAPI source')
+          overlay = ['crates/napi/build.rs', 'crates/napi/src/lib.rs']
+          baseline = {name: hashlib.sha256(Path(name).read_bytes()).hexdigest() for name in overlay}
+          stage = Path(os.environ['RUNNER_TEMP']) / 'napi-msvc-tools'
+          for path in stage.rglob('*'):
+              if path.is_file():
+                  destination = Path(path.relative_to(stage))
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copyfile(path, destination)
+          subprocess.run([sys.executable, '-I', 'scripts/patch_napi_notice_source.py', 'crates/napi/src/lib.rs'], check=True)
+          changed = subprocess.check_output(['git', 'diff', '--name-only', '--', 'Cargo.toml', 'crates', 'tests/node', 'root-docs', 'package.json', 'package-lock.json'], text=True).splitlines()
+          if set(changed) != set(overlay):
+              raise SystemExit('MSVC source overlay changed more than the private resource files')
+          record = {'source_ref': os.environ['SOURCE_REF'], 'tooling_ref': os.environ['GITHUB_SHA'], 'binding_overlay': {name: {'baseline_sha256': baseline[name], 'compiled_sha256': hashlib.sha256(Path(name).read_bytes()).hexdigest()} for name in overlay}, 'scope': 'Original 0.8.1 source with private NAPI Cargo/std resource only; not historical dependency evidence.'}
+          (Path(os.environ['RUNNER_TEMP']) / 'napi-msvc-source.json').write_text(json.dumps(record, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          targets: ${{ matrix.target }}
+          components: rust-docs, llvm-tools-preview
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about@0.9.3
+      - name: Verify PE and bounded input regression guards
+        run: python -I -m unittest discover -s ci -p test_msvc_napi_evidence.py -v
+      - name: Prepare exact reviewed Cargo/std notices
+        shell: python
+        run: |
+          import os
+          import shutil
+          import subprocess
+          import sys
+          from pathlib import Path
+          evidence = Path(os.environ['RUNNER_TEMP']) / 'napi-msvc-evidence'
+          subprocess.run([sys.executable, 'scripts/prepare_js_notices.py', str(evidence)], check=True)
+          shutil.copyfile(Path(os.environ['RUNNER_TEMP']) / 'napi-msvc-source.json', evidence / 'source-provenance.json')
+          for name in ['LICENSE-MIT', 'LICENSE-APACHE']:
+              shutil.copyfile(name, evidence / name)
+      - name: Resolve unchanged npm manifest and verify tool licenses
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp package-lock.json "$RUNNER_TEMP/napi-msvc-evidence/npm-lock-source.json"
+          npm install --ignore-scripts --no-audit --no-fund
+          git diff --exit-code -- package.json
+          cp package-lock.json "$RUNNER_TEMP/napi-msvc-evidence/npm-lock-resolved.json"
+          node scripts/check-npm-licenses.mjs
+          node -e 'if(require("@napi-rs/cli/package.json").version!=="3.6.2")throw new Error("NAPI CLI version requires review")'
+      - name: Select existing VC and Windows SDK without installing components
+        shell: python
+        run: |
+          import hashlib
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+          base = Path(os.environ['ProgramFiles(x86)'])
+          vswhere = base / 'Microsoft Visual Studio/Installer/vswhere.exe'
+          installations = json.loads(subprocess.check_output([str(vswhere), '-all', '-products', '*', '-format', 'json'], encoding='utf-8-sig'))
+          arch = os.environ['MSVC_ARCH']
+          selected = None
+          for installation in sorted(installations, key=lambda item: tuple(map(int, item['installationVersion'].split('.'))), reverse=True):
+              vs = Path(installation['installationPath'])
+              version_file = vs / 'VC/Auxiliary/Build/Microsoft.VCToolsVersion.default.txt'
+              if not version_file.is_file():
+                  continue
+              version = version_file.read_text(encoding='utf-8-sig').strip()
+              tools = vs / 'VC/Tools/MSVC' / version
+              linker = tools / 'bin/Hostx64' / arch / 'link.exe'
+              if linker.is_file() and (tools / 'lib' / arch).is_dir():
+                  selected = (vs, tools, linker, version, installation['installationVersion'])
+                  break
+          if selected is None:
+              raise SystemExit('requested existing MSVC cross-linker is missing')
+          vs, tools, linker, version, installation_version = selected
+          sdk = base / 'Windows Kits/10'
+          versions = [path for path in (sdk / 'Lib').iterdir() if path.is_dir() and all(part.isdigit() for part in path.name.split('.')) and (path / 'ucrt' / arch).is_dir() and (path / 'um' / arch).is_dir()]
+          if not versions:
+              raise SystemExit('matching existing Windows SDK library directories missing')
+          sdk_lib = max(versions, key=lambda path: tuple(map(int, path.name.split('.'))))
+          libraries = [tools / 'lib' / arch, sdk_lib / 'ucrt' / arch, sdk_lib / 'um' / arch]
+          evidence = Path(os.environ['RUNNER_TEMP']) / 'napi-msvc-evidence'
+          record = {'target': os.environ['MSVC_TARGET'], 'visual_studio_root': str(vs), 'visual_studio_version': installation_version, 'vctools_version': version, 'linker': str(linker), 'linker_sha256': hashlib.sha256(linker.read_bytes()).hexdigest(), 'windows_sdk_root': str(sdk), 'windows_sdk_version': sdk_lib.name, 'library_directories': list(map(str, libraries)), 'scope': 'Selected installed compiler/SDK identities; not agreement acceptance or distribution permission.'}
+          (evidence / 'selected-sdk.json').write_text(json.dumps(record, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+      - name: Build the actual addon with final-target MSVC link reproduction
+        shell: python
+        run: |
+          import json
+          import os
+          import shutil
+          import subprocess
+          import sys
+          from pathlib import Path
+          evidence = Path(os.environ['RUNNER_TEMP']) / 'napi-msvc-evidence'
+          sdk = json.loads((evidence / 'selected-sdk.json').read_text(encoding='utf-8'))
+          reproduction = Path(os.environ['RUNNER_TEMP']) / 'napi-msvc-link'
+          reproduction.mkdir()
+          if os.environ.get('RUSTFLAGS') or os.environ.get('CARGO_ENCODED_RUSTFLAGS'):
+              raise SystemExit('preexisting MSVC linker flags require review')
+          flags = ['-C', 'link-arg=/MAP:' + str(evidence / 'native-link.map'), '-C', 'link-arg=/VERBOSE:LIB', '-C', 'link-arg=/LINKREPRO:' + str(reproduction), '-C', 'link-arg=/LINKREPROTARGET:ktav_napi.dll']
+          for library in sdk['library_directories']:
+              flags += ['-C', 'link-arg=/LIBPATH:' + library]
+          key = 'CARGO_TARGET_' + os.environ['MSVC_TARGET'].upper().replace('-', '_') + '_LINKER'
+          environment = {**os.environ, key: sdk['linker'], 'CARGO_ENCODED_RUSTFLAGS': chr(31).join(flags), 'KTAV_NAPI_NOTICES_GZIP': str(evidence / 'NOTICE.json.gz'), 'RUSTC_LOG': 'rustc_codegen_ssa::back::link=info'}
+          command = ['npx.cmd', '--no-install', 'napi', 'build', '--release', '-p', 'ktav-napi', '--target', os.environ['MSVC_TARGET'], '--platform', '--js', 'false', '--output-dir', '.']
+          result = subprocess.run(command, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+          (evidence / 'linker-stdout.txt').write_bytes(result.stdout)
+          (evidence / 'linker-stderr.txt').write_bytes(result.stderr)
+          sys.stdout.buffer.write(result.stdout)
+          sys.stderr.buffer.write(result.stderr)
+          if result.returncode:
+              raise SystemExit(result.returncode)
+          binary = Path(os.environ['MSVC_ADDON'])
+          staged = evidence / binary.name
+          shutil.copyfile(binary, staged)
+          original = Path('target') / os.environ['MSVC_TARGET'] / 'release/ktav_napi.dll'
+          subprocess.run([sys.executable, '-I', 'scripts/collect_msvc_napi_evidence.py', str(evidence), str(staged), str(original), str(evidence / 'selected-sdk.json'), str(reproduction), os.environ['MSVC_TARGET']], check=True)
+          report = subprocess.check_output([sys.executable, '-I', 'scripts/check_embedded_notices.py', str(staged), str(evidence / 'NOTICE.json')])
+          (evidence / 'embedded-notice-verification.json').write_bytes(report)
+          if Path('Cargo.lock').read_bytes() != (evidence / 'Cargo.lock').read_bytes():
+              raise SystemExit('MSVC build changed the reviewed lock')
+      - name: Run actual matching-x64 Node consumer
+        if: matrix.target == 'x86_64-pc-windows-msvc'
+        shell: python
+        run: |
+          import hashlib
+          import json
+          import os
+          import shutil
+          import subprocess
+          from pathlib import Path
+          evidence = Path(os.environ['RUNNER_TEMP']) / 'napi-msvc-evidence'
+          if subprocess.check_output(['node', '-p', 'process.arch'], text=True).strip() != 'x64':
+              raise SystemExit('matching x64 Node consumer required')
+          subprocess.run(['npm.cmd', 'run', 'build:ts'], check=True)
+          Path('dist/native').mkdir(parents=True, exist_ok=True)
+          shutil.copyfile(evidence / os.environ['MSVC_ADDON'], Path('dist/native') / os.environ['MSVC_ADDON'])
+          script = 'import assert from "node:assert/strict";import {createRequire} from "node:module";import {realpathSync} from "node:fs";await import("./dist/ts/node.js");const require=createRequire(import.meta.url);const expected=realpathSync("dist/native/"+process.env.MSVC_ADDON);assert.deepEqual(Object.keys(require.cache).filter(p=>p.endsWith(".node")),[expected]);await import("./tests/node/run-node-napi.mjs");'
+          subprocess.run(['node', '--input-type=module', '-e', script], check=True)
+          record = {'loaded_built_addon': True, 'binary_sha256': hashlib.sha256((evidence / os.environ['MSVC_ADDON']).read_bytes()).hexdigest(), 'scope': 'Matching-x64 NAPI consumer only; ARM addon not executed.'}
+          (evidence / 'consumer.json').write_text(json.dumps(record, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: napi-msvc-evidence-${{ matrix.target }}
+          path: ${{ runner.temp }}/napi-msvc-evidence/
+          if-no-files-found: warn
