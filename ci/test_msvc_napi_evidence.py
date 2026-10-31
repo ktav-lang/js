@@ -43,23 +43,32 @@ class MsvcEvidenceTests(unittest.TestCase):
             MSVC.pe_machine(data)
 
     def test_default_legal_limit_is_unchanged(self):
-        self.assertEqual(MSVC.legal_read_limit('unknown/NOTICE.txt', {}, 4 * 1024 * 1024), 4 * 1024 * 1024)
+        self.assertEqual(MSVC.legal_read_limit('unknown/NOTICE.txt', 4 * 1024 * 1024), 4 * 1024 * 1024)
         with self.assertRaisesRegex(ValueError, 'exceeds 4 MiB'):
-            MSVC.legal_read_limit('unknown/NOTICE.txt', {}, 4 * 1024 * 1024 + 1)
+            MSVC.legal_read_limit('unknown/NOTICE.txt', 4 * 1024 * 1024 + 1)
 
-    def test_observed_large_original_is_collectable_only_at_exact_identity(self):
+    def test_large_document_bound_is_path_and_size_specific(self):
         key = 'visual-studio/Licenses/1033/ThirdPartyNotices.txt'
-        info = {'visual_studio_version': '18.11.12315.225', 'vctools_version': '14.51.36231', 'windows_sdk_version': '10.0.26100.0'}
-        self.assertEqual(MSVC.legal_read_limit(key, info, 6167634), 6167634)
-        for field in info:
-            with self.subTest(field=field), self.assertRaisesRegex(ValueError, 'exceeds 4 MiB'):
-                MSVC.legal_read_limit(key, {**info, field: 'unreviewed'}, 6167634)
+        self.assertEqual(MSVC.legal_read_limit(key, 6167634), 6167634)
         for name in [key.lower(), key + '.other', 'windows-sdk/Licenses/1033/ThirdPartyNotices.txt']:
             with self.subTest(path=name), self.assertRaisesRegex(ValueError, 'exceeds 4 MiB'):
-                MSVC.legal_read_limit(name, info, 6167634)
+                MSVC.legal_read_limit(name, 6167634)
         for size in [6167633, 6167635, 32 * 1024 * 1024]:
             with self.subTest(size=size), self.assertRaisesRegex(ValueError, 'exceeds 4 MiB'):
-                MSVC.legal_read_limit(key, info, size)
+                MSVC.legal_read_limit(key, size)
+
+    def test_unknown_same_size_legal_bytes_are_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'ThirdPartyNotices.txt'
+            path.write_bytes(b'x' * 6167634)
+            with self.assertRaisesRegex(ValueError, 'unreviewed oversized SDK legal SHA256'):
+                MSVC.legal_document(path, 'visual-studio/Licenses/1033/ThirdPartyNotices.txt')
+
+    def test_default_legal_document_bytes_are_preserved(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'LICENSE.txt'
+            path.write_bytes(b'full original copyright and grant')
+            self.assertEqual(MSVC.legal_document(path, 'unknown/LICENSE.txt'), path.read_bytes())
 
     def test_large_original_reader_still_rejects_overflow(self):
         with tempfile.TemporaryDirectory() as temporary:
