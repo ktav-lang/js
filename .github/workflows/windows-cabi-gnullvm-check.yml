@@ -1,0 +1,258 @@
+name: Windows C ABI GNU LLVM compatibility evidence
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_REF: 562deb3fde092d63a78f359be095e5079929d0d1
+
+jobs:
+  cabi-gnullvm:
+    name: C ABI GNU LLVM / ${{ matrix.target }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-pc-windows-gnullvm
+            compiler: x86_64-w64-mingw32-clang.exe
+            machine: 34404
+          - target: aarch64-pc-windows-gnullvm
+            compiler: aarch64-w64-mingw32-clang.exe
+            machine: 43620
+    env:
+      CABI_TARGET: ${{ matrix.target }}
+      CABI_COMPILER: ${{ matrix.compiler }}
+      CABI_MACHINE: ${{ matrix.machine }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preserve reviewed lock and notice tooling
+        shell: python
+        run: |
+          import os
+          import shutil
+          from pathlib import Path
+          stage = Path(os.environ['RUNNER_TEMP']) / 'cabi-gnullvm-tools'
+          stage.mkdir()
+          for name in ['Cargo.lock', 'ci/js-build-lock.json', 'scripts/prepare_js_notices.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/source_license_supplements.py', 'ci/about.toml', 'ci/licenses/js-source-supplements.json']:
+              path = stage / name
+              path.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(name, path)
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_REF }}
+          persist-credentials: false
+      - name: Restore tools without changing any binding sources
+        shell: python
+        run: |
+          import os
+          import shutil
+          import subprocess
+          from pathlib import Path
+          if subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() != os.environ['SOURCE_REF']:
+              raise SystemExit('unexpected Windows C ABI source')
+          stage = Path(os.environ['RUNNER_TEMP']) / 'cabi-gnullvm-tools'
+          for path in stage.rglob('*'):
+              if path.is_file():
+                  destination = Path(path.relative_to(stage))
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copyfile(path, destination)
+          subprocess.run(['git', 'diff', '--exit-code', '--', 'Cargo.toml', 'crates', 'package.json', 'package-lock.json'], check=True)
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          targets: ${{ matrix.target }}
+          components: rust-docs
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about@0.9.3
+      - name: Prepare reviewed Cargo/std evidence
+        shell: python
+        run: |
+          import os
+          import shutil
+          import subprocess
+          import sys
+          from pathlib import Path
+          evidence = Path(os.environ['RUNNER_TEMP']) / 'cabi-gnullvm-evidence'
+          subprocess.run([sys.executable, 'scripts/prepare_js_notices.py', str(evidence)], check=True)
+          for name in ['LICENSE-MIT', 'LICENSE-APACHE']:
+              shutil.copyfile(name, evidence / name)
+      - name: Install the exact previously reviewed LLVM MinGW SDK
+        shell: python
+        run: |
+          import hashlib
+          import json
+          import os
+          import stat
+          import subprocess
+          import urllib.request
+          import zipfile
+          from pathlib import Path, PurePosixPath
+          root = Path(os.environ['RUNNER_TEMP'])
+          sdk = root / 'cabi-gnullvm-sdk'
+          sdk.mkdir()
+          archive_path = sdk / 'sdk.zip'
+          url = 'https://github.com/mstorsjo/llvm-mingw/releases/download/20261020/llvm-mingw-20261020-ucrt-x86_64.zip'
+          checksum = hashlib.sha256()
+          total = 0
+          with urllib.request.urlopen(url, timeout=120) as response, archive_path.open('xb') as output:
+              while chunk := response.read(1024 * 1024):
+                  total += len(chunk)
+                  if total > 256 * 1024 * 1024:
+                      raise SystemExit('candidate SDK size bound exceeded')
+                  checksum.update(chunk)
+                  output.write(chunk)
+          if checksum.hexdigest() != 'fd5462b7f5d93b2ff981fcd3f9c7e427e47f3203c64ea91c27bcc444eebd74cd':
+              raise SystemExit('candidate SDK differs from reviewed archive')
+          with zipfile.ZipFile(archive_path) as archive:
+              seen = set()
+              for item in archive.infolist():
+                  path = PurePosixPath(item.filename)
+                  if path.is_absolute() or '..' in path.parts or '\\' in item.filename or ':' in item.filename or item.filename.casefold() in seen or stat.S_IFMT(item.external_attr >> 16) == stat.S_IFLNK:
+                      raise SystemExit('unsafe or duplicate candidate SDK path')
+                  seen.add(item.filename.casefold())
+              archive.extractall(sdk)
+          install = sdk / 'llvm-mingw-20261020-ucrt-x86_64'
+          compiler = install / 'bin' / os.environ['CABI_COMPILER']
+          if not compiler.is_file():
+              raise SystemExit('candidate compiler missing')
+          evidence = root / 'cabi-gnullvm-evidence'
+          (evidence / 'compiler-version.txt').write_bytes(subprocess.check_output([str(compiler), '--version']))
+          record = {'source_ref': os.environ['SOURCE_REF'], 'tooling_ref': os.environ['GITHUB_SHA'], 'target': os.environ['CABI_TARGET'], 'sdk_archive_sha256': checksum.hexdigest(), 'sdk_source': url, 'coverage': 'Compatibility and input probe only; not completed runtime licensing, embedded CABI notices, npm delivery or NAPI compatibility.'}
+          (evidence / 'source-provenance.json').write_text(json.dumps(record, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+          key = 'CARGO_TARGET_' + os.environ['CABI_TARGET'].upper().replace('-', '_') + '_LINKER'
+          flags = ['-C', 'target-feature=+crt-static', '-C', 'link-arg=-Wl,-Map,' + (evidence / 'native-link.map').as_posix(), '-C', 'link-arg=-Wl,--reproduce=' + (root / 'cabi-gnullvm-link.tar').as_posix()]
+          with Path(os.environ['GITHUB_ENV']).open('a', encoding='utf-8') as output:
+              for name, value in [(key, str(compiler)), ('CARGO_ENCODED_RUSTFLAGS', chr(31).join(flags)), ('LLVM_MINGW_CANDIDATE', str(install))]:
+                  output.write(name + '=' + value + '\n')
+          with Path(os.environ['GITHUB_PATH']).open('a', encoding='utf-8') as output:
+              output.write(str(install / 'bin') + '\n')
+      - name: Build the unchanged C ABI crate
+        run: cargo build --locked --release -p ktav-cabi --target ${{ matrix.target }}
+      - name: Capture exact PE, link inputs and original SDK legal documents
+        shell: python
+        run: |
+          import base64
+          import hashlib
+          import json
+          import os
+          import re
+          import shutil
+          import struct
+          import subprocess
+          import tarfile
+          from pathlib import Path, PurePosixPath
+          root = Path(os.environ['RUNNER_TEMP'])
+          evidence = root / 'cabi-gnullvm-evidence'
+          original = Path('target') / os.environ['CABI_TARGET'] / 'release/ktav_cabi.dll'
+          binary = evidence / 'ktav_cabi.dll'
+          shutil.copyfile(original, binary)
+          data = binary.read_bytes()
+          if len(data) < 64 or len(data) > 128 * 1024 * 1024 or data[:2] != b'MZ':
+              raise SystemExit('expected bounded PE library')
+          offset = int.from_bytes(data[60:64], 'little')
+          if offset + 24 > len(data) or data[offset:offset + 4] != b'PE\0\0' or struct.unpack_from('<H', data, offset + 4)[0] != int(os.environ['CABI_MACHINE']) or not struct.unpack_from('<H', data, offset + 22)[0] & 0x2000:
+              raise SystemExit('PE CPU or DLL kind differs from target')
+          sdk = Path(os.environ['LLVM_MINGW_CANDIDATE'])
+          pe = subprocess.check_output([str(sdk / 'bin/llvm-readobj.exe'), '--file-headers', '--coff-imports', '--coff-exports', str(binary)])
+          (evidence / 'pe-inputs.txt').write_bytes(pe)
+          imports = [name.decode('ascii').lower() for name in re.findall(rb'^\s*Name: ([^\r\n]+[.]dll)\s*$', pe, re.M | re.I)]
+          allowed = {'kernel32.dll', 'ntdll.dll', 'ucrtbase.dll', 'msvcrt.dll', 'advapi32.dll', 'bcrypt.dll', 'crypt32.dll', 'dbghelp.dll', 'ole32.dll', 'oleaut32.dll', 'rpcrt4.dll', 'secur32.dll', 'shell32.dll', 'shlwapi.dll', 'user32.dll', 'userenv.dll', 'version.dll', 'ws2_32.dll', 'psapi.dll'}
+          if not imports or any(name not in allowed and not name.startswith(('api-ms-win-', 'ext-ms-win-')) for name in imports):
+              raise SystemExit('C ABI candidate imports a non-OS runtime DLL: ' + repr(imports))
+          exports = re.findall(rb'^\s*Name: (ktav_[^\r\n]+)\s*$', pe, re.M)
+          if not {b'ktav_version', b'ktav_loads', b'ktav_free'} <= set(exports):
+              raise SystemExit('expected C ABI exports missing')
+          link_map = evidence / 'native-link.map'
+          if not link_map.is_file() or not 0 < link_map.stat().st_size <= 32 * 1024 * 1024:
+              raise SystemExit('missing or oversized actual C ABI map')
+          reproduction = root / 'cabi-gnullvm-link.tar'
+          if not reproduction.is_file() or reproduction.stat().st_size > 512 * 1024 * 1024:
+              raise SystemExit('missing or oversized linker reproduction')
+          inputs = []
+          seen = set()
+          total = 0
+          with tarfile.open(reproduction, mode='r:') as archive:
+              for item in archive:
+                  path = PurePosixPath(item.name)
+                  if path.is_absolute() or '..' in path.parts or '\\' in item.name or item.name in seen or item.issym() or item.islnk():
+                      raise SystemExit('unsafe linker input record')
+                  seen.add(item.name)
+                  if item.isdir():
+                      continue
+                  if not item.isfile() or item.size > 128 * 1024 * 1024:
+                      raise SystemExit('invalid linker input type/size')
+                  total += item.size
+                  if total > 512 * 1024 * 1024 or len(seen) > 8192:
+                      raise SystemExit('link input inventory exceeds bound')
+                  source = archive.extractfile(item)
+                  checksum = hashlib.sha256()
+                  size = 0
+                  while chunk := source.read(1024 * 1024):
+                      checksum.update(chunk)
+                      size += len(chunk)
+                  if size != item.size:
+                      raise SystemExit('truncated linker input')
+                  inputs.append({'path': item.name, 'bytes': size, 'sha256': checksum.hexdigest()})
+          if not any(item['path'].endswith('/response.txt') for item in inputs):
+              raise SystemExit('missing actual linker command evidence')
+          (evidence / 'link-input-fingerprints.json').write_text(json.dumps(inputs, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+          legal = []
+          total = 0
+          for path in sorted(sdk.rglob('*')):
+              if not path.is_file() or not re.match(r'(?i)^(?:license|copying|copyright|notice|authors|disclaimer)', path.name):
+                  continue
+              if path.stat().st_size > 4 * 1024 * 1024:
+                  raise SystemExit('SDK legal document exceeds bound')
+              data = path.read_bytes()
+              total += len(data)
+              if total > 32 * 1024 * 1024:
+                  raise SystemExit('SDK legal inventory exceeds bound')
+              try:
+                  text = data.decode('utf-8')
+              except UnicodeDecodeError:
+                  text = None
+              legal.append({'path': path.relative_to(sdk).as_posix(), 'sha256': hashlib.sha256(data).hexdigest(), 'raw_bytes_base64': base64.b64encode(data).decode('ascii'), 'utf8_text': text})
+          (evidence / 'sdk-legal.json').write_text(json.dumps(legal, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          if Path('Cargo.lock').read_bytes() != (evidence / 'Cargo.lock').read_bytes():
+              raise SystemExit('candidate changed the reviewed Cargo lock')
+          result = {'target': os.environ['CABI_TARGET'], 'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(), 'map_sha256': hashlib.sha256(link_map.read_bytes()).hexdigest(), 'machine': int(os.environ['CABI_MACHINE']), 'imports': imports, 'exports': [name.decode('ascii') for name in exports], 'sdk_legal_files': len(legal), 'coverage': 'Actual PE and input fingerprints; runtime source/member licensing and distribution notices remain separate.'}
+          (evidence / 'native-verification.json').write_text(json.dumps(result, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+      - name: Load the actual x64 C ABI with SDK paths removed
+        if: matrix.target == 'x86_64-pc-windows-gnullvm'
+        shell: python
+        run: |
+          import hashlib
+          import json
+          import os
+          import shutil
+          import subprocess
+          import sys
+          from pathlib import Path
+          evidence = Path(os.environ['RUNNER_TEMP']) / 'cabi-gnullvm-evidence'
+          probe = Path(os.environ['RUNNER_TEMP']) / 'cabi-gnullvm-clean-path'
+          probe.mkdir()
+          binary = probe / 'ktav_cabi.dll'
+          shutil.copyfile(evidence / binary.name, binary)
+          windows = Path(os.environ['SystemRoot'])
+          environment = {**os.environ, 'PATH': str(windows / 'System32') + os.pathsep + str(windows)}
+          script = 'import ctypes; library=ctypes.CDLL("./ktav_cabi.dll"); [getattr(library,name) for name in ["ktav_version","ktav_loads","ktav_free"]]; print("C ABI library loaded and exports resolved")'
+          result = subprocess.run([sys.executable, '-I', '-c', script], cwd=probe, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
+          (evidence / 'loader-stdout.txt').write_bytes(result.stdout)
+          (evidence / 'loader-stderr.txt').write_bytes(result.stderr)
+          if result.returncode != 0:
+              raise SystemExit('actual C ABI library failed to load with SDK paths removed')
+          record = {'sdk_path_removed': True, 'only_own_dll_staged': True, 'exit_code': result.returncode, 'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(), 'scope': 'Matching-x64 DLL loader/export probe only; no Bun/Deno or parser-corpus claim. ARM DLL not executed.'}
+          (evidence / 'loader-probe.json').write_text(json.dumps(record, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cabi-gnullvm-evidence-${{ matrix.target }}
+          path: ${{ runner.temp }}/cabi-gnullvm-evidence/
+          if-no-files-found: warn
