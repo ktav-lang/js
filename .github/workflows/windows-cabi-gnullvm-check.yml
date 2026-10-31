@@ -163,8 +163,14 @@ jobs:
           pe = subprocess.check_output([str(sdk / 'bin/llvm-readobj.exe'), '--file-headers', '--coff-imports', '--coff-exports', str(binary)])
           (evidence / 'pe-inputs.txt').write_bytes(pe)
           imports = [name.decode('ascii').lower() for name in re.findall(rb'^\s*Name: ([^\r\n]+[.]dll)\s*$', pe, re.M | re.I)]
-          allowed = {'kernel32.dll', 'ntdll.dll', 'ucrtbase.dll', 'msvcrt.dll', 'advapi32.dll', 'bcrypt.dll', 'crypt32.dll', 'dbghelp.dll', 'ole32.dll', 'oleaut32.dll', 'rpcrt4.dll', 'secur32.dll', 'shell32.dll', 'shlwapi.dll', 'user32.dll', 'userenv.dll', 'version.dll', 'ws2_32.dll', 'psapi.dll'}
-          if not imports or any(name not in allowed and not name.startswith(('api-ms-win-', 'ext-ms-win-')) for name in imports):
+          # https://learn.microsoft.com/en-us/windows/win32/seccng/processprng
+          allowed = {'kernel32.dll', 'ntdll.dll', 'ucrtbase.dll', 'msvcrt.dll', 'advapi32.dll', 'bcrypt.dll', 'bcryptprimitives.dll', 'crypt32.dll', 'dbghelp.dll', 'ole32.dll', 'oleaut32.dll', 'rpcrt4.dll', 'secur32.dll', 'shell32.dll', 'shlwapi.dll', 'user32.dll', 'userenv.dll', 'version.dll', 'ws2_32.dll', 'psapi.dll'}
+          def os_import(name):
+              return name in allowed or name.startswith(('api-ms-win-', 'ext-ms-win-'))
+          assert os_import('bcryptprimitives.dll')
+          for name in ['libunwind.dll', 'libgcc_s_seh-1.dll', 'libstdc++-6.dll', 'vcruntime140.dll', 'foreign.dll']:
+              assert not os_import(name), name
+          if not imports or not all(os_import(name) for name in imports):
               raise SystemExit('C ABI candidate imports a non-OS runtime DLL: ' + repr(imports))
           exports = re.findall(rb'^\s*Name: (ktav_[^\r\n]+)\s*$', pe, re.M)
           if not {b'ktav_version', b'ktav_loads', b'ktav_free'} <= set(exports):
