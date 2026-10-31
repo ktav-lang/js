@@ -1,0 +1,168 @@
+name: macOS native runtime evidence
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_REF: 562deb3fde092d63a78f359be095e5079929d0d1
+
+jobs:
+  macos-native:
+    name: macOS native inputs / ${{ matrix.target }}
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            addon: ktav.darwin-x64.node
+          - target: aarch64-apple-darwin
+            addon: ktav.darwin-arm64.node
+    env:
+      MACOS_TARGET: ${{ matrix.target }}
+      NAPI_ADDON: ${{ matrix.addon }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preserve reviewed tools and private build hook
+        shell: python
+        run: |
+          import os
+          import shutil
+          from pathlib import Path
+          stage = Path(os.environ['RUNNER_TEMP']) / 'macos-native-tools'
+          stage.mkdir()
+          names = ['Cargo.lock', 'ci/js-build-lock.json', 'crates/napi/build.rs', 'scripts/patch_napi_notice_source.py', 'scripts/macos_native_evidence.py', 'ci/test_macos_native_evidence.py', 'scripts/prepare_js_notices.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/source_license_supplements.py', 'scripts/check_embedded_notices.py', 'scripts/check-npm-licenses.mjs', 'ci/about.toml', 'ci/licenses/js-source-supplements.json']
+          for name in names:
+              destination = stage / name
+              destination.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(name, destination)
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_REF }}
+          submodules: recursive
+          persist-credentials: false
+      - name: Restore tools and graft only private NAPI metadata
+        shell: python
+        run: |
+          import hashlib
+          import json
+          import os
+          import shutil
+          import subprocess
+          import sys
+          from pathlib import Path
+          if subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() != os.environ['SOURCE_REF']:
+              raise SystemExit('unexpected macOS source revision')
+          overlay = ['crates/napi/build.rs', 'crates/napi/src/lib.rs']
+          baseline = {name: hashlib.sha256(Path(name).read_bytes()).hexdigest() for name in overlay}
+          stage = Path(os.environ['RUNNER_TEMP']) / 'macos-native-tools'
+          for path in stage.rglob('*'):
+              if path.is_file():
+                  destination = Path(path.relative_to(stage))
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copyfile(path, destination)
+          subprocess.run([sys.executable, '-I', 'scripts/patch_napi_notice_source.py', 'crates/napi/src/lib.rs'], check=True)
+          changed = subprocess.check_output(['git', 'diff', '--name-only', '--', 'Cargo.toml', 'crates', 'tests/node', 'root-docs', 'package.json', 'package-lock.json'], text=True).splitlines()
+          if set(changed) != set(overlay):
+              raise SystemExit('macOS source overlay changed more than the two private resource files')
+          record = {'source_ref': os.environ['SOURCE_REF'], 'tooling_ref': os.environ['GITHUB_SHA'], 'binding_overlay': {name: {'baseline_sha256': baseline[name], 'compiled_sha256': hashlib.sha256(Path(name).read_bytes()).hexdigest()} for name in overlay}, 'scope': 'Original 0.8.1 source with private NAPI Cargo/std resource only; CABI source remains unchanged.'}
+          (Path(os.environ['RUNNER_TEMP']) / 'macos-native-source.json').write_text(json.dumps(record, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          targets: ${{ matrix.target }}
+          components: rust-docs
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about@0.9.3
+      - name: Verify Mach-O and SDK-boundary regressions
+        run: python3 -I -m unittest discover -s ci -p test_macos_native_evidence.py -v
+      - name: Prepare reviewed Cargo/std notices and source evidence
+        shell: python
+        run: |
+          import os
+          import shutil
+          import subprocess
+          import sys
+          from pathlib import Path
+          evidence = Path(os.environ['RUNNER_TEMP']) / 'macos-native-notices'
+          subprocess.run([sys.executable, 'scripts/prepare_js_notices.py', str(evidence)], check=True)
+          shutil.copyfile(Path(os.environ['RUNNER_TEMP']) / 'macos-native-source.json', evidence / 'source-provenance.json')
+      - name: Resolve unchanged npm manifest and verify tool licenses
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp package-lock.json "$RUNNER_TEMP/macos-native-notices/npm-lock-source.json"
+          npm install --ignore-scripts --no-audit --no-fund
+          git diff --exit-code -- package.json
+          cp package-lock.json "$RUNNER_TEMP/macos-native-notices/npm-lock-resolved.json"
+          node scripts/check-npm-licenses.mjs
+          node -e 'if(require("@napi-rs/cli/package.json").version!=="3.6.2")throw new Error("NAPI CLI version requires review")'
+      - name: Build both native roles and preserve actual link evidence
+        shell: python
+        run: |
+          import hashlib
+          import json
+          import os
+          import shutil
+          import subprocess
+          import sys
+          from pathlib import Path
+          evidence = Path(os.environ['RUNNER_TEMP']) / 'macos-native-notices'
+          target = os.environ['MACOS_TARGET']
+          if os.environ.get('RUSTFLAGS') or os.environ.get('CARGO_ENCODED_RUSTFLAGS'):
+              raise SystemExit('preexisting macOS flags require review')
+          commands = [('napi', ['npx', '--no-install', 'napi', 'build', '--release', '-p', 'ktav-napi', '--target', target, '--platform', '--js', 'false', '--output-dir', '.']), ('cabi', ['cargo', 'build', '--locked', '--release', '-p', 'ktav-cabi', '--target', target])]
+          for role, command in commands:
+              link_map = evidence / (role + '-native-link.map')
+              environment = {**os.environ, 'CARGO_ENCODED_RUSTFLAGS': '-C' + chr(31) + 'link-arg=-Wl,-map,' + str(link_map), 'KTAV_NAPI_NOTICES_GZIP': str(evidence / 'NOTICE.json.gz'), 'RUSTC_LOG': 'rustc_codegen_ssa::back::link=info'}
+              result = subprocess.run(command, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+              (evidence / (role + '-linker-trace.txt')).write_bytes(result.stderr)
+              sys.stdout.buffer.write(result.stdout)
+              sys.stderr.buffer.write(result.stderr)
+              if result.returncode:
+                  raise SystemExit(result.returncode)
+              original = Path('target') / target / 'release' / ('libktav_' + role + '.dylib')
+              binary = Path(os.environ['NAPI_ADDON']) if role == 'napi' else original
+              staged = evidence / binary.name
+              shutil.copyfile(binary, staged)
+              subprocess.run([sys.executable, '-I', 'scripts/macos_native_evidence.py', str(staged), str(original), str(link_map), str(evidence), target, role], check=True)
+              if role == 'napi':
+                  report = subprocess.check_output([sys.executable, '-I', 'scripts/check_embedded_notices.py', str(staged), str(evidence / 'NOTICE.json')])
+                  (evidence / 'napi-embedded-verification.json').write_bytes(report)
+          if Path('Cargo.lock').read_bytes() != (evidence / 'Cargo.lock').read_bytes():
+              raise SystemExit('macOS build changed the reviewed Cargo lock')
+          for name, command in [('clang-version.txt', ['clang', '--version']), ('sdk-version.txt', ['xcrun', '--show-sdk-version']), ('xcode-version.txt', ['xcodebuild', '-version'])]:
+              (evidence / name).write_bytes(subprocess.check_output(command))
+      - name: Run actual matching-CPU NAPI consumer
+        shell: python
+        run: |
+          import hashlib
+          import json
+          import os
+          import shutil
+          import subprocess
+          from pathlib import Path
+          evidence = Path(os.environ['RUNNER_TEMP']) / 'macos-native-notices'
+          host = subprocess.check_output(['node', '-p', 'process.arch'], text=True).strip()
+          target = 'arm64' if os.environ['MACOS_TARGET'].startswith('aarch64-') else 'x64'
+          native = host == target
+          if native:
+              subprocess.run(['npm', 'run', 'build:ts'], check=True)
+              Path('dist/native').mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(evidence / os.environ['NAPI_ADDON'], Path('dist/native') / os.environ['NAPI_ADDON'])
+              script = 'import assert from "node:assert/strict";import {createRequire} from "node:module";import {realpathSync} from "node:fs";await import("./dist/ts/node.js");const require=createRequire(import.meta.url);const expected=realpathSync("dist/native/"+process.env.NAPI_ADDON);assert.deepEqual(Object.keys(require.cache).filter(p=>p.endsWith(".node")),[expected]);await import("./tests/node/run-node-napi.mjs");'
+              subprocess.run(['node', '--input-type=module', '-e', script], check=True)
+          report = {'target': os.environ['MACOS_TARGET'], 'host_node_arch': host, 'native_execution': native, 'napi_binary_sha256': hashlib.sha256((evidence / os.environ['NAPI_ADDON']).read_bytes()).hexdigest(), 'scope': 'Matching-CPU NAPI consumer only; CABI binary inspected as data, not executed by this step.'}
+          (evidence / 'execution-scope.json').write_text(json.dumps(report, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-native-evidence-${{ matrix.target }}
+          path: ${{ runner.temp }}/macos-native-notices/
+          if-no-files-found: warn
