@@ -67,6 +67,23 @@ COLLECT = importlib.util.module_from_spec(COLLECT_SPEC)
 COLLECT_SPEC.loader.exec_module(COLLECT)
 
 
+class NoticeFilenameTests(unittest.TestCase):
+    def test_numbered_copying_documents_are_included(self):
+        for name in ['COPYING2', 'COPYING3', 'COPYING3.LIB', 'copying3.lib', 'COPYING3.gz']:
+            with self.subTest(name=name):
+                self.assertIsNotNone(COLLECT.LEGAL.fullmatch(name))
+
+    def test_existing_notice_names_remain_included(self):
+        for name in ['LICENSE', 'LICENCE', 'COPYING', 'COPYING.LIB', 'COPYING.RUNTIME', 'COPYRIGHT', 'NOTICE', 'LICENSE-MIT', 'NOTICE_extra']:
+            with self.subTest(name=name):
+                self.assertIsNotNone(COLLECT.LEGAL.fullmatch(name))
+
+    def test_unrelated_names_remain_excluded(self):
+        for name in ['COPYING3helper', 'COPYINGcat', 'LICENSE3', 'README', 'libgcc.a', 'prefix-COPYING3']:
+            with self.subTest(name=name):
+                self.assertIsNone(COLLECT.LEGAL.fullmatch(name))
+
+
 class NoticeByteTests(unittest.TestCase):
     def test_utf8_notice_is_preserved_exactly(self):
         data = 'Copyright © fixture'.encode('utf-8')

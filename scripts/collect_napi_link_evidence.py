@@ -11,7 +11,7 @@ import subprocess
 import sys
 
 TARGETS = {'x86_64-unknown-linux-gnu': 62, 'aarch64-unknown-linux-gnu': 183}
-LEGAL = re.compile(r'^(?:license|licence|copying|copyright|notice)(?:[._-].*)?$', re.I)
+LEGAL = re.compile(r'^(?:license|licence|copying[0-9]*|copyright|notice)(?:[._-].*)?$', re.I)
 
 
 def sha(path):
