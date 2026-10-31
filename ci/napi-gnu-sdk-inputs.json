@@ -1,0 +1,128 @@
+{
+  "coverage": "Pinned SDK input bytes; source-name and declared-version correspondence are not a reproducible source-build claim.",
+  "repository_revision": "9cd8dda8e1798b7ce74bbba900cd8c6767afa37f",
+  "schema_version": 1,
+  "sdk_version": "1.0.3",
+  "targets": {
+    "aarch64-unknown-linux-gnu": {
+      "compiler": {
+        "bytes": 828528,
+        "git_blob_sha": "36a02f6c2d9fabbb57adfc9a918a2a0e8788002b",
+        "path": "bin/aarch64-unknown-linux-gnu-gcc",
+        "repository_path": "x64/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-gcc",
+        "sha256": "3cdc81cf0998bfa9a39377af5722764b13a5d6dcf1aecc1f144722b455d0b045"
+      },
+      "configuration": {
+        "bytes": 4920,
+        "git_blob_sha": "1a45d7aff02accda4847e3ea6a0690402b9641e8",
+        "path": "bin/aarch64-unknown-linux-gnu-ct-ng.config",
+        "repository_path": "x64/aarch64-unknown-linux-gnu/bin/aarch64-unknown-linux-gnu-ct-ng.config",
+        "sha256": "0dea140e772babd916f1df202fc926d9f437d79b40abbaf4fb02bcb620c9a8ee"
+      },
+      "runtime_inputs": [
+        {
+          "bytes": 1440,
+          "git_blob_sha": "5edbe0a2d3dda3d28e25a8e626f98d785cf1c340",
+          "path": "aarch64-unknown-linux-gnu/sysroot/usr/lib/crti.o",
+          "repository_path": "x64/aarch64-unknown-linux-gnu/aarch64-unknown-linux-gnu/sysroot/usr/lib/crti.o",
+          "sha256": "0b0250606c8c3305631c8e26dd58a26df1297dc0c2d501442625bf6748365e8c"
+        },
+        {
+          "bytes": 1016,
+          "git_blob_sha": "9a77f62d19f4df3bc97bde4dc45fc6f4dd92d5ab",
+          "path": "aarch64-unknown-linux-gnu/sysroot/usr/lib/crtn.o",
+          "repository_path": "x64/aarch64-unknown-linux-gnu/aarch64-unknown-linux-gnu/sysroot/usr/lib/crtn.o",
+          "sha256": "50ea930e73f339140017b9faf4124313fda4f1c3946b59a6af5f31988336b91b"
+        },
+        {
+          "bytes": 75816,
+          "git_blob_sha": "85094597a2e77da57df6745a66f825ae964c81e8",
+          "path": "aarch64-unknown-linux-gnu/sysroot/usr/lib/libc_nonshared.a",
+          "repository_path": "x64/aarch64-unknown-linux-gnu/aarch64-unknown-linux-gnu/sysroot/usr/lib/libc_nonshared.a",
+          "sha256": "24e31e0ced364852e667877fc4da8ad3d111bb2544a744b1a25538a4b4c2395f"
+        },
+        {
+          "bytes": 4724,
+          "git_blob_sha": "f37718a9c8649fb1d6da7043ab2c7f647ae2b504",
+          "path": "aarch64-unknown-linux-gnu/sysroot/usr/lib/libpthread_nonshared.a",
+          "repository_path": "x64/aarch64-unknown-linux-gnu/aarch64-unknown-linux-gnu/sysroot/usr/lib/libpthread_nonshared.a",
+          "sha256": "6681ebf6a60ab0819587b0c1888218c7e1a7846f03df171ff6fe505e6265ef58"
+        },
+        {
+          "bytes": 3408,
+          "git_blob_sha": "1990db7f27139ad2dda5705b2912e8eef29d7ca6",
+          "path": "lib/gcc/aarch64-unknown-linux-gnu/4.8.5/crtbeginS.o",
+          "repository_path": "x64/aarch64-unknown-linux-gnu/lib/gcc/aarch64-unknown-linux-gnu/4.8.5/crtbeginS.o",
+          "sha256": "4c7955ace6928b8602bef526d171bc6ed6a968927d0222b76476e55878cf8d1e"
+        },
+        {
+          "bytes": 1392,
+          "git_blob_sha": "d4cf4503e88a0c9e65062e14ee33eee4ed642651",
+          "path": "lib/gcc/aarch64-unknown-linux-gnu/4.8.5/crtendS.o",
+          "repository_path": "x64/aarch64-unknown-linux-gnu/lib/gcc/aarch64-unknown-linux-gnu/4.8.5/crtendS.o",
+          "sha256": "f50ebe3bcb8896e74beb060ee4883cc71eded13ce62b2a5d4478166633e84947"
+        }
+      ]
+    },
+    "x86_64-unknown-linux-gnu": {
+      "compiler": {
+        "bytes": 869488,
+        "git_blob_sha": "f8568accd69d728c68e73ed124404c6af66d8c3a",
+        "path": "bin/x86_64-unknown-linux-gnu-gcc",
+        "repository_path": "x64/x86_64-unknown-linux-gnu/bin/x86_64-unknown-linux-gnu-gcc",
+        "sha256": "172152675d84539fec54571b2007095d55b33b6da8aecaa8904e5f5795488e51"
+      },
+      "configuration": {
+        "bytes": 4905,
+        "git_blob_sha": "eb99b96dccaa94e689c042f4e9cbc41b3b6699f8",
+        "path": "bin/x86_64-unknown-linux-gnu-ct-ng.config",
+        "repository_path": "x64/x86_64-unknown-linux-gnu/bin/x86_64-unknown-linux-gnu-ct-ng.config",
+        "sha256": "978d0dff8d6ecc38a2dd8f9dd56a56d7083df6189fc05adb818b7d6f2109449e"
+      },
+      "runtime_inputs": [
+        {
+          "bytes": 2824,
+          "git_blob_sha": "ede7f02a24d6cc7a90e78873cfadbb8c6d8fc27b",
+          "path": "x86_64-unknown-linux-gnu/sysroot/usr/lib/crti.o",
+          "repository_path": "x64/x86_64-unknown-linux-gnu/x86_64-unknown-linux-gnu/sysroot/usr/lib/crti.o",
+          "sha256": "f6b62f52bba9c208fa65188e670e01fa0634d6aac08f4ea70d4054b91837c72a"
+        },
+        {
+          "bytes": 2544,
+          "git_blob_sha": "a07d5c1dd50dd216291481722a7063f97af5428c",
+          "path": "x86_64-unknown-linux-gnu/sysroot/usr/lib/crtn.o",
+          "repository_path": "x64/x86_64-unknown-linux-gnu/x86_64-unknown-linux-gnu/sysroot/usr/lib/crtn.o",
+          "sha256": "aa96c36b491d6835d75cae1774584f8e2fb299b784fe11b4d70bc2dc40fd250d"
+        },
+        {
+          "bytes": 65182,
+          "git_blob_sha": "b3f7bf33633ee98393d19700527b327ae26967c6",
+          "path": "x86_64-unknown-linux-gnu/sysroot/usr/lib/libc_nonshared.a",
+          "repository_path": "x64/x86_64-unknown-linux-gnu/x86_64-unknown-linux-gnu/sysroot/usr/lib/libc_nonshared.a",
+          "sha256": "a07403f9e6fa62130b96deb0d2aa84b517b67cc2a13138264d7a527634c7c399"
+        },
+        {
+          "bytes": 4332,
+          "git_blob_sha": "3a973f182e868ae5405b822a198b57828f91c027",
+          "path": "x86_64-unknown-linux-gnu/sysroot/usr/lib/libpthread_nonshared.a",
+          "repository_path": "x64/x86_64-unknown-linux-gnu/x86_64-unknown-linux-gnu/sysroot/usr/lib/libpthread_nonshared.a",
+          "sha256": "f8488896e8a81316cfc03cea79f34428bb279696bb3940c82edfb9349962f83c"
+        },
+        {
+          "bytes": 3368,
+          "git_blob_sha": "b56a5577016f8de0a9b8a0037ad620784216bd1b",
+          "path": "lib/gcc/x86_64-unknown-linux-gnu/4.8.5/crtbeginS.o",
+          "repository_path": "x64/x86_64-unknown-linux-gnu/lib/gcc/x86_64-unknown-linux-gnu/4.8.5/crtbeginS.o",
+          "sha256": "a4206eded529ecbc814556370eeb0edb286be49749d2d65f54f83e438ef6ea4d"
+        },
+        {
+          "bytes": 1936,
+          "git_blob_sha": "3a2fd8270ffe7b225ac3a8de2474c499248d5bdf",
+          "path": "lib/gcc/x86_64-unknown-linux-gnu/4.8.5/crtendS.o",
+          "repository_path": "x64/x86_64-unknown-linux-gnu/lib/gcc/x86_64-unknown-linux-gnu/4.8.5/crtendS.o",
+          "sha256": "0eaf7f3c0c919b188499c3a7f33fb84395ecb4be1072c7e19c2702f9d48319e5"
+        }
+      ]
+    }
+  }
+}

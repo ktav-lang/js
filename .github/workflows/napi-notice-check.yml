@@ -1,0 +1,159 @@
+name: NAPI GNU runtime evidence
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_REF: 562deb3fde092d63a78f359be095e5079929d0d1
+
+jobs:
+  napi-link-inputs:
+    name: NAPI GNU inputs / ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            addon: ktav.linux-x64-gnu.node
+          - target: aarch64-unknown-linux-gnu
+            addon: ktav.linux-arm64-gnu.node
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preserve source-backed audit tools
+        shell: python
+        run: |
+          import os
+          import shutil
+          from pathlib import Path
+          stage = Path(os.environ['RUNNER_TEMP']) / 'napi-notice-tools'
+          stage.mkdir()
+          for name in ['crates/napi/build.rs', 'scripts/patch_napi_notice_source.py', 'ci/test_napi_notice_overlay.py', 'scripts/check_embedded_notices.py', 'Cargo.lock', 'ci/js-build-lock.json', 'ci/test_js_build_lock.py', 'scripts/capture_napi_cross_link.py', 'scripts/collect_napi_link_evidence.py', 'ci/test_napi_cross_link.py', 'ci/napi-gnu-sdk-inputs.json', 'ci/licenses/napi-gnu-runtime.json', 'ci/test_napi_gnu_runtime_notices.py', 'scripts/napi_gnu_runtime_notices.py', 'scripts/prepare_js_notices.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/source_license_supplements.py', 'scripts/check-npm-licenses.mjs', 'ci/about.toml', 'ci/licenses/js-source-supplements.json']:
+              target = stage / name
+              target.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(name, target)
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_REF }}
+          submodules: recursive
+          persist-credentials: false
+      - name: Restore tools and the two reviewed private resource changes
+        shell: python
+        run: |
+          import hashlib
+          import json
+          import os
+          import shutil
+          import subprocess
+          import sys
+          from pathlib import Path
+          if subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() != os.environ['SOURCE_REF']:
+              raise SystemExit('unexpected NAPI source revision')
+          overlay = ['crates/napi/build.rs', 'crates/napi/src/lib.rs']
+          baseline = {name: hashlib.sha256(Path(name).read_bytes()).hexdigest() for name in overlay}
+          stage = Path(os.environ['RUNNER_TEMP']) / 'napi-notice-tools'
+          for path in stage.rglob('*'):
+              if path.is_file():
+                  target = Path(path.relative_to(stage))
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copyfile(path, target)
+          subprocess.run([sys.executable, '-I', 'scripts/patch_napi_notice_source.py', 'crates/napi/src/lib.rs'], check=True)
+          changed = subprocess.check_output(['git', 'diff', '--name-only', '--', 'Cargo.toml', 'crates', 'tests/node', 'root-docs', 'package.json', 'package-lock.json'], text=True).splitlines()
+          if set(changed) != set(overlay):
+              raise SystemExit('binding overlay must contain exactly the two reviewed resource files')
+          binding_overlay = {name: {'baseline_sha256': baseline[name], 'compiled_sha256': hashlib.sha256(Path(name).read_bytes()).hexdigest()} for name in overlay}
+          record = {'source_ref': os.environ['SOURCE_REF'], 'tooling_ref': os.environ['GITHUB_SHA'], 'binding_overlay': binding_overlay, 'napi_build_rs_sha256': binding_overlay['crates/napi/build.rs']['compiled_sha256'], 'reviewed_lock_sha256': hashlib.sha256(Path('Cargo.lock').read_bytes()).hexdigest(), 'coverage': 'Original source with two explicit private resource changes; not historical package evidence or completed npm delivery.'}
+          (Path(os.environ['RUNNER_TEMP']) / 'napi-source-provenance.json').write_text(json.dumps(record, sort_keys=True, indent=2))
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          targets: ${{ matrix.target }}
+          components: rust-docs
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about@0.9.3
+      - name: Verify transparent linker capture and reviewed lock guards
+        run: |
+          python3 -I -m unittest discover -s ci -p test_napi_cross_link.py -v
+          python3 -I -m unittest discover -s ci -p test_js_build_lock.py -v
+          python3 -I -m unittest discover -s ci -p test_napi_gnu_runtime_notices.py -v
+          python3 -I -m unittest discover -s ci -p test_napi_notice_overlay.py -v
+      - name: Prepare locked Cargo/std notices and linker evidence directory
+        shell: python
+        env:
+          NAPI_TARGET: ${{ matrix.target }}
+        run: |
+          import os
+          import shutil
+          import subprocess
+          import sys
+          from pathlib import Path
+          evidence = Path(os.environ['RUNNER_TEMP']) / 'napi-notices'
+          subprocess.run([sys.executable, 'scripts/prepare_js_notices.py', str(evidence)], check=True)
+          subprocess.run([sys.executable, '-I', 'scripts/napi_gnu_runtime_notices.py', 'prepare', str(evidence), os.environ['NAPI_TARGET']], check=True)
+          shutil.copyfile(Path(os.environ['RUNNER_TEMP']) / 'napi-source-provenance.json', evidence / 'source-provenance.json')
+          shutil.copyfile('ci/napi-gnu-sdk-inputs.json', evidence / 'napi-gnu-sdk-inputs.json')
+          maps = evidence / 'link-maps'
+          maps.mkdir()
+          key = 'CARGO_TARGET_' + os.environ['NAPI_TARGET'].upper().replace('-', '_') + '_LINKER'
+          capture = Path('scripts/napi-link-capture') / (os.environ['NAPI_TARGET'] + '-gcc')
+          capture.parent.mkdir()
+          shutil.copyfile('scripts/capture_napi_cross_link.py', capture)
+          capture.chmod(0o755)
+          with Path(os.environ['GITHUB_ENV']).open('a', encoding='utf-8') as output:
+              for name, value in [(key, str(capture.resolve())), ('KTAV_NAPI_TARGET', os.environ['NAPI_TARGET']), ('KTAV_NAPI_LINK_EVIDENCE', str(maps)), ('KTAV_NAPI_NOTICES_GZIP', str((evidence / 'NOTICE.json.gz').resolve()))]:
+                  output.write(name + '=' + value + chr(10))
+      - name: Resolve the original npm release graph and check licenses
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp package-lock.json "$RUNNER_TEMP/napi-notices/npm-lock-source.json"
+          npm install --ignore-scripts --no-audit --no-fund
+          git diff --exit-code -- package.json
+          cp package-lock.json "$RUNNER_TEMP/napi-notices/npm-lock-resolved.json"
+          node scripts/check-npm-licenses.mjs
+          node -e 'const c=require("@napi-rs/cli/package.json");const t=require("@napi-rs/cross-toolchain/package.json");if(c.version!=="3.6.2"||t.version!=="1.0.3")throw new Error("NAPI build tool versions require source review");'
+      - name: Build with the unchanged GNU NAPI cross path and capture actual map
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x scripts/napi-link-capture/${{ matrix.target }}-gcc
+          npx --no-install napi build --release -p ktav-napi --target ${{ matrix.target }} --platform --js false --output-dir . --use-napi-cross
+          cmp Cargo.lock "$RUNNER_TEMP/napi-notices/Cargo.lock"
+          python3 scripts/collect_napi_link_evidence.py ${{ matrix.addon }} "$RUNNER_TEMP/napi-notices" ${{ matrix.target }}
+          python3 -I scripts/napi_gnu_runtime_notices.py verify "$RUNNER_TEMP/napi-notices" ${{ matrix.target }}
+          python3 -I scripts/check_embedded_notices.py ${{ matrix.addon }} "$RUNNER_TEMP/napi-notices/NOTICE.json" > "$RUNNER_TEMP/napi-notices/embedded-notice-verification.json"
+          cp ${{ matrix.addon }} "$RUNNER_TEMP/napi-notices/${{ matrix.addon }}"
+      - name: Verify bounded resource encoder with the real build dependency
+        shell: python
+        run: |
+          import os
+          import subprocess
+          from pathlib import Path
+          libraries = list(Path('target/release/deps').glob('libnapi_build-*.rlib'))
+          if len(libraries) != 1:
+              raise SystemExit('expected one pinned host napi-build library')
+          library = libraries[0].resolve()
+          test = Path(os.environ['RUNNER_TEMP']) / 'napi-build-hook-tests'
+          subprocess.run(['rustc', '--test', '--edition=2021', 'crates/napi/build.rs', '--extern', 'napi_build=' + str(library), '-L', 'dependency=' + str(library.parent), '-o', str(test)], check=True)
+          subprocess.run([str(test)], check=True)
+      - name: Verify actual matching-CPU Node consumer
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run build:ts
+          mkdir -p dist/native
+          cp ${{ matrix.addon }} dist/native/${{ matrix.addon }}
+          node --input-type=module -e 'import assert from "node:assert/strict";import {createRequire} from "node:module";import {readFileSync,realpathSync,writeFileSync} from "node:fs";import {createHash} from "node:crypto";await import("./dist/ts/node.js");const require=createRequire(import.meta.url);const expected=realpathSync("dist/native/ktav.linux-x64-gnu.node");assert.deepEqual(Object.keys(require.cache).filter(p=>p.endsWith(".node")),[expected]);writeFileSync(process.env.RUNNER_TEMP+"/napi-notices/consumer.json",JSON.stringify({loaded_built_addon:true,binary_sha256:createHash("sha256").update(readFileSync(expected)).digest("hex")}));await import("./tests/node/run-node-napi.mjs");'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: napi-license-prototype-${{ matrix.target }}
+          path: ${{ runner.temp }}/napi-notices/
+          if-no-files-found: warn

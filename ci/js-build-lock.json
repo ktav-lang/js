@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "cargo_lock_sha256": "c09c21c421fda8a5411f756f5df5718de41d4cf92ad237150592011f9f785932",
+  "reviewed_source_ref": "562deb3fde092d63a78f359be095e5079929d0d1",
+  "reviewed_ci": {
+    "repository": "ktav-lang/js",
+    "run": 40994854671,
+    "artifact": 12950643988,
+    "target": "x86_64-unknown-linux-gnu",
+    "rust_toolchain": "1.99.1"
+  },
+  "coverage": "Previously successful, source-reviewed CI build graph for product 0.8.1. This is not evidence of the original historical published dependency graph. Updating this lock requires renewed source/license review."
+}
