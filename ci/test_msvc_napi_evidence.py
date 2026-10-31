@@ -42,6 +42,35 @@ class MsvcEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'DLL image'):
             MSVC.pe_machine(data)
 
+    def test_default_legal_limit_is_unchanged(self):
+        self.assertEqual(MSVC.legal_read_limit('unknown/NOTICE.txt', {}, 4 * 1024 * 1024), 4 * 1024 * 1024)
+        with self.assertRaisesRegex(ValueError, 'exceeds 4 MiB'):
+            MSVC.legal_read_limit('unknown/NOTICE.txt', {}, 4 * 1024 * 1024 + 1)
+
+    def test_observed_large_original_is_collectable_only_at_exact_identity(self):
+        key = 'visual-studio/Licenses/1033/ThirdPartyNotices.txt'
+        info = {'visual_studio_version': '18.11.12315.225', 'vctools_version': '14.51.36231', 'windows_sdk_version': '10.0.26100.0'}
+        self.assertEqual(MSVC.legal_read_limit(key, info, 6167634), 6167634)
+        for field in info:
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, 'exceeds 4 MiB'):
+                MSVC.legal_read_limit(key, {**info, field: 'unreviewed'}, 6167634)
+        for name in [key.lower(), key + '.other', 'windows-sdk/Licenses/1033/ThirdPartyNotices.txt']:
+            with self.subTest(path=name), self.assertRaisesRegex(ValueError, 'exceeds 4 MiB'):
+                MSVC.legal_read_limit(name, info, 6167634)
+        for size in [6167633, 6167635, 32 * 1024 * 1024]:
+            with self.subTest(size=size), self.assertRaisesRegex(ValueError, 'exceeds 4 MiB'):
+                MSVC.legal_read_limit(key, info, size)
+
+    def test_large_original_reader_still_rejects_overflow(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'ThirdPartyNotices.txt'
+            path.write_bytes(b'x' * 6167634)
+            self.assertEqual(len(MSVC.read(path, 6167634)), 6167634)
+            with path.open('ab') as output:
+                output.write(b'x')
+            with self.assertRaisesRegex(ValueError, 'exceeds bound'):
+                MSVC.read(path, 6167634)
+
     def test_read_and_fingerprint_size_bounds(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / 'input.data'

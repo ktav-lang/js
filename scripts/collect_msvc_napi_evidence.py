@@ -43,6 +43,20 @@ def pe_machine(data):
     return struct.unpack_from('<H', data, offset + 4)[0]
 
 
+def legal_read_limit(key, info, size):
+    if size <= 4 * 1024 * 1024:
+        return 4 * 1024 * 1024
+    if (
+        key == 'visual-studio/Licenses/1033/ThirdPartyNotices.txt'
+        and info['visual_studio_version'] == '18.11.12315.225'
+        and info['vctools_version'] == '14.51.36231'
+        and info['windows_sdk_version'] == '10.0.26100.0'
+        and size == 6167634
+    ):
+        return 6167634
+    raise ValueError(f'SDK legal original exceeds 4 MiB: {key}; bytes={size}')
+
+
 def collect(evidence, binary, original, sdk_info, reproduction, target):
     machines = {'x86_64-pc-windows-msvc': 0x8664, 'aarch64-pc-windows-msvc': 0xAA64}
     if target not in machines:
@@ -121,9 +135,7 @@ def collect(evidence, binary, original, sdk_info, reproduction, target):
         seen.add(key.casefold())
         if not path.resolve().is_relative_to(root.resolve()):
             raise ValueError('SDK legal document escapes selected installation')
-        if path.stat().st_size > 4 * 1024 * 1024:
-            raise ValueError(f'SDK legal original exceeds 4 MiB: {key}; bytes={path.stat().st_size}')
-        raw = read(path, 4 * 1024 * 1024)
+        raw = read(path, legal_read_limit(key, info, path.stat().st_size))
         total += len(raw)
         if total > 32 * 1024 * 1024 or len(legal) >= 1024:
             raise ValueError('MSVC SDK legal inventory exceeds bound')
