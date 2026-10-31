@@ -31,7 +31,7 @@ jobs:
           from pathlib import Path
           stage = Path(os.environ['RUNNER_TEMP']) / 'napi-notice-tools'
           stage.mkdir()
-          for name in ['crates/napi/build.rs', 'crates/napi/src/lib.rs', 'scripts/check_embedded_notices.py', 'Cargo.lock', 'ci/js-build-lock.json', 'ci/test_js_build_lock.py', 'scripts/capture_napi_cross_link.py', 'scripts/collect_napi_link_evidence.py', 'ci/test_napi_cross_link.py', 'ci/napi-gnu-sdk-inputs.json', 'ci/licenses/napi-gnu-runtime.json', 'ci/test_napi_gnu_runtime_notices.py', 'scripts/napi_gnu_runtime_notices.py', 'scripts/prepare_js_notices.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/source_license_supplements.py', 'scripts/check-npm-licenses.mjs', 'ci/about.toml', 'ci/licenses/js-source-supplements.json']:
+          for name in ['crates/napi/build.rs', 'scripts/patch_napi_notice_source.py', 'ci/test_napi_notice_overlay.py', 'scripts/check_embedded_notices.py', 'Cargo.lock', 'ci/js-build-lock.json', 'ci/test_js_build_lock.py', 'scripts/capture_napi_cross_link.py', 'scripts/collect_napi_link_evidence.py', 'ci/test_napi_cross_link.py', 'ci/napi-gnu-sdk-inputs.json', 'ci/licenses/napi-gnu-runtime.json', 'ci/test_napi_gnu_runtime_notices.py', 'scripts/napi_gnu_runtime_notices.py', 'scripts/prepare_js_notices.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/source_license_supplements.py', 'scripts/check-npm-licenses.mjs', 'ci/about.toml', 'ci/licenses/js-source-supplements.json']:
               target = stage / name
               target.parent.mkdir(parents=True, exist_ok=True)
               shutil.copyfile(name, target)
@@ -48,6 +48,7 @@ jobs:
           import os
           import shutil
           import subprocess
+          import sys
           from pathlib import Path
           if subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() != os.environ['SOURCE_REF']:
               raise SystemExit('unexpected NAPI source revision')
@@ -59,6 +60,7 @@ jobs:
                   target = Path(path.relative_to(stage))
                   target.parent.mkdir(parents=True, exist_ok=True)
                   shutil.copyfile(path, target)
+          subprocess.run([sys.executable, '-I', 'scripts/patch_napi_notice_source.py', 'crates/napi/src/lib.rs'], check=True)
           changed = subprocess.check_output(['git', 'diff', '--name-only', '--', 'Cargo.toml', 'crates', 'tests/node', 'root-docs', 'package.json', 'package-lock.json'], text=True).splitlines()
           if set(changed) != set(overlay):
               raise SystemExit('binding overlay must contain exactly the two reviewed resource files')
@@ -80,6 +82,7 @@ jobs:
           python3 -I -m unittest discover -s ci -p test_napi_cross_link.py -v
           python3 -I -m unittest discover -s ci -p test_js_build_lock.py -v
           python3 -I -m unittest discover -s ci -p test_napi_gnu_runtime_notices.py -v
+          python3 -I -m unittest discover -s ci -p test_napi_notice_overlay.py -v
       - name: Prepare locked Cargo/std notices and linker evidence directory
         shell: python
         env:
