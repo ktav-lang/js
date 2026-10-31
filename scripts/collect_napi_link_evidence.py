@@ -83,6 +83,7 @@ def collect(binary, evidence, target):
     if len(records) != 1:
         raise ValueError('actual addon must match exactly one captured shared link')
     record = records[0]
+    (evidence / 'native-link-command.json').write_text(json.dumps(record, sort_keys=True, indent=2) + '\n', encoding='utf-8')
     if PurePosixPath(record['map']).name != record['map']:
         raise ValueError('unsafe captured native map name')
     link_map = evidence / 'link-maps' / record['map']

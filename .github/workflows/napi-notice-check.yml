@@ -31,7 +31,7 @@ jobs:
           from pathlib import Path
           stage = Path(os.environ['RUNNER_TEMP']) / 'napi-notice-tools'
           stage.mkdir()
-          for name in ['Cargo.lock', 'ci/js-build-lock.json', 'ci/test_js_build_lock.py', 'scripts/capture_napi_cross_link.py', 'scripts/collect_napi_link_evidence.py', 'ci/test_napi_cross_link.py', 'ci/napi-gnu-sdk-inputs.json', 'scripts/prepare_js_notices.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/source_license_supplements.py', 'scripts/check-npm-licenses.mjs', 'ci/about.toml', 'ci/licenses/js-source-supplements.json']:
+          for name in ['Cargo.lock', 'ci/js-build-lock.json', 'ci/test_js_build_lock.py', 'scripts/capture_napi_cross_link.py', 'scripts/collect_napi_link_evidence.py', 'ci/test_napi_cross_link.py', 'ci/napi-gnu-sdk-inputs.json', 'ci/licenses/napi-gnu-runtime.json', 'ci/test_napi_gnu_runtime_notices.py', 'scripts/napi_gnu_runtime_notices.py', 'scripts/prepare_js_notices.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/source_license_supplements.py', 'scripts/check-npm-licenses.mjs', 'ci/about.toml', 'ci/licenses/js-source-supplements.json']:
               target = stage / name
               target.parent.mkdir(parents=True, exist_ok=True)
               shutil.copyfile(name, target)
@@ -74,6 +74,7 @@ jobs:
         run: |
           python3 -I -m unittest discover -s ci -p test_napi_cross_link.py -v
           python3 -I -m unittest discover -s ci -p test_js_build_lock.py -v
+          python3 -I -m unittest discover -s ci -p test_napi_gnu_runtime_notices.py -v
       - name: Prepare locked Cargo/std notices and linker evidence directory
         shell: python
         env:
@@ -86,6 +87,7 @@ jobs:
           from pathlib import Path
           evidence = Path(os.environ['RUNNER_TEMP']) / 'napi-notices'
           subprocess.run([sys.executable, 'scripts/prepare_js_notices.py', str(evidence)], check=True)
+          subprocess.run([sys.executable, '-I', 'scripts/napi_gnu_runtime_notices.py', 'prepare', str(evidence), os.environ['NAPI_TARGET']], check=True)
           shutil.copyfile(Path(os.environ['RUNNER_TEMP']) / 'napi-source-provenance.json', evidence / 'source-provenance.json')
           shutil.copyfile('ci/napi-gnu-sdk-inputs.json', evidence / 'napi-gnu-sdk-inputs.json')
           maps = evidence / 'link-maps'
@@ -116,6 +118,7 @@ jobs:
           npx --no-install napi build --release -p ktav-napi --target ${{ matrix.target }} --platform --js false --output-dir . --use-napi-cross
           cmp Cargo.lock "$RUNNER_TEMP/napi-notices/Cargo.lock"
           python3 scripts/collect_napi_link_evidence.py ${{ matrix.addon }} "$RUNNER_TEMP/napi-notices" ${{ matrix.target }}
+          python3 -I scripts/napi_gnu_runtime_notices.py verify "$RUNNER_TEMP/napi-notices" ${{ matrix.target }}
       - name: Verify actual matching-CPU Node consumer
         if: matrix.target == 'x86_64-unknown-linux-gnu'
         shell: bash
