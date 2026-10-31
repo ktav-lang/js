@@ -116,7 +116,7 @@ jobs:
           evidence="$RUNNER_TEMP/gnu-cabi-evidence"
           zig version > "$evidence/zig-version.txt"
           zig env > "$evidence/zig-env.json"
-          cargo zigbuild --version > "$evidence/cargo-zigbuild-version.txt"
+          cargo-zigbuild --version > "$evidence/cargo-zigbuild-version.txt"
           sha256sum "$(command -v cargo-zigbuild)" > "$evidence/cargo-zigbuild.sha256"
           sha256sum "$(command -v zig)" > "$evidence/zig.sha256"
           export ZIG_GLOBAL_CACHE_DIR="$RUNNER_TEMP/gnu-cabi-zig-cache"
