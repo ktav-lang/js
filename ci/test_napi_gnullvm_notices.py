@@ -14,7 +14,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 import napi_gnullvm_notices as RUNTIME
-from prepare_gnu_napi_variant_notices import configure, resource_hook
+from prepare_gnu_napi_variant_notices import bind_variant_license, configure, resource_hook
 from stage_gnu_napi_variant import fingerprints
 
 
@@ -107,6 +107,30 @@ class NapiRuntimeTests(unittest.TestCase):
         self.assertEqual(patched.count(b'napi_build::setup();'), 1)
         with self.assertRaisesRegex(ValueError, 'resource template'):
             resource_hook(source + b'changed')
+
+    def test_variant_license_binding_preserves_other_registry_fallbacks(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            vendor = Path(temporary)
+            grant = next(item for item in RUNTIME.catalogue(ROOT)['original_documents'] if 'napi-rs/napi-rs/' in item['source'])
+            (vendor / 'LICENSE').write_text(grant['text'], encoding='utf-8', newline='')
+            package = {'id': 'local-napi', 'name': 'napi', 'version': '3.15.0', 'source': None, 'license': 'MIT', 'manifest_path': str(vendor / 'Cargo.toml')}
+            metadata = {'packages': [package]}
+            entry = {'id': 'MIT', 'text': 'generic fallback', 'source_path': None, 'used_by': [{'crate': {'id': 'local-napi'}}, {'crate': {'id': 'registry-napi-sys'}}]}
+            report = {'licenses': [entry]}
+            combined = bind_variant_license(metadata, report, vendor, grant)
+            self.assertEqual(combined['licenses'][0], {**entry, 'used_by': [{'crate': {'id': 'registry-napi-sys'}}]})
+            self.assertEqual(combined['licenses'][1]['text'], grant['text'])
+            self.assertEqual(combined['licenses'][1]['used_by'], [{'crate': {'id': 'local-napi'}}])
+            self.assertEqual(report, {'licenses': [entry]})
+            for key, wrong in [('version', '3.15.1'), ('source', 'registry+https://github.com/rust-lang/crates.io-index'), ('license', 'MIT OR GPL-3.0-only'), ('manifest_path', str(vendor / 'foreign/Cargo.toml'))]:
+                with self.subTest(key=key), self.assertRaisesRegex(ValueError, 'source identity differs'):
+                    bind_variant_license({'packages': [{**package, key: wrong}]}, report, vendor, grant)
+            for licenses in [[], [entry, entry], [{**entry, 'id': 'Apache-2.0'}], [{**entry, 'source_path': 'foreign/LICENSE'}]]:
+                with self.assertRaisesRegex(ValueError, 'coverage differs|shape differs'):
+                    bind_variant_license(metadata, {'licenses': licenses}, vendor, grant)
+            (vendor / 'LICENSE').write_bytes(b'changed')
+            with self.assertRaisesRegex(ValueError, 'original license differs'):
+                bind_variant_license(metadata, report, vendor, grant)
 
     def test_linker_fingerprints_preserve_actual_bytes(self):
         with tempfile.TemporaryDirectory() as temporary:

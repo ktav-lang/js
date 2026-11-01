@@ -1,5 +1,6 @@
 """Собрать полный notice explicit GNU source variant без ослабления original guards."""
 
+import copy
 import gzip
 import hashlib
 import json
@@ -43,6 +44,38 @@ def resource_hook(template):
         raise ValueError('unreviewed notice resource template')
     replacement = b'    if !(std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows")\n        && std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("gnu")) {\n        napi_build::setup();\n    }'
     return template.replace(b'    napi_build::setup();', replacement)
+
+
+def bind_variant_license(metadata, report, vendor, grant):
+    packages = [item for item in metadata['packages'] if item['name'] == 'napi']
+    if len(packages) != 1:
+        raise ValueError('variant NAPI license package count differs')
+    package = packages[0]
+    if package['version'] != '3.15.0' or package.get('source') is not None or package.get('license') != 'MIT' or Path(package['manifest_path']).resolve().parent != vendor.resolve():
+        raise ValueError('variant NAPI license source identity differs')
+    path = vendor / 'LICENSE'
+    text = grant['text']
+    if sha(text.encode()) != grant['sha256'] or path.is_symlink() or path.read_bytes() != text.encode():
+        raise ValueError('variant NAPI complete original license differs')
+    combined = copy.deepcopy(report)
+    licenses = []
+    matched = 0
+    for entry in combined['licenses']:
+        uses = [use for use in entry['used_by'] if use['crate']['id'] == package['id']]
+        if not uses:
+            licenses.append(entry)
+            continue
+        if len(uses) != 1 or entry.get('id') != 'MIT' or entry.get('source_path'):
+            raise ValueError('variant NAPI fallback shape differs')
+        matched += 1
+        others = [use for use in entry['used_by'] if use['crate']['id'] != package['id']]
+        if others:
+            licenses.append({**entry, 'used_by': others})
+        licenses.append({**entry, 'text': text, 'source_path': str(path), 'used_by': uses, 'origin': 'checksum-bound-explicit-source-variant'})
+    if matched != 1:
+        raise ValueError('variant NAPI fallback coverage differs')
+    combined['licenses'] = licenses
+    return combined
 
 
 def prepare(evidence, target):
@@ -120,7 +153,9 @@ def prepare(evidence, target):
     shutil.copyfile(Path(sysroot) / 'share/doc/rust/COPYRIGHT-library.html', evidence / 'COPYRIGHT-library.html')
     report = subprocess.check_output(['cargo', 'about', 'generate', '--locked', '--all-features', '--fail', '--config', 'ci/about.toml', '--format', 'json'])
     (evidence / 'licenses-cargo-about.json').write_bytes(report)
-    combined, provenance = supplement_fallbacks(metadata, json.loads(report), locked, root / 'ci/licenses/js-source-supplements.json')
+    variant_report = bind_variant_license(metadata, json.loads(report), vendor, grant[0])
+    combined, provenance = supplement_fallbacks(metadata, variant_report, locked, root / 'ci/licenses/js-source-supplements.json')
+    provenance.append({'name': 'napi', 'version': '3.15.0', 'origin': 'checksum-bound-explicit-source-variant', 'upstream_archive_sha256': CRATE_SHA, 'vcs_revision': NAPI_VCS, 'license_sha256': grant[0]['sha256']})
     combined['source_license_supplements'] = provenance
     (evidence / 'licenses.json').write_text(json.dumps(combined, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     bundle = json.loads(_build(evidence))
