@@ -1,0 +1,249 @@
+name: Musl native notice and input evidence
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_REF: 562deb3fde092d63a78f359be095e5079929d0d1
+  LC_ALL: C
+  NODE_MUSL_IMAGE: node@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914
+
+jobs:
+  musl-notices:
+    name: Musl notice inputs / ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-latest
+            platform: linux/amd64
+            arch: x64
+            addon: ktav.linux-x64-musl.node
+            bun: bun-linux-x64-musl
+            bun_sha: a5a8ccc5e74dcb883fe974f125a7bdb3b41e5195ed1b870e73f17effd3eb2b2d
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            arch: arm64
+            addon: ktav.linux-arm64-musl.node
+            bun: bun-linux-aarch64-musl
+            bun_sha: 57f01b02ac7113c61c935f28f38c2eab849e3c970dab21f8b640a87b1ef65009
+    env:
+      MUSL_TARGET: ${{ matrix.target }}
+      MUSL_PLATFORM: ${{ matrix.platform }}
+      MUSL_ARCH: ${{ matrix.arch }}
+      MUSL_ADDON: ${{ matrix.addon }}
+      MUSL_BUN: ${{ matrix.bun }}
+      MUSL_BUN_SHA: ${{ matrix.bun_sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preserve reviewed notice tools and four-file native overlay
+        shell: python
+        run: |
+          import os
+          import shutil
+          from pathlib import Path
+          stage = Path(os.environ['RUNNER_TEMP']) / 'musl-notice-tools'
+          stage.mkdir()
+          names = ['Cargo.lock', 'ci/js-build-lock.json', 'crates/napi/build.rs', 'crates/cabi/build.rs', 'scripts/patch_napi_notice_source.py', 'scripts/patch_cabi_notice_source.py', 'ci/test_cabi_notice_overlay.py', 'ci/test_napi_notice_overlay.py', 'scripts/prepare_js_notices.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/source_license_supplements.py', 'scripts/check_embedded_notices.py', 'scripts/check-npm-licenses.mjs', 'ci/about.toml', 'ci/licenses/js-source-supplements.json', 'scripts/capture-zig-link.sh', 'scripts/musl_native_evidence.py', 'ci/musl-runtime-catalog.json', 'ci/test_musl_native_evidence.py']
+          for name in names:
+              destination = stage / name
+              destination.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(name, destination)
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_REF }}
+          submodules: recursive
+          persist-credentials: false
+      - name: Graft native metadata without newer core APIs
+        shell: python
+        run: |
+          import hashlib
+          import json
+          import os
+          import shutil
+          import subprocess
+          import sys
+          from pathlib import Path
+          if subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() != os.environ['SOURCE_REF']:
+              raise SystemExit('unexpected musl source ref')
+          overlay = ['crates/napi/build.rs', 'crates/napi/src/lib.rs', 'crates/cabi/build.rs', 'crates/cabi/src/lib.rs']
+          baseline = {name: hashlib.sha256(Path(name).read_bytes()).hexdigest() if Path(name).is_file() else None for name in overlay}
+          stage = Path(os.environ['RUNNER_TEMP']) / 'musl-notice-tools'
+          for path in stage.rglob('*'):
+              if path.is_file():
+                  destination = Path(path.relative_to(stage))
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copyfile(path, destination)
+          subprocess.run([sys.executable, '-I', 'scripts/patch_napi_notice_source.py', 'crates/napi/src/lib.rs'], check=True)
+          subprocess.run([sys.executable, '-I', 'scripts/patch_cabi_notice_source.py', 'crates/cabi/src/lib.rs'], check=True)
+          protected = ['Cargo.toml', 'crates', 'tests', 'root-docs', 'package.json', 'package-lock.json']
+          changed = set(subprocess.check_output(['git', 'diff', '--name-only', '--', *protected], text=True).splitlines())
+          changed.update(subprocess.check_output(['git', 'ls-files', '--others', '--exclude-standard', '--', *protected], text=True).splitlines())
+          if changed != set(overlay):
+              raise SystemExit('musl source changed beyond four native notice files')
+          record = {'source_ref': os.environ['SOURCE_REF'], 'tooling_ref': os.environ['GITHUB_SHA'], 'target': os.environ['MUSL_TARGET'], 'notice_overlay': {name: {'baseline_sha256': baseline[name], 'compiled_sha256': hashlib.sha256(Path(name).read_bytes()).hexdigest()} for name in overlay}, 'scope': 'Original 0.8.1 source with NAPI/CABI notices; conservative runtime collection only, actual retained input review remains required.'}
+          (Path(os.environ['RUNNER_TEMP']) / 'musl-notice-source.json').write_text(json.dumps(record, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          targets: ${{ matrix.target }}
+          components: rust-docs
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.14.0
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild@0.24.0
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about@0.9.3
+      - name: Verify source preservation and musl ABI regression guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          for test in test_cabi_notice_overlay.py test_napi_notice_overlay.py test_musl_native_evidence.py; do
+            python3 -I -m unittest discover -s ci -p "$test" -v
+          done
+      - name: Prepare reviewed source-bound candidate notices and npm tools
+        shell: python
+        run: |
+          import os
+          import shutil
+          import subprocess
+          import sys
+          from pathlib import Path
+          evidence = Path(os.environ['RUNNER_TEMP']) / 'musl-native-evidence'
+          subprocess.run([sys.executable, 'scripts/prepare_js_notices.py', str(evidence)], check=True)
+          subprocess.run([sys.executable, '-I', 'scripts/musl_native_evidence.py', 'prepare', str(evidence)], check=True)
+          shutil.copyfile(Path(os.environ['RUNNER_TEMP']) / 'musl-notice-source.json', evidence / 'source-provenance.json')
+          for name in ['LICENSE-MIT', 'LICENSE-APACHE']:
+              shutil.copyfile(name, evidence / name)
+          shutil.copyfile('package-lock.json', evidence / 'npm-lock-source.json')
+          subprocess.run(['npm', 'install', '--ignore-scripts', '--no-audit', '--no-fund'], check=True)
+          subprocess.run(['git', 'diff', '--exit-code', '--', 'package.json'], check=True)
+          shutil.copyfile('package-lock.json', evidence / 'npm-lock-resolved.json')
+          subprocess.run(['node', 'scripts/check-npm-licenses.mjs'], check=True)
+          subprocess.run(['node', '-e', 'if(require("@napi-rs/cli/package.json").version!=="3.6.2")throw new Error("NAPI CLI version requires review")'], check=True)
+          subprocess.run(['npm', 'run', 'build:ts'], check=True)
+      - name: Build both musl roles and collect actual input evidence
+        shell: python
+        run: |
+          import os
+          import shutil
+          import subprocess
+          import sys
+          from pathlib import Path
+          evidence = Path(os.environ['RUNNER_TEMP']) / 'musl-native-evidence'
+          if os.environ.get('RUSTFLAGS') or os.environ.get('CARGO_ENCODED_RUSTFLAGS'):
+              raise SystemExit('preexisting musl flags require review')
+          target = os.environ['MUSL_TARGET']
+          sysroot = subprocess.check_output(['rustc', '--print', 'sysroot'], text=True).strip()
+          wrapper = Path('scripts/capture-zig-link.sh').resolve()
+          wrapper.chmod(0o755)
+          commands = [('napi', ['npx', '--no-install', 'napi', 'build', '--release', '-p', 'ktav-napi', '--target', target, '--platform', '--js', 'false', '--output-dir', '.', '--cross-compile']), ('cabi', ['cargo', 'zigbuild', '--locked', '--release', '-p', 'ktav-cabi', '--target', target])]
+          for role, command in commands:
+              directory = evidence / role
+              directory.mkdir()
+              cache = Path(os.environ['RUNNER_TEMP']) / ('musl-zig-cache-' + role)
+              cache.mkdir()
+              environment = {**os.environ, 'RUSTFLAGS': '-C target-feature=-crt-static -C link-arg=-Wl,--print-map', 'ZIG_GLOBAL_CACHE_DIR': str(cache), 'CARGO_ZIGBUILD_ZIG_COMMAND': str(wrapper), 'KTAV_REAL_ZIG': shutil.which('zig'), 'KTAV_LINK_MAP': str(directory / 'native-link.map'), 'KTAV_LINK_COMMAND': str(directory / 'native-link-command.json'), 'KTAV_NAPI_NOTICES_GZIP': str(evidence / 'NOTICE.json.gz'), 'KTAV_CABI_NOTICES_GZIP': str(evidence / 'NOTICE.json.gz'), 'RUSTC_LOG': 'rustc_codegen_ssa::back::link=info'}
+              environment.pop('CARGO_ZIGBUILD_ZIG_COMMAND_ARGS', None)
+              result = subprocess.run(command, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+              (directory / 'build-stdout.txt').write_bytes(result.stdout)
+              (directory / 'build-stderr.txt').write_bytes(result.stderr)
+              sys.stdout.buffer.write(result.stdout)
+              sys.stderr.buffer.write(result.stderr)
+              if result.returncode:
+                  raise SystemExit(result.returncode)
+              original = Path('target') / target / 'release' / ('libktav_' + role + '.so')
+              binary = Path(os.environ['MUSL_ADDON']) if role == 'napi' else original
+              if binary.read_bytes() != original.read_bytes():
+                  raise SystemExit('musl staged/original bytes differ')
+              subprocess.run([sys.executable, '-I', 'scripts/musl_native_evidence.py', 'capture', str(binary), str(directory), target, role, str(cache), sysroot], check=True)
+              report = subprocess.check_output([sys.executable, '-I', 'scripts/check_embedded_notices.py', str(directory / binary.name), str(evidence / 'NOTICE.json')])
+              (directory / 'embedded-verification.json').write_bytes(report)
+          if Path('Cargo.lock').read_bytes() != (evidence / 'Cargo.lock').read_bytes():
+              raise SystemExit('musl build changed reviewed lock')
+      - name: Run actual matching-CPU Node and Bun consumers in pinned Alpine
+        shell: python
+        run: |
+          import hashlib
+          import json
+          import os
+          import platform
+          import shutil
+          import stat
+          import subprocess
+          import urllib.request
+          import zipfile
+          from pathlib import Path, PurePosixPath
+          expected_host = 'x86_64' if os.environ['MUSL_ARCH'] == 'x64' else 'aarch64'
+          if platform.machine() != expected_host:
+              raise SystemExit('native matching-CPU musl runner required; no emulation claim')
+          temporary = Path(os.environ['RUNNER_TEMP'])
+          evidence = temporary / 'musl-native-evidence'
+          tools = temporary / 'musl-consumer-tools'
+          tools.mkdir()
+          archive = tools / 'bun.zip'
+          url = 'https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/' + os.environ['MUSL_BUN'] + '.zip'
+          checksum = hashlib.sha256()
+          total = 0
+          with urllib.request.urlopen(url, timeout=120) as response, archive.open('xb') as output:
+              while chunk := response.read(1024 * 1024):
+                  total += len(chunk)
+                  if total > 128 * 1024 * 1024:
+                      raise SystemExit('musl Bun tool archive exceeds bound')
+                  checksum.update(chunk)
+                  output.write(chunk)
+          if checksum.hexdigest() != os.environ['MUSL_BUN_SHA']:
+              raise SystemExit('musl Bun tool bytes differ')
+          stage = temporary / 'musl-consumer-stage'
+          for folder in ['tools', 'dist/native', 'cabi/release', 'spec']:
+              (stage / folder).mkdir(parents=True, exist_ok=True)
+          with zipfile.ZipFile(archive) as source:
+              member = source.getinfo(os.environ['MUSL_BUN'] + '/bun')
+              if not member.file_size <= 256 * 1024 * 1024 or member.is_dir() or stat.S_IFMT(member.external_attr >> 16) == stat.S_IFLNK:
+                  raise SystemExit('unexpected musl Bun executable member')
+              with source.open(member) as input_file, (stage / 'tools/bun').open('xb') as output:
+                  shutil.copyfileobj(input_file, output, 1024 * 1024)
+          (stage / 'tools/bun').chmod(0o755)
+          shutil.copyfile(evidence / 'napi' / os.environ['MUSL_ADDON'], stage / 'dist/native' / os.environ['MUSL_ADDON'])
+          shutil.copyfile(evidence / 'cabi/libktav_cabi.so', stage / 'cabi/release/libktav_cabi.so')
+          shutil.copytree('dist/ts', stage / 'dist/ts')
+          shutil.copytree('tests', stage / 'tests')
+          shutil.copytree('spec/versions', stage / 'spec/versions')
+          shutil.copyfile('package.json', stage / 'package.json')
+          image = os.environ['NODE_MUSL_IMAGE']
+          docker_platform = os.environ['MUSL_PLATFORM']
+          subprocess.run(['docker', 'pull', '--platform', docker_platform, image], check=True)
+          (evidence / 'consumer-image.json').write_bytes(subprocess.check_output(['docker', 'image', 'inspect', image]))
+          node_script = 'import assert from "node:assert/strict";import {createRequire} from "node:module";import {realpathSync} from "node:fs";assert.equal(process.arch,process.env.EXPECTED_ARCH);await import("./dist/ts/node.js");const require=createRequire(import.meta.url);assert.deepEqual(Object.keys(require.cache).filter(p=>p.endsWith(".node")),[realpathSync("dist/native/"+process.env.ADDON)]);await import("./tests/node/run-node-napi.mjs");'
+          commands = [('node', ['node', '--input-type=module', '-e', node_script]), ('bun', ['/work/tools/bun', 'run', 'tests/bun/run-bun-ffi.mjs'])]
+          for role, command in commands:
+              result = subprocess.run(['docker', 'run', '--rm', '--platform', docker_platform, '--network', 'none', '--mount', 'type=bind,source=' + str(stage) + ',target=/work,readonly', '--workdir', '/work', '--env', 'EXPECTED_ARCH=' + os.environ['MUSL_ARCH'], '--env', 'ADDON=' + os.environ['MUSL_ADDON'], '--env', 'CARGO_TARGET_DIR=/work/cabi', image, *command], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+              (evidence / (role + '-consumer-stdout.txt')).write_bytes(result.stdout)
+              (evidence / (role + '-consumer-stderr.txt')).write_bytes(result.stderr)
+              if result.returncode or b'passed' not in result.stdout or b'skipping' in result.stdout.lower():
+                  sys_stdout = result.stdout.decode('utf-8', errors='replace')
+                  sys_stderr = result.stderr.decode('utf-8', errors='replace')
+                  raise SystemExit(role + ' actual musl corpus failed:\n' + sys_stdout + '\n' + sys_stderr)
+          record = {'target': os.environ['MUSL_TARGET'], 'native_runner_arch': platform.machine(), 'node_napi_corpus': True, 'bun_cabi_corpus': True, 'emulated': False, 'napi_sha256': hashlib.sha256((stage / 'dist/native' / os.environ['MUSL_ADDON']).read_bytes()).hexdigest(), 'cabi_sha256': hashlib.sha256((stage / 'cabi/release/libktav_cabi.so').read_bytes()).hexdigest(), 'bun_archive_sha256': checksum.hexdigest(), 'node_image': image, 'scope': 'Actual matching-CPU Alpine Node/Bun corpus execution. No Deno-musl or completed retained-runtime licensing claim.'}
+          (evidence / 'consumer-verification.json').write_text(json.dumps(record, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: musl-native-evidence-${{ matrix.target }}
+          path: ${{ runner.temp }}/musl-native-evidence/
+          if-no-files-found: warn
