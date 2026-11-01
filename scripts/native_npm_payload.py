@@ -97,7 +97,7 @@ def files(root):
             if len(result) >= 4096 or total > 256 * 1024 * 1024:
                 raise ValueError('payload inventory exceeds bound')
             result.append({'path': name, 'bytes': len(raw), 'sha256': sha(raw)})
-    return result
+    return sorted(result, key=lambda item: item['path'])
 
 
 def check_manifest(root, manifest_name):

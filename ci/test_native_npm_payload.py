@@ -227,6 +227,27 @@ class PayloadTests(unittest.TestCase):
                 ASSEMBLY.assemble(payloads, root / 'templates', root / 'output')
             self.assertFalse((root / 'output').exists())
 
+    def test_inventory_order_is_canonical_with_windows_path_comparison(self):
+        class WindowsEntry:
+            def __init__(self, path):
+                self.path = path
+
+            def __getattr__(self, name):
+                return getattr(self.path, name)
+
+            def __lt__(self, other):
+                return self.path.name.casefold() < other.path.name.casefold()
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            names = ['Cargo.lock', 'COPYRIGHT-library.html', 'binary', 'LICENSE-MIT']
+            for name in names:
+                (root / name).write_bytes(name.encode())
+            entries = [WindowsEntry(root / name) for name in names]
+            with patch.object(Path, 'rglob', return_value=entries):
+                inventory = PAYLOAD.files(root)
+            self.assertEqual([item['path'] for item in inventory], sorted(names))
+
     def test_actual_native_tarball_retains_both_complete_roles(self):
         with tempfile.TemporaryDirectory() as temporary:
             root, inputs, template, output, lock = self.assembled_fixture(temporary)
