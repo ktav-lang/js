@@ -46,12 +46,19 @@ jobs:
       - name: Preserve reviewed notice tools and four-file native overlay
         shell: python
         run: |
+          import hashlib
+          import json
           import os
           import shutil
           from pathlib import Path
           stage = Path(os.environ['RUNNER_TEMP']) / 'musl-notice-tools'
           stage.mkdir()
           names = ['Cargo.lock', 'ci/js-build-lock.json', 'crates/napi/build.rs', 'crates/cabi/build.rs', 'scripts/patch_napi_notice_source.py', 'scripts/patch_cabi_notice_source.py', 'ci/test_cabi_notice_overlay.py', 'ci/test_napi_notice_overlay.py', 'scripts/prepare_js_notices.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/source_license_supplements.py', 'scripts/check_embedded_notices.py', 'scripts/check-npm-licenses.mjs', 'ci/about.toml', 'ci/licenses/js-source-supplements.json', 'scripts/capture-zig-link.sh', 'scripts/musl_native_evidence.py', 'ci/musl-runtime-catalog.json', 'ci/test_musl_native_evidence.py']
+          retained = Path('ci/musl-retained-runtime.json').read_bytes()
+          if hashlib.sha256(retained).hexdigest() != 'ed6146168bd64b5022037c7a4ff30e71a21da74b07c697aa848799520166c1b5':
+              raise SystemExit('unreviewed retained musl source profile')
+          names += ['scripts/musl_retained_runtime.py', 'ci/musl-retained-runtime.json', 'ci/test_musl_retained_runtime.py']
+          names += [item['path'] for item in json.loads(retained)['materials']]
           for name in names:
               destination = stage / name
               destination.parent.mkdir(parents=True, exist_ok=True)
@@ -113,7 +120,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for test in test_cabi_notice_overlay.py test_napi_notice_overlay.py test_musl_native_evidence.py; do
+          for test in test_cabi_notice_overlay.py test_napi_notice_overlay.py test_musl_native_evidence.py test_musl_retained_runtime.py; do
             python3 -I -m unittest discover -s ci -p "$test" -v
           done
       - name: Prepare reviewed source-bound candidate notices and npm tools
@@ -127,6 +134,7 @@ jobs:
           evidence = Path(os.environ['RUNNER_TEMP']) / 'musl-native-evidence'
           subprocess.run([sys.executable, 'scripts/prepare_js_notices.py', str(evidence)], check=True)
           subprocess.run([sys.executable, '-I', 'scripts/musl_native_evidence.py', 'prepare', str(evidence)], check=True)
+          subprocess.run([sys.executable, '-I', 'scripts/musl_retained_runtime.py', 'prepare', str(evidence)], check=True)
           shutil.copyfile(Path(os.environ['RUNNER_TEMP']) / 'musl-notice-source.json', evidence / 'source-provenance.json')
           for name in ['LICENSE-MIT', 'LICENSE-APACHE']:
               shutil.copyfile(name, evidence / name)
@@ -174,6 +182,7 @@ jobs:
               subprocess.run([sys.executable, '-I', 'scripts/musl_native_evidence.py', 'capture', str(binary), str(directory), target, role, str(cache), sysroot], check=True)
               report = subprocess.check_output([sys.executable, '-I', 'scripts/check_embedded_notices.py', str(directory / binary.name), str(evidence / 'NOTICE.json')])
               (directory / 'embedded-verification.json').write_bytes(report)
+              subprocess.run([sys.executable, '-I', 'scripts/musl_retained_runtime.py', 'verify', str(evidence), target, role], check=True)
           if Path('Cargo.lock').read_bytes() != (evidence / 'Cargo.lock').read_bytes():
               raise SystemExit('musl build changed reviewed lock')
       - name: Run actual matching-CPU Node and Bun consumers in pinned Alpine
@@ -239,7 +248,7 @@ jobs:
                   sys_stdout = result.stdout.decode('utf-8', errors='replace')
                   sys_stderr = result.stderr.decode('utf-8', errors='replace')
                   raise SystemExit(role + ' actual musl corpus failed:\n' + sys_stdout + '\n' + sys_stderr)
-          record = {'target': os.environ['MUSL_TARGET'], 'native_runner_arch': platform.machine(), 'node_napi_corpus': True, 'bun_cabi_corpus': True, 'emulated': False, 'napi_sha256': hashlib.sha256((stage / 'dist/native' / os.environ['MUSL_ADDON']).read_bytes()).hexdigest(), 'cabi_sha256': hashlib.sha256((stage / 'cabi/release/libktav_cabi.so').read_bytes()).hexdigest(), 'bun_archive_sha256': checksum.hexdigest(), 'node_image': image, 'scope': 'Actual matching-CPU Alpine Node/Bun corpus execution. No Deno-musl or completed retained-runtime licensing claim.'}
+          record = {'target': os.environ['MUSL_TARGET'], 'native_runner_arch': platform.machine(), 'node_napi_corpus': True, 'bun_cabi_corpus': True, 'emulated': False, 'napi_sha256': hashlib.sha256((stage / 'dist/native' / os.environ['MUSL_ADDON']).read_bytes()).hexdigest(), 'cabi_sha256': hashlib.sha256((stage / 'cabi/release/libktav_cabi.so').read_bytes()).hexdigest(), 'bun_archive_sha256': checksum.hexdigest(), 'node_image': image, 'scope': 'Actual matching-CPU Alpine Node/Bun corpus execution. Exact source/grant gates are separate; no Deno-musl or production npm delivery claim.'}
           (evidence / 'consumer-verification.json').write_text(json.dumps(record, sort_keys=True, indent=2) + '\n', encoding='utf-8')
       - uses: actions/upload-artifact@v4
         if: always()

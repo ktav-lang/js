@@ -50,7 +50,7 @@ def prepare(evidence):
     if subprocess.check_output(['zig', 'version'], text=True).strip() != '0.14.0':
         raise ValueError('unreviewed musl Zig version')
     lib = Path(json.loads(subprocess.check_output(['zig', 'env']))['lib_dir']).resolve()
-    sections = ['Ktav musl candidate runtime notice collection.\nActual retained inputs still require review before production delivery.\n']
+    sections = ['Ktav musl runtime source notice collection.\nExact role/target retained input gates are recorded separately.\n']
     for item in profile['files']:
         relative = PurePosixPath(item['path'])
         if relative.is_absolute() or '..' in relative.parts or '\\' in item['path']:
@@ -68,8 +68,8 @@ def prepare(evidence):
     bundle = json.loads(before)
     if 'non_cargo_runtimes' in bundle or (evidence / 'NOTICE.cargo-std.json').exists():
         raise ValueError('musl candidate notices already augmented')
-    bundle['non_cargo_runtimes'] = [{'name': 'Conservative Zig libunwind/musl source-notice collection', 'source_revision': REVISION, 'catalog_sha256': CATALOG_SHA, 'files': profile['files'], 'credits': profile['credits'], 'coverage': profile['coverage']}]
-    bundle['coverage'] += ' Candidate musl source notice collection only; retained runtime input review remains required.'
+    bundle['non_cargo_runtimes'] = [{'name': 'Zig libunwind/musl original source-notice collection', 'source_revision': REVISION, 'catalog_sha256': CATALOG_SHA, 'files': profile['files'], 'credits': profile['credits'], 'coverage': profile['coverage']}]
+    bundle['coverage'] += ' Includes original musl source notice collection; exact retained input/source gates are required separately.'
     raw = (json.dumps(bundle, ensure_ascii=False, sort_keys=True, indent=2) + '\n').encode('utf-8')
     compressed = gzip.compress(raw, mtime=0)
     if len(raw) > 64 * 1024 * 1024 or len(compressed) > 4 * 1024 * 1024:
@@ -109,6 +109,19 @@ def capture(binary, evidence, target, role, cache, sysroot):
         if path.is_file():
             raw = read(path, 128 * 1024 * 1024)
             record.update({'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()})
+        if origin == 'zig-cache':
+            objects = []
+            for member in sorted(members):
+                selected = Path(member)
+                if not selected.is_absolute():
+                    selected = path.parent / selected
+                if not selected.resolve().is_relative_to(cache.resolve()):
+                    raise ValueError('actual Zig member escapes fresh cache')
+                raw = read(selected, 16 * 1024 * 1024)
+                if len(raw) < 64 or raw[:6] != b'\x7fELF\x02\x01' or struct.unpack_from('<HH', raw, 16) != (1, cpu):
+                    raise ValueError('actual Zig member ELF CPU/kind differs')
+                objects.append({'name': selected.name, 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(), 'machine': cpu})
+            record['object_inputs'] = objects
         records.append(record)
     direct = sorted(set(re.findall(r'[^\s()]+[.]o(?=:\()', mapping.decode('utf-8'))))
     for name in ['NOTICE.json', 'NOTICE.json.gz', 'NOTICE.cargo-std.json', 'musl-runtime-catalog.json', 'NOTICE.musl-runtime.txt', 'Cargo.lock', 'source-provenance.json']:
@@ -116,7 +129,7 @@ def capture(binary, evidence, target, role, cache, sysroot):
     destination = evidence / binary.name
     if destination.resolve() != binary.resolve():
         shutil.copyfile(binary, destination)
-    report = {'target': target, 'role': role, 'machine': cpu, 'binary_sha256': hashlib.sha256(data).hexdigest(), 'map_sha256': hashlib.sha256(mapping).hexdigest(), 'imports': needed, 'archive_inputs': records, 'direct_objects': direct, 'scope': 'Actual musl candidate binary/resource/input collection only. Retained-source grant review still required; no production npm delivery approval.'}
+    report = {'target': target, 'role': role, 'machine': cpu, 'binary_sha256': hashlib.sha256(data).hexdigest(), 'map_sha256': hashlib.sha256(mapping).hexdigest(), 'imports': needed, 'archive_inputs': records, 'direct_objects': direct, 'scope': 'Actual musl binary/resource/input collection. Exact source/grant gates are recorded separately in retained-runtime-verification.json; not production npm assembly.'}
     (evidence / 'native-verification.json').write_text(json.dumps(report, sort_keys=True, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(report, sort_keys=True))
 
