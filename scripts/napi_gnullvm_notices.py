@@ -11,7 +11,7 @@ import urllib.error
 import urllib.request
 
 CATALOG = 'ci/licenses/napi-gnullvm-runtime.json'
-CATALOG_SHA = 'f1642eb589e5481d017f5d05178e593249efd94e9eb8de8b85f203adc057a85d'
+CATALOG_SHA = '0a5390a23f29fefafd13d0ff389698c9b99bc29676f251efc9beccd41de3174d'
 SDK_SHA = 'fd5462b7f5d93b2ff981fcd3f9c7e427e47f3203c64ea91c27bcc444eebd74cd'
 REVISIONS = {'mingw-w64/mingw-w64': '0d6dfbc348dfad714761c0a7151615767f96bcb5', 'llvm/llvm-project': '7a941dfb2877a0b8cf30323fefa85ad019e0b0f5', 'napi-rs/napi-rs': 'd9cb526c15e63ba30e06b4d169068c9854180595'}
 DATA_ONLY = {'mingw-w64-crt/crt/cinitexe.c', 'mingw-w64-crt/misc/mingw_matherr.c', 'mingw-w64-crt/misc/dllmain.c'}
@@ -36,6 +36,11 @@ def catalogue(root):
     document = json.loads(raw)
     if document['sdk_archive_sha256'] != SDK_SHA or len(document['source_files']) != 61 or len(document['original_documents']) != 7:
         raise ValueError('GNU NAPI runtime catalogue roles differ')
+    for item in document['original_documents']:
+        original_text = item['text'].encode('utf-8')
+        blob = hashlib.sha1(b'blob ' + str(len(original_text)).encode() + b'\0' + original_text).hexdigest()
+        if hashlib.sha256(original_text).hexdigest() != item['sha256'] or blob != item['git_blob']:
+            raise ValueError('GNU NAPI catalogue original text identity differs: ' + item['path'])
     return document
 
 

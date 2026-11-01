@@ -40,7 +40,10 @@ class NapiRuntimeTests(unittest.TestCase):
         self.assertIn(b'Copyright (c) 2020-present LongYinan', text)
         self.assertIn(b'Copyright (c) 2018 GitHub', text)
         for item in document['original_documents']:
-            self.assertIn(item['text'].encode(), text)
+            raw = item['text'].encode('utf-8')
+            self.assertIn(raw, text)
+            self.assertEqual(hashlib.sha256(raw).hexdigest(), item['sha256'])
+            self.assertEqual(hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest(), item['git_blob'])
         sources = [item for item in document['source_files'] if item['path'].endswith('crtdll_atexit_register.c')]
         self.assertEqual(len(sources), 1)
         self.assertIn('Public Domain', sources[0]['source_notices'][0])
