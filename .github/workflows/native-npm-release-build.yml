@@ -31,6 +31,9 @@ jobs:
   wasm:
     needs: contracts
     uses: ./.github/workflows/wasm-notice-check.yml
+  installed-consumers:
+    needs: assemble
+    uses: ./.github/workflows/packed-npm-consumers.yml
   assemble:
     name: Pack eight native packages and the main package
     needs: [gnu-napi, gnu-cabi, macos-native, musl-native, windows-cabi, windows-napi, wasm]
