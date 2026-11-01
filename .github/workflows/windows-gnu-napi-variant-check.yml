@@ -1,4 +1,4 @@
-name: Windows GNU NAPI source variant probe
+name: Windows GNU NAPI source-bound notice candidate
 
 on:
   pull_request:
@@ -13,6 +13,7 @@ jobs:
   variant:
     name: GNU NAPI variant / ${{ matrix.target }}
     runs-on: windows-latest
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -37,7 +38,9 @@ jobs:
           from pathlib import Path
           stage = Path(os.environ['RUNNER_TEMP']) / 'gnu-napi-tools'
           stage.mkdir()
-          names = ['Cargo.lock', 'scripts/windows_gnu_napi_variant.py', 'ci/test_windows_gnu_napi_variant.py', 'ci/fixtures/windows-gnu-napi/project-build.rs.txt', 'ci/fixtures/windows-gnu-napi/project-Cargo.toml.txt']
+          names = ['Cargo.lock', 'scripts/windows_gnu_napi_variant.py', 'ci/test_windows_gnu_napi_variant.py', 'ci/fixtures/windows-gnu-napi/project-build.rs.txt', 'ci/fixtures/windows-gnu-napi/project-Cargo.toml.txt',
+                   'scripts/prepare_gnu_napi_variant_notices.py', 'scripts/stage_gnu_napi_variant.py', 'scripts/napi_gnullvm_notices.py', 'scripts/rust_compiler_notices.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/source_license_supplements.py', 'scripts/patch_napi_notice_source.py', 'scripts/check_embedded_notices.py', 'ci/about.toml', 'ci/licenses/js-source-supplements.json', 'ci/licenses/napi-gnullvm-runtime.json', 'ci/rust-compiler-notices.json', 'ci/test_napi_gnullvm_notices.py', 'ci/fixtures/windows-gnu-napi/project-config.toml.txt', 'ci/fixtures/windows-gnu-napi/resource-build.rs.txt',
+                   *[str(path) for path in Path('ci/licenses/rust-compiler-originals').glob('*')]]
           for name in names:
               target = stage / name
               target.parent.mkdir(parents=True, exist_ok=True)
@@ -56,6 +59,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.99.1
         with:
           targets: ${{ matrix.target }}
+          components: rust-docs
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about@0.9.3
       - name: Restore tooling without copying current binding APIs
         shell: python
         run: |
@@ -72,6 +79,8 @@ jobs:
           subprocess.run(['git', 'diff', '--exit-code', '--', 'Cargo.toml', 'crates', 'ts', 'tests', 'package.json', 'package-lock.json'], check=True)
       - name: Verify source and lock variant guards
         run: python -I -m unittest discover -s ci -p test_windows_gnu_napi_variant.py -v
+      - name: Verify complete source/runtime grants and resource overlays
+        run: python -I -m unittest discover -s ci -p test_napi_gnullvm_notices.py -v
       - name: Fetch the original locked dependency graph
         run: cargo fetch --locked
       - name: Install checksum-pinned LLVM MinGW SDK
@@ -113,7 +122,7 @@ jobs:
           if not compiler.is_file():
               raise SystemExit('exact target compiler missing')
           key = 'CARGO_TARGET_' + os.environ['NAPI_TARGET'].upper().replace('-', '_') + '_LINKER'
-          flags = ['-C', 'target-feature=+crt-static', '-C', 'link-arg=-Wl,-Map,' + (root / 'gnu-napi-evidence/native-link.map').as_posix()]
+          flags = ['-C', 'target-feature=+crt-static', '-C', 'link-arg=-Wl,-Map,' + (root / 'gnu-napi-evidence/native-link.map').as_posix(), '-C', 'link-arg=-Wl,--reproduce=' + (root / 'gnu-napi-link.tar').as_posix()]
           with Path(os.environ['GITHUB_ENV']).open('a', encoding='utf-8') as output:
               for name, value in [(key, str(compiler)), ('CARGO_ENCODED_RUSTFLAGS', chr(31).join(flags)), ('LLVM_MINGW_PROBE', str(install))]:
                   output.write(name + '=' + value + '\n')
@@ -151,8 +160,13 @@ jobs:
           record = json.loads((evidence / 'source-variant.json').read_text(encoding='utf-8'))
           record.update({'target': os.environ['NAPI_TARGET'], 'tooling_ref': os.environ['GITHUB_SHA'], 'sdk_archive_sha256': 'fd5462b7f5d93b2ff981fcd3f9c7e427e47f3203c64ea91c27bcc444eebd74cd', 'compiler_sha256': hashlib.sha256(compiler.read_bytes()).hexdigest()})
           (evidence / 'source-variant.json').write_text(json.dumps(record, sort_keys=True, indent=2) + '\n', encoding='utf-8')
-          subprocess.run(['cargo', 'build', '--locked', '--release', '-p', 'ktav-napi', '--target', os.environ['NAPI_TARGET'], '--config', config], check=True)
-      - name: Capture actual GNU PE and link evidence without distributing binaries
+          subprocess.run([sys.executable, '-I', 'scripts/prepare_gnu_napi_variant_notices.py', str(evidence), os.environ['NAPI_TARGET']], check=True)
+          subprocess.run([sys.executable, '-I', 'scripts/napi_gnullvm_notices.py', 'prepare', str(evidence), os.environ['NAPI_TARGET']], check=True)
+          environment = {**os.environ, 'KTAV_NAPI_NOTICES_GZIP': str(evidence / 'NOTICE.json.gz')}
+          subprocess.run(['cargo', 'build', '--locked', '--release', '-p', 'ktav-napi', '--target', os.environ['NAPI_TARGET'], '--config', config], env=environment, check=True)
+          if Path('Cargo.lock').read_bytes() != (evidence / 'Cargo.variant.lock').read_bytes():
+              raise SystemExit('compiled variant lock changed')
+      - name: Capture actual GNU PE and verify source-bound notices before native upload
         shell: python
         run: |
           import hashlib
@@ -161,6 +175,7 @@ jobs:
           import re
           import struct
           import subprocess
+          import sys
           from pathlib import Path
           root = Path(os.environ['RUNNER_TEMP'])
           evidence = root / 'gnu-napi-evidence'
@@ -186,8 +201,10 @@ jobs:
           map_raw = mapping.read_bytes()
           if re.search(rb'(?i)(?:vcruntime|libcmt)[^\s()]*[.]lib|VC[/\\]Tools[/\\]MSVC', map_raw):
               raise SystemExit('actual map contains Microsoft startup inputs')
-          record = {'target': os.environ['NAPI_TARGET'], 'binary_sha256': hashlib.sha256(raw).hexdigest(), 'map_sha256': hashlib.sha256(map_raw).hexdigest(), 'imports': imports, 'machine': int(os.environ['NAPI_MACHINE']), 'native_binary_uploaded': False, 'scope': 'Experimental GNU source-variant compilation and PE/link evidence only. Not production distribution or final runtime/source grant clearance.'}
+          subprocess.run([sys.executable, '-I', 'scripts/stage_gnu_napi_variant.py', 'capture', str(root / 'gnu-napi-link.tar'), str(evidence / 'link-input-fingerprints.json')], check=True)
+          record = {'target': os.environ['NAPI_TARGET'], 'binary_sha256': hashlib.sha256(raw).hexdigest(), 'map_sha256': hashlib.sha256(map_raw).hexdigest(), 'imports': imports, 'machine': int(os.environ['NAPI_MACHINE']), 'scope': 'Actual GNU source-variant PE and linker input identity; runtime/resource gate recorded separately. Not npm or historical package clearance.'}
           (evidence / 'binary-verification.json').write_text(json.dumps(record, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+          subprocess.run([sys.executable, '-I', 'scripts/napi_gnullvm_notices.py', 'verify', str(evidence), str(binary), os.environ['NAPI_TARGET']], check=True)
       - name: Verify actual x64 Node consumer using the built GNU addon
         if: matrix.target == 'x86_64-pc-windows-gnullvm'
         shell: python
@@ -226,6 +243,22 @@ jobs:
               raise SystemExit('native corpus incomplete or summary missing')
           record = {'target': os.environ['NAPI_TARGET'], 'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(), 'loaded_built_addon': True, 'sdk_path_removed': True, 'legacy_loader_filename': destination.name, 'scope': 'Legacy loader filename compatibility, not an MSVC target claim. Actual GNU target is recorded in compiler and PE evidence. ARM execution not claimed.'}
           (evidence / 'consumer-verification.json').write_text(json.dumps(record, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+      - name: Stage complete native legal and source roles after all gates
+        shell: python
+        run: |
+          import os
+          import subprocess
+          import sys
+          from pathlib import Path
+          evidence = Path(os.environ['RUNNER_TEMP']) / 'gnu-napi-evidence'
+          binary = Path('target') / os.environ['NAPI_TARGET'] / 'release/ktav_napi.dll'
+          subprocess.run([sys.executable, '-I', 'scripts/stage_gnu_napi_variant.py', 'stage', str(evidence), str(binary), os.environ['NAPI_TARGET']], check=True)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gnu-napi-native-candidate-${{ matrix.target }}
+          path: ${{ runner.temp }}/gnu-napi-native-payload/
+          include-hidden-files: true
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -1,0 +1,163 @@
+{
+  "coverage": "Complete original Rust compiler-builtins, LLVM compiler-rt and libm grants and a conservative source witness collection for the pinned compiler. Not a retained-code inventory, all-target input proof or change to the first-party MIT OR Apache-2.0 license.",
+  "llvm_revision": "1b9c0d5ff9bbe7634aead059efe6b11a7eeba145",
+  "materials": [
+    {
+      "bytes": 15078,
+      "git_blob": "00ae6140bd54e1b538d833f60438e11ed8be12cf",
+      "legal_document": true,
+      "path": "ci/licenses/rust-compiler-originals/compiler-builtins-LICENSE.txt",
+      "repository": "rust-lang/rust",
+      "revision": "58cf8f9c35b355199727627d07ae34a4e2846d67",
+      "role": "compiler-builtins-LICENSE.txt",
+      "sha256": "ab6eec6caf0fa5775e411c7a8bc6a45c4ef2956b0980b157ab74fc5cd62a928b",
+      "upstream_path": "library/compiler-builtins/LICENSE.txt"
+    },
+    {
+      "bytes": 2005,
+      "git_blob": "b2f1443f2eb09d297b62c7b44fce9e31d71b10a2",
+      "legal_document": false,
+      "path": "ci/licenses/rust-compiler-originals/compiler-builtins-Cargo.toml.txt",
+      "repository": "rust-lang/rust",
+      "revision": "58cf8f9c35b355199727627d07ae34a4e2846d67",
+      "role": "compiler-builtins-Cargo.toml.txt",
+      "sha256": "d89e31fed70f2cad9c6e91b787bf4c0fb680c631196b2a7215c81745aaf7fb7e",
+      "upstream_path": "library/compiler-builtins/compiler-builtins/Cargo.toml"
+    },
+    {
+      "bytes": 27313,
+      "git_blob": "e86c784b5c6317a53e9ff89104b15e60ba7ac4bf",
+      "legal_document": false,
+      "path": "ci/licenses/rust-compiler-originals/compiler-builtins-build.rs.txt",
+      "repository": "rust-lang/rust",
+      "revision": "58cf8f9c35b355199727627d07ae34a4e2846d67",
+      "role": "compiler-builtins-build.rs.txt",
+      "sha256": "dd1d07d0852fd6a654c69d6dafd8ae66744853cb5678610008dbf6ae6baec11e",
+      "upstream_path": "library/compiler-builtins/compiler-builtins/build.rs"
+    },
+    {
+      "bytes": 463,
+      "git_blob": "2c12cb7f3095b2ace3938a666ebd1b607b8a269c",
+      "legal_document": false,
+      "path": "ci/licenses/rust-compiler-originals/compiler-builtins-aarch64.rs.txt",
+      "repository": "rust-lang/rust",
+      "revision": "58cf8f9c35b355199727627d07ae34a4e2846d67",
+      "role": "compiler-builtins-aarch64.rs.txt",
+      "sha256": "5acb367779a8e6e6e06e188e715d6d2ff76b9c3208acd899e139957bd1d3c877",
+      "upstream_path": "library/compiler-builtins/compiler-builtins/src/aarch64.rs"
+    },
+    {
+      "bytes": 16463,
+      "git_blob": "367768ecb60d65069679b3c84a9ef932c5ab6962",
+      "legal_document": false,
+      "path": "ci/licenses/rust-compiler-originals/compiler-builtins-aarch64-outline-atomics.rs.txt",
+      "repository": "rust-lang/rust",
+      "revision": "58cf8f9c35b355199727627d07ae34a4e2846d67",
+      "role": "compiler-builtins-aarch64-outline-atomics.rs.txt",
+      "sha256": "d2e6ed0066ac36db55dfaa245bdc814353456dda92437aba539cc828d2011ae9",
+      "upstream_path": "library/compiler-builtins/compiler-builtins/src/aarch64_outline_atomics.rs"
+    },
+    {
+      "bytes": 5851,
+      "git_blob": "a444d82892c36f8c1e3ba5f1977638d56fb929f8",
+      "legal_document": false,
+      "path": "ci/licenses/rust-compiler-originals/compiler-rt-aarch64-lse.S.txt",
+      "repository": "rust-lang/llvm-project",
+      "revision": "1b9c0d5ff9bbe7634aead059efe6b11a7eeba145",
+      "role": "compiler-rt-aarch64-lse.S.txt",
+      "sha256": "dcd05cb984ef8d777642eb960e3ef61b1140f268c3e4744f8f738aa46fd8ed66",
+      "upstream_path": "compiler-rt/lib/builtins/aarch64/lse.S"
+    },
+    {
+      "bytes": 3026,
+      "git_blob": "347bb4e121c97c98aa6e7440b1c952978bfedc9b",
+      "legal_document": false,
+      "path": "ci/licenses/rust-compiler-originals/compiler-rt-aarch64-cpu-model.c.txt",
+      "repository": "rust-lang/llvm-project",
+      "revision": "1b9c0d5ff9bbe7634aead059efe6b11a7eeba145",
+      "role": "compiler-rt-aarch64-cpu-model.c.txt",
+      "sha256": "405b2ad2520db341af1338be2e58cce9d28a9f63006486d1c9572f4fe10ae032",
+      "upstream_path": "compiler-rt/lib/builtins/cpu_model/aarch64.c"
+    },
+    {
+      "bytes": 16708,
+      "git_blob": "5a79a1b9d5cb0af9a779751f07033e44ca3b14d8",
+      "legal_document": true,
+      "path": "ci/licenses/rust-compiler-originals/compiler-rt-LICENSE.TXT",
+      "repository": "rust-lang/llvm-project",
+      "revision": "1b9c0d5ff9bbe7634aead059efe6b11a7eeba145",
+      "role": "compiler-rt-LICENSE.TXT",
+      "sha256": "1a8f1058753f1ba890de984e48f0242a3a5c29a6a8f2ed9fd813f36985387e8d",
+      "upstream_path": "compiler-rt/LICENSE.TXT"
+    },
+    {
+      "bytes": 1049,
+      "git_blob": "6964eba020b8aa7a08629b249e3b9aea3ce3e448",
+      "legal_document": true,
+      "path": "ci/licenses/rust-compiler-originals/compiler-rt-CREDITS.TXT",
+      "repository": "rust-lang/llvm-project",
+      "revision": "1b9c0d5ff9bbe7634aead059efe6b11a7eeba145",
+      "role": "compiler-rt-CREDITS.TXT",
+      "sha256": "a9901f47a089da41e4690682d00ce4cedaa2baf41fedbe79beee366d43ac2461",
+      "upstream_path": "compiler-rt/CREDITS.TXT"
+    },
+    {
+      "bytes": 7270,
+      "git_blob": "3dfa3863bb77007fbec01b7c931bf1c349953d11",
+      "legal_document": false,
+      "path": "ci/licenses/rust-compiler-originals/compiler-builtins-math-mod.rs.txt",
+      "repository": "rust-lang/rust",
+      "revision": "58cf8f9c35b355199727627d07ae34a4e2846d67",
+      "role": "compiler-builtins-math-mod.rs.txt",
+      "sha256": "a3ff615e04d9ae9a0bb36cfbfd9a0aaf183ab6e32ddfe836cdf4f243f97a401e",
+      "upstream_path": "library/compiler-builtins/compiler-builtins/src/math/mod.rs"
+    },
+    {
+      "bytes": 4407,
+      "git_blob": "9eb902ea578f87588d8236619a67ab7db72c8ba8",
+      "legal_document": false,
+      "path": "ci/licenses/rust-compiler-originals/libm-trunc.rs.txt",
+      "repository": "rust-lang/rust",
+      "revision": "58cf8f9c35b355199727627d07ae34a4e2846d67",
+      "role": "libm-trunc.rs.txt",
+      "sha256": "ef59952a1a80ec93be27eb78c977189084ff7fcae0e8f782d60b5947e1de141c",
+      "upstream_path": "library/compiler-builtins/libm/src/math/trunc.rs"
+    },
+    {
+      "bytes": 14088,
+      "git_blob": "2f8e41f147472510b05e0adeadf350df6f5a6b96",
+      "legal_document": true,
+      "path": "ci/licenses/rust-compiler-originals/libm-LICENSE.txt",
+      "repository": "rust-lang/rust",
+      "revision": "58cf8f9c35b355199727627d07ae34a4e2846d67",
+      "role": "libm-LICENSE.txt",
+      "sha256": "3823dda7cf046602f4b4e77ec8e227863dc4736037cc85bb33d9f19febe16bb7",
+      "upstream_path": "library/compiler-builtins/libm/LICENSE.txt"
+    },
+    {
+      "bytes": 1152,
+      "git_blob": "0b252fab94ae1d54aac4df8d5ab6f7a2e919bd32",
+      "legal_document": false,
+      "path": "ci/licenses/rust-compiler-originals/libm-generic-trunc.rs.txt",
+      "repository": "rust-lang/rust",
+      "revision": "58cf8f9c35b355199727627d07ae34a4e2846d67",
+      "role": "libm-generic-trunc.rs.txt",
+      "sha256": "3a3ca091cd1d750276601dc2dfeb2a8ff058636ea2b66a748c55a1804bc8f00a",
+      "upstream_path": "library/compiler-builtins/libm/src/math/generic/trunc.rs"
+    },
+    {
+      "bytes": 16862,
+      "git_blob": "6193aa416e22249ed25e856aa03dda2f5a585b62",
+      "legal_document": false,
+      "path": "ci/licenses/rust-compiler-originals/compiler-builtins-float-conv.rs.txt",
+      "repository": "rust-lang/rust",
+      "revision": "58cf8f9c35b355199727627d07ae34a4e2846d67",
+      "role": "compiler-builtins-float-conv.rs.txt",
+      "sha256": "740286ec154ddd78a9a8e5e6b8fad2c564585d1a76051cd6ee429c313d660070",
+      "upstream_path": "library/compiler-builtins/compiler-builtins/src/float/conv.rs"
+    }
+  ],
+  "rust_revision": "58cf8f9c35b355199727627d07ae34a4e2846d67",
+  "rust_version": "1.99.1",
+  "schema_version": 1
+}
