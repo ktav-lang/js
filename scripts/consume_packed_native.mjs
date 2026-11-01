@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 const [archivesArg, sourceArg, workArg, rid] = process.argv.slice(2);
@@ -90,11 +90,18 @@ assert.ok(!existsSync(join(main, "dist/native")), "no local NAPI fallback may ma
 cpSync(join(source, "tests"), join(main, "tests"), { recursive: true, errorOnExist: true, force: false });
 mkdirSync(join(main, "spec/versions/0.8"), { recursive: true });
 cpSync(join(source, "spec/versions/0.8/tests"), join(main, "spec/versions/0.8/tests"), { recursive: true, errorOnExist: true, force: false });
+if (!rid.endsWith("-musl")) {
+    cpSync(join(source, "tests"), join(work, "tests"), { recursive: true, errorOnExist: true, force: false });
+    mkdirSync(join(work, "spec/versions/0.8"), { recursive: true });
+    cpSync(join(source, "spec/versions/0.8/tests"), join(work, "spec/versions/0.8/tests"), { recursive: true, errorOnExist: true, force: false });
+    symlinkSync(join(main, "dist"), join(work, "dist"), process.platform === "win32" ? "junction" : "dir");
+    assert.equal(realpathSync(join(work, "dist")), realpathSync(join(main, "dist")));
+}
 const napi = realpathSync(join(native, selected.roles.napi.package_binary));
 const cabi = realpathSync(join(native, selected.roles.cabi.package_binary));
 const childEnvironment = { ...environment, PACKED_MAIN: main, PACKED_NATIVE: native, PACKED_NAPI: napi, PACKED_CABI: cabi, EXPECTED_ARCH: arch, EXPECTED_RID: rid, PACKED_PROOF: proof };
 const nodeScript = `import assert from "node:assert/strict";import {createRequire} from "node:module";import {realpathSync,readFileSync,writeFileSync} from "node:fs";import {createHash} from "node:crypto";import {pathToFileURL} from "node:url";assert.equal(process.arch,process.env.EXPECTED_ARCH);const entry=import.meta.resolve("@ktav-lang/ktav");assert.equal(realpathSync(new URL(entry)),realpathSync(process.env.PACKED_MAIN+"/dist/ts/node.js"));await import("@ktav-lang/ktav");const require=createRequire(import.meta.url);assert.deepEqual(Object.keys(require.cache).filter(p=>p.endsWith(".node")),[realpathSync(process.env.PACKED_NAPI)]);writeFileSync(process.env.PACKED_PROOF+"/node-loaded.json",JSON.stringify({binary_sha256:createHash("sha256").update(readFileSync(process.env.PACKED_NAPI)).digest("hex"),loaded_installed_addon:true}));await import(pathToFileURL(process.env.PACKED_MAIN+"/tests/node/run-node-napi.mjs").href);`;
-const ffiScript = runtime => `import assert from "node:assert/strict";import {createRequire} from "node:module";import {realpathSync,readFileSync,writeFileSync,existsSync} from "node:fs";import {createHash} from "node:crypto";import {pathToFileURL} from "node:url";const arch=${runtime === "bun" ? "process.arch" : '({x86_64:"x64",aarch64:"arm64"})[Deno.build.arch]'};assert.equal(arch,process.env.EXPECTED_ARCH);assert.ok(!process.env.KTAV_LIB_PATH);assert.ok(!process.env.CARGO_TARGET_DIR);assert.ok(!existsSync(process.env.PACKED_MAIN+"/target/release"));const entry=import.meta.resolve("@ktav-lang/ktav/ffi");assert.equal(realpathSync(new URL(entry)),realpathSync(process.env.PACKED_MAIN+"/dist/ts/ffi-${runtime}.js"));const require=createRequire(entry);const library=require.resolve("@ktav-lang/js-"+process.env.EXPECTED_RID+"/"+process.env.PACKED_CABI.split(/[\\\\/]/).at(-1));assert.equal(realpathSync(library),realpathSync(process.env.PACKED_CABI));const api=await import("@ktav-lang/ktav/ffi");assert.deepEqual(await api.loads("service: packed\\n"),{service:"packed"});writeFileSync(process.env.PACKED_PROOF+"/${runtime}-loaded.json",JSON.stringify({binary_sha256:createHash("sha256").update(readFileSync(library)).digest("hex"),default_package_locator:true}));await import(pathToFileURL(process.env.PACKED_MAIN+"/tests/${runtime}/run-${runtime}-ffi.${runtime === "bun" ? "mjs" : "ts"}").href);`;
+const ffiScript = runtime => `import assert from "node:assert/strict";import {createRequire} from "node:module";import {realpathSync,readFileSync,writeFileSync,existsSync} from "node:fs";import {createHash} from "node:crypto";import {pathToFileURL} from "node:url";const arch=${runtime === "bun" ? "process.arch" : '({x86_64:"x64",aarch64:"arm64"})[Deno.build.arch]'};assert.equal(arch,process.env.EXPECTED_ARCH);assert.ok(!process.env.KTAV_LIB_PATH);assert.ok(!process.env.CARGO_TARGET_DIR);assert.ok(!existsSync(process.env.PACKED_MAIN+"/target/release"));const entry=import.meta.resolve("@ktav-lang/ktav/ffi");assert.equal(realpathSync(new URL(entry)),realpathSync(process.env.PACKED_MAIN+"/dist/ts/ffi-${runtime}.js"));const require=createRequire(entry);const library=require.resolve("@ktav-lang/js-"+process.env.EXPECTED_RID+"/"+process.env.PACKED_CABI.split(/[\\\\/]/).at(-1));assert.equal(realpathSync(library),realpathSync(process.env.PACKED_CABI));const api=await import("@ktav-lang/ktav/ffi");assert.deepEqual(await api.loads("service: packed\\n"),{service:"packed"});writeFileSync(process.env.PACKED_PROOF+"/${runtime}-loaded.json",JSON.stringify({binary_sha256:createHash("sha256").update(readFileSync(library)).digest("hex"),default_package_locator:true}));await import(pathToFileURL(process.env.PACKED_TEST_ROOT+"/tests/${runtime}/run-${runtime}-ffi.${runtime === "bun" ? "mjs" : "ts"}").href);`;
 const scripts = [["node", process.execPath, nodeScript]];
 scripts.push(["bun", process.env.BUN_EXECUTABLE || "bun", ffiScript("bun")]);
 if (!rid.endsWith("-musl")) scripts.push(["deno", "deno", ffiScript("deno")]);
@@ -103,7 +110,8 @@ for (const [runtime, executable, script] of scripts) {
     const path = join(work, `preflight-${runtime}.mjs`);
     writeFileSync(path, script + "\n");
     const args = runtime === "deno" ? ["run", "--no-config", "--no-lock", "--cached-only", "--node-modules-dir=manual", "--allow-ffi", "--allow-env", "--allow-read", `--allow-write=${proof}`, path] : [path];
-    const result = spawnSync(executable, args, { cwd: work, env: childEnvironment, encoding: "utf8" });
+    const runtimeEnvironment = { ...childEnvironment, PACKED_TEST_ROOT: runtime === "deno" ? work : main };
+    const result = spawnSync(executable, args, { cwd: work, env: runtimeEnvironment, encoding: "utf8" });
     writeFileSync(join(proof, `${runtime}-stdout.txt`), result.stdout ?? "");
     writeFileSync(join(proof, `${runtime}-stderr.txt`), result.stderr ?? "");
     process.stdout.write(result.stdout ?? "");
