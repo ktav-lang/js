@@ -10,6 +10,7 @@ from check_native_npm import unpack, verify as verify_native
 from check_wasm_npm import verify as verify_wasm
 from native_npm_payload import LICENSES, LOCK, SOURCE, TARGETS, read, sha
 from pack_native_npm import DOC_SHA
+from patch_ffi_package_urls import verify_records as verify_ffi_overlays
 
 
 def verify(root):
@@ -40,6 +41,7 @@ def verify(root):
             report = verify_wasm(archive, evidence, package)
             provenance = json.loads(read(evidence / 'source-provenance.json'))
             notice = json.loads(read(evidence / 'NOTICE.json'))
+            verify_ffi_overlays(provenance['ffi_url_overlays'])
             if report['wasm'] != item['wasm'] or report['package_sha256'] != item['sha256'] or provenance['source_ref'] != SOURCE or provenance['tooling_ref'] != manifest['tooling_ref'] or provenance['platform_documentation_overlay']['compiled_sha256'] != DOC_SHA or sha(read(evidence / 'Cargo.lock', 4 * 1024 * 1024)) != LOCK or notice['cargo_lock_sha256'] != LOCK:
                 raise ValueError('main package actual source/resource/lock identity differs')
             copyright_report = read(evidence / 'COPYRIGHT-library.html')

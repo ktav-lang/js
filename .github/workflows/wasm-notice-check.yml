@@ -23,7 +23,7 @@ jobs:
           from pathlib import Path
           stage = Path(os.environ['RUNNER_TEMP']) / 'wasm-notice-tools'
           stage.mkdir()
-          for name in ['root-docs/PLATFORM-README/overview/body-1.md', 'Cargo.lock', 'ci/js-build-lock.json', 'ci/test_js_build_lock.py', 'scripts/wasm-notice-resource.mjs', 'tests/wasm-notice-resource.test.mjs', 'tests/test_wasm_npm.py', 'scripts/prepare_js_notices.py', 'scripts/check_wasm_npm.py', 'scripts/check-npm-licenses.mjs', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/check_embedded_notices.py', 'ci/about.toml', 'scripts/source_license_supplements.py', 'ci/test_js_source_supplements.py', 'ci/licenses/js-source-supplements.json']:
+          for name in ['scripts/patch_ffi_package_urls.py', 'ci/test_ffi_package_urls.py', 'ci/fixtures/ffi-package-urls/ffi-bun.ts.txt', 'ci/fixtures/ffi-package-urls/ffi-deno.ts.txt', 'root-docs/PLATFORM-README/overview/body-1.md', 'Cargo.lock', 'ci/js-build-lock.json', 'ci/test_js_build_lock.py', 'scripts/wasm-notice-resource.mjs', 'tests/wasm-notice-resource.test.mjs', 'tests/test_wasm_npm.py', 'scripts/prepare_js_notices.py', 'scripts/check_wasm_npm.py', 'scripts/check-npm-licenses.mjs', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/check_embedded_notices.py', 'ci/about.toml', 'scripts/source_license_supplements.py', 'ci/test_js_source_supplements.py', 'ci/licenses/js-source-supplements.json']:
               target = stage / name
               target.parent.mkdir(parents=True, exist_ok=True)
               shutil.copyfile(name, target)
@@ -32,7 +32,7 @@ jobs:
           ref: ${{ env.SOURCE_REF }}
           submodules: recursive
           persist-credentials: false
-      - name: Apply notice-only build overlay
+      - name: Apply reviewed resource, documentation and FFI URL compatibility overlays
         shell: python
         run: |
           import hashlib
@@ -55,6 +55,8 @@ jobs:
                   shutil.copyfile(path, target)
           if hashlib.sha256(document.read_bytes()).hexdigest() != '35f1387f0566eea501c65a7f378076afe1a6d9f17725fd8168bf5fc21fa58a58':
               raise SystemExit('reviewed platform documentation overlay differs')
+          import sys
+          ffi_overlays = json.loads(subprocess.check_output([sys.executable, '-I', 'scripts/patch_ffi_package_urls.py', '.']))
           script = Path('scripts/build-wasm.mjs')
           original = script.read_bytes()
           anchor = b'buildWebInline();'
@@ -67,10 +69,12 @@ jobs:
           packaged = shebang + bytes([10]) + b'import { addNoticeFile } from "./wasm-notice-resource.mjs";' + bytes([10]) + body.replace(anchor, hook + bytes([10, 10]) + anchor)
           script.write_bytes(packaged)
           record = {'source_ref': os.environ['SOURCE_REF'], 'tooling_ref': os.environ['GITHUB_SHA'], 'original_build_script_sha256': hashlib.sha256(original).hexdigest(), 'packaged_build_script_sha256': hashlib.sha256(packaged).hexdigest(), 'reviewed_lock_sha256': hashlib.sha256(Path('Cargo.lock').read_bytes()).hexdigest(), 'platform_documentation_overlay': {'path': 'root-docs/PLATFORM-README/overview/body-1.md', 'original_sha256': document_before, 'compiled_sha256': '35f1387f0566eea501c65a7f378076afe1a6d9f17725fd8168bf5fc21fa58a58'}, 'coverage': 'Audit-only Cargo/std prototype, not historical npm or non-Cargo runtime compliance.'}
+          record['ffi_url_overlays'] = ffi_overlays
+          record['coverage'] = 'Original 0.8.1 parser/ABI with explicit resource, documentation and file-URL compatibility overlays. Not historical dependency or blanket SDK evidence.'
           (Path(os.environ['RUNNER_TEMP']) / 'wasm-source-provenance.json').write_text(json.dumps(record, sort_keys=True, indent=2))
-          changed = subprocess.check_output(['git', 'diff', '--name-only', '--', 'Cargo.toml', 'crates', 'tests/node', 'root-docs', 'package.json', 'package-lock.json'], text=True).splitlines()
-          if set(changed) != {'root-docs/PLATFORM-README/overview/body-1.md'}:
-              raise SystemExit('WASM source changed beyond the reviewed documentation unit')
+          changed = subprocess.check_output(['git', 'diff', '--name-only', '--', 'Cargo.toml', 'crates', 'ts', 'tests/node', 'root-docs', 'package.json', 'package-lock.json'], text=True).splitlines()
+          if set(changed) != {'root-docs/PLATFORM-README/overview/body-1.md', 'ts/ffi-bun.ts', 'ts/ffi-deno.ts'}:
+              raise SystemExit('WASM source changed beyond reviewed documentation/FFI URL overlays')
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -89,6 +93,7 @@ jobs:
           python3 -I -m unittest discover -s tests -p test_wasm_npm.py -v
           python3 -I -m unittest discover -s ci -p test_js_source_supplements.py -v
           python3 -I -m unittest discover -s ci -p test_js_build_lock.py -v
+          python3 -I -m unittest discover -s ci -p test_ffi_package_urls.py -v
       - name: Prepare source-backed locked notices
         shell: bash
         run: |

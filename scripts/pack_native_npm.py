@@ -12,6 +12,7 @@ from assemble_native_npm import DOCS, assemble
 from check_native_npm import unpack, verify as verify_native
 from check_wasm_npm import verify as verify_wasm
 from native_npm_payload import LICENSES, LOCK, SOURCE, TARGETS, files, read, relative, sha
+from patch_ffi_package_urls import verify_records as verify_ffi_overlays
 
 DOC_UNIT = 'root-docs/PLATFORM-README/overview/body-1.md'
 DOC_SHA = '35f1387f0566eea501c65a7f378076afe1a6d9f17725fd8168bf5fc21fa58a58'
@@ -48,6 +49,7 @@ def verify_main(root, tooling):
     provenance = json.loads(read(root / 'source-provenance.json'))
     if sha(lock) != LOCK or provenance['source_ref'] != SOURCE or provenance['tooling_ref'] != tooling or provenance['platform_documentation_overlay']['compiled_sha256'] != DOC_SHA:
         raise ValueError('main package source/lock/documentation binding differs')
+    verify_ffi_overlays(provenance['ffi_url_overlays'])
     archive = root / name
     original = json.loads(read(root / 'npm-verification.json'))
     with tempfile.TemporaryDirectory(prefix='ktav-packed-main-') as temporary:
