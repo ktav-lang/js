@@ -35,6 +35,43 @@ def reviewed(root):
     return json.loads(profile), json.loads(catalog)
 
 
+BUILTINS_SHA256 = '7b8e2f772be9d0263e725dd7322490e651149d77c7787664ab9af1162085b8c3'
+RUST_REVISION = '58cf8f9c35b355199727627d07ae34a4e2846d67'
+
+
+def builtins_notice(root, target):
+    raw = read(root / 'ci/napi-gnu-rust-builtins.json', 1024 * 1024)
+    if hashlib.sha256(raw).hexdigest() != BUILTINS_SHA256:
+        raise ValueError('GNU Rust builtins profile differs from review')
+    profile = json.loads(raw)
+    materials = []
+    for item in profile['materials']:
+        path = PurePosixPath(item['path'])
+        if path.is_absolute() or '..' in path.parts or '\\' in item['path']:
+            raise ValueError('unsafe GNU Rust original path')
+        data = read(root / item['path'], 4 * 1024 * 1024)
+        blob = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+        if len(data) != item['bytes'] or hashlib.sha256(data).hexdigest() != item['sha256'] or blob != item['git_blob']:
+            raise ValueError('GNU Rust original material identity differs')
+        materials.append({**item, 'text': data.decode('utf-8')})
+    return {'profile_sha256': BUILTINS_SHA256, 'rust_revision': profile['rust_revision'], 'llvm_revision': profile['llvm_revision'], 'compiler_builtins_license': 'MIT AND Apache-2.0 WITH LLVM-exception', 'libm_license': 'MIT', 'retained': profile['targets'][target], 'materials': materials, 'coverage': profile['coverage']}
+
+
+def verify_builtins(notice, mapping, rustc):
+    if '\ncommit-hash: ' + RUST_REVISION + '\n' not in rustc or '\nrelease: 1.99.1\n' not in rustc:
+        raise ValueError('GNU Rust builtins compiler identity differs')
+    pairs = set(re.findall(r'([^\s()]*libcompiler_builtins-[0-9a-f]+[.]rlib)\(([^()\n]+)\)', mapping))
+    paths = {archive for archive, _ in pairs}
+    expected = notice['rust_compiler_builtins']['retained']
+    if len(paths) != 1:
+        raise ValueError('GNU Rust builtins archive set differs')
+    archive = paths.pop()
+    suffix = '/lib/rustlib/' + notice['target'] + '/lib/' + expected['archive']
+    if not PurePosixPath(archive).is_absolute() or not archive.endswith(suffix) or sorted(member for _, member in pairs) != expected['members']:
+        raise ValueError('GNU Rust builtins retained inputs differ')
+    return archive
+
+
 def runtime_notice(root, target):
     if target not in TARGETS:
         raise ValueError('unreviewed GNU runtime target')
@@ -47,7 +84,7 @@ def runtime_notice(root, target):
         blob = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
         if len(data) != item['bytes'] or hashlib.sha256(data).hexdigest() != item['sha256'] or blob != item['git_blob']:
             raise ValueError('GNU source or license material identity mismatch')
-    return {'schema_version': 1, 'target': target, 'profile_sha256': PROFILE_SHA256, 'sdk_catalog_sha256': CATALOG_SHA256, 'sdk_revision': profile['sdk_revision'], 'sdk_inputs': catalog['targets'][target], 'archive_members': MEMBERS, 'loaded_crt_objects': sorted(CRT), 'materials': materials, 'glibc_terms': profile['glibc_terms'], 'gcc_terms': profile['gcc_terms'], 'compilation_process': profile['compilation_process'], 'scope': profile['scope'], 'unused_archive': 'libpthread_nonshared.a is loaded, but no members are retained by this reviewed link profile.', 'host_libraries': 'System shared libraries including glibc and libgcc_s are host-provided, not redistributed in this addon payload; their dynamic use is distinct from the selected compiled-in CRT members.'}
+    return {'schema_version': 1, 'target': target, 'rust_compiler_builtins': builtins_notice(root, target), 'profile_sha256': PROFILE_SHA256, 'sdk_catalog_sha256': CATALOG_SHA256, 'sdk_revision': profile['sdk_revision'], 'sdk_inputs': catalog['targets'][target], 'archive_members': MEMBERS, 'loaded_crt_objects': sorted(CRT), 'materials': materials, 'glibc_terms': profile['glibc_terms'], 'gcc_terms': profile['gcc_terms'], 'compilation_process': profile['compilation_process'], 'scope': profile['scope'], 'unused_archive': 'libpthread_nonshared.a is loaded, but no members are retained by this reviewed link profile.', 'host_libraries': 'System shared libraries including glibc and libgcc_s are host-provided, not redistributed in this addon payload; their dynamic use is distinct from the selected compiled-in CRT members.'}
 
 
 def notice_bytes(notice):
@@ -55,6 +92,10 @@ def notice_bytes(notice):
     sections = ['GNU NAPI runtime notices — ' + notice['target'], notice['scope'], notice['glibc_terms'], notice['gcc_terms'], notice['compilation_process'], notice['unused_archive'], notice['host_libraries']]
     for item in notice['materials']:
         sections.extend(['=' * 72, item['id'], item['repository'] + ' @ ' + item['revision'], 'Git blob: ' + item['git_blob'] + '; SHA256: ' + item['sha256'], item['text']])
+    sections.extend([notice['rust_compiler_builtins']['coverage'], 'Rust compiler-builtins: MIT AND Apache-2.0 WITH LLVM-exception; libm: MIT.'])
+    for item in notice['rust_compiler_builtins']['materials']:
+        if item['legal_document']:
+            sections.extend(['=' * 72, item['repository'] + ' @ ' + item['revision'], item['upstream_path'], item['text']])
     plain = ('\n\n'.join(sections) + '\n').encode('utf-8')
     return data, plain
 
@@ -66,6 +107,8 @@ def prepare(root, evidence, target):
     if any(path.exists() or path.is_symlink() for path in paths):
         raise ValueError('GNU runtime notice output already exists')
     bundle = json.loads(read(evidence / 'NOTICE.json', 64 * 1024 * 1024))
+    if '\ncommit-hash: ' + RUST_REVISION + '\n' not in bundle.get('rustc', '') or '\nrelease: 1.99.1\n' not in bundle.get('rustc', ''):
+        raise ValueError('GNU Rust builtins compiler identity differs')
     if 'napi_gnu_runtime' in bundle:
         raise ValueError('GNU runtime bundle already augmented')
     bundle['napi_gnu_runtime'] = notice
@@ -146,6 +189,12 @@ def verify(root, evidence, target):
         raise ValueError('GNU compressed bundle differs from readable notice')
     if bundle.get('napi_gnu_runtime') != notice:
         raise ValueError('GNU runtime notice absent from augmented bundle')
+    rustc = read(evidence / 'rustc.txt', 64 * 1024).decode('utf-8')
+    mapping = read(evidence / 'native-link.map', 32 * 1024 * 1024)
+    archive = verify_builtins(notice, mapping.decode('utf-8'), rustc)
+    archive_bytes = read(Path(archive), 128 * 1024 * 1024)
+    builtins_result = {'target': target, 'rust_revision': RUST_REVISION, 'profile_sha256': BUILTINS_SHA256, 'map_sha256': hashlib.sha256(mapping).hexdigest(), 'archive': PurePosixPath(archive).name, 'archive_bytes': len(archive_bytes), 'archive_sha256': hashlib.sha256(archive_bytes).hexdigest(), 'members': notice['rust_compiler_builtins']['retained']['members']}
+    (evidence / 'rust-builtins-verification.json').write_text(json.dumps(builtins_result, sort_keys=True, indent=2) + '\n', encoding='utf-8')
     report = json.loads(read(evidence / 'native-link-inputs.json', 1024 * 1024))
     verify_link(notice, report, json.loads(read(evidence / 'sdk-notice-files.json', 48 * 1024 * 1024)), json.loads(read(evidence / 'native-link-command.json', 1024 * 1024)), read(evidence / 'rustc.txt', 64 * 1024).decode('utf-8'), read(evidence / 'compiler-version.txt', 64 * 1024).decode('utf-8'))
     result = {'target': target, 'binary_sha256': report['binary_sha256'], 'runtime_notice_sha256': hashlib.sha256(data).hexdigest(), 'plain_notice_sha256': hashlib.sha256(plain).hexdigest(), 'profile_sha256': PROFILE_SHA256, 'scope': 'Actual GNU SDK inputs, selected source/license notices and final link process verified; embedding and npm delivery are separate gates, not established by this report.'}
