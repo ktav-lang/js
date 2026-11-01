@@ -1,7 +1,7 @@
 name: Windows C ABI GNU LLVM compatibility evidence
 
 on:
-  pull_request:
+  workflow_call:
 
 permissions:
   contents: read
@@ -38,7 +38,7 @@ jobs:
           from pathlib import Path
           stage = Path(os.environ['RUNNER_TEMP']) / 'cabi-gnullvm-tools'
           stage.mkdir()
-          for name in ['Cargo.lock', 'ci/js-build-lock.json', 'crates/cabi/build.rs', 'scripts/patch_cabi_notice_source.py', 'ci/test_cabi_notice_overlay.py', 'scripts/cabi_gnullvm_notices.py', 'ci/test_cabi_gnullvm_notices.py', 'ci/licenses/cabi-gnullvm-runtime.json', 'scripts/check_embedded_notices.py', 'scripts/check-npm-licenses.mjs', 'scripts/prepare_js_notices.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/source_license_supplements.py', 'ci/about.toml', 'ci/licenses/js-source-supplements.json']:
+          for name in ['scripts/native_npm_payload.py', 'scripts/windows_gnu_napi_variant.py', 'Cargo.lock', 'ci/js-build-lock.json', 'crates/cabi/build.rs', 'scripts/patch_cabi_notice_source.py', 'ci/test_cabi_notice_overlay.py', 'scripts/cabi_gnullvm_notices.py', 'ci/test_cabi_gnullvm_notices.py', 'ci/licenses/cabi-gnullvm-runtime.json', 'scripts/check_embedded_notices.py', 'scripts/check-npm-licenses.mjs', 'scripts/prepare_js_notices.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/source_license_supplements.py', 'ci/about.toml', 'ci/licenses/js-source-supplements.json']:
               path = stage / name
               path.parent.mkdir(parents=True, exist_ok=True)
               shutil.copyfile(name, path)
@@ -335,6 +335,32 @@ jobs:
               raise SystemExit('actual consumer DLL bytes changed')
           record = {'target': os.environ['CABI_TARGET'], 'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(), 'sdk_path_removed': True, 'actual_bun_corpus': True, 'actual_deno_corpus': True, 'bun_version': subprocess.check_output(['bun', '--version'], env=environment, text=True).strip(), 'deno_version': subprocess.check_output(['deno', '--version'], env=environment, text=True).strip(), 'scope': 'Matching-x64 actual C ABI consumers with pinned spec corpus. ARM DLL inspected only; no NAPI claim.'}
           (evidence / 'consumer-verification.json').write_text(json.dumps(record, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+      - name: Stage complete source-bound native npm roles
+        env:
+          NPM_TARGET: ${{ matrix.target }}
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          import subprocess
+          import sys
+          sys.path.insert(0, str(Path('scripts').resolve()))
+          from native_npm_payload import TARGETS
+          target = os.environ['NPM_TARGET']
+          rid = next(name for name, value in TARGETS.items() if value == target)
+          root = Path(os.environ['RUNNER_TEMP'])
+          evidence = root / 'cabi-gnullvm-evidence'
+          for role in ['cabi']:
+              output = root / ('native-npm-' + rid + '-' + role)
+              subprocess.run([sys.executable, '-I', 'scripts/native_npm_payload.py', str(evidence), str(output), rid, role], check=True)
+          with Path(os.environ['GITHUB_ENV']).open('a', encoding='utf-8') as destination:
+              destination.write('NPM_RID=' + rid + '\n')
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NPM_RID }}-cabi
+          path: ${{ runner.temp }}/native-npm-${{ env.NPM_RID }}-cabi/
+          include-hidden-files: true
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:

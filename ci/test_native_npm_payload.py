@@ -2,12 +2,14 @@
 
 import contextlib
 import gzip
+import io
 import json
 import os
 from pathlib import Path
 import struct
 import sys
 import tempfile
+import tarfile
 import unittest
 from unittest.mock import patch
 
@@ -15,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 import native_npm_payload as PAYLOAD
 import assemble_native_npm as ASSEMBLY
+import check_native_npm as PACKED
 
 
 @contextlib.contextmanager
@@ -223,6 +226,39 @@ class PayloadTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'sixteen native role payloads required'):
                 ASSEMBLY.assemble(payloads, root / 'templates', root / 'output')
             self.assertFalse((root / 'output').exists())
+
+    def test_actual_native_tarball_retains_both_complete_roles(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, inputs, template, output, lock = self.assembled_fixture(temporary)
+            with patch.object(PAYLOAD, 'LOCK', lock):
+                ASSEMBLY.assemble_platform('darwin-x64', inputs, template, output)
+                archive = root / 'package.tgz'
+                with tarfile.open(archive, 'w:gz') as packed:
+                    for path in sorted(output.rglob('*')):
+                        if path.is_file():
+                            packed.add(path, arcname='package/' + path.relative_to(output).as_posix(), recursive=False)
+                report = PACKED.verify(archive, 'darwin-x64')
+            self.assertEqual(report['package'], '@ktav-lang/js-darwin-x64')
+            self.assertEqual(set(report['roles']), {'napi', 'cabi'})
+            self.assertEqual(report['package_sha256'], PAYLOAD.sha(archive.read_bytes()))
+
+    def test_tar_traversal_symlinks_and_duplicate_aliases_are_rejected(self):
+        for name, symlink in [('../escape', False), ('package/alias', True), ('package/./package.json', False)]:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                archive = root / 'package.tgz'
+                with tarfile.open(archive, 'w:gz') as packed:
+                    first = tarfile.TarInfo('package/package.json')
+                    first.size = 2
+                    packed.addfile(first, io.BytesIO(b'{}'))
+                    entry = tarfile.TarInfo(name)
+                    if symlink:
+                        entry.type = tarfile.SYMTYPE
+                        entry.linkname = '../../escape'
+                    packed.addfile(entry, io.BytesIO(b''))
+                with self.assertRaisesRegex(ValueError, 'unsafe or duplicate|kind/size'):
+                    PACKED.unpack(archive, root / 'unpacked')
+                self.assertFalse((root / 'escape').exists())
 
 
 if __name__ == '__main__':

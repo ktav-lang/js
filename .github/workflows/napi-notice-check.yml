@@ -1,7 +1,7 @@
 name: NAPI GNU runtime evidence
 
 on:
-  pull_request:
+  workflow_call:
 
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
           from pathlib import Path
           stage = Path(os.environ['RUNNER_TEMP']) / 'napi-notice-tools'
           stage.mkdir()
-          for name in ['ci/napi-gnu-rust-builtins.json', *[str(path) for path in Path('ci/licenses/musl-rust-originals').glob('*.txt')], 'crates/napi/build.rs', 'scripts/patch_napi_notice_source.py', 'ci/test_napi_notice_overlay.py', 'scripts/check_embedded_notices.py', 'Cargo.lock', 'ci/js-build-lock.json', 'ci/test_js_build_lock.py', 'scripts/capture_napi_cross_link.py', 'scripts/collect_napi_link_evidence.py', 'ci/test_napi_cross_link.py', 'ci/napi-gnu-sdk-inputs.json', 'ci/licenses/napi-gnu-runtime.json', 'ci/test_napi_gnu_runtime_notices.py', 'scripts/napi_gnu_runtime_notices.py', 'scripts/prepare_js_notices.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/source_license_supplements.py', 'scripts/check-npm-licenses.mjs', 'ci/about.toml', 'ci/licenses/js-source-supplements.json']:
+          for name in ['scripts/native_npm_payload.py', 'scripts/windows_gnu_napi_variant.py', 'ci/napi-gnu-rust-builtins.json', *[str(path) for path in Path('ci/licenses/musl-rust-originals').glob('*.txt')], 'crates/napi/build.rs', 'scripts/patch_napi_notice_source.py', 'ci/test_napi_notice_overlay.py', 'scripts/check_embedded_notices.py', 'Cargo.lock', 'ci/js-build-lock.json', 'ci/test_js_build_lock.py', 'scripts/capture_napi_cross_link.py', 'scripts/collect_napi_link_evidence.py', 'ci/test_napi_cross_link.py', 'ci/napi-gnu-sdk-inputs.json', 'ci/licenses/napi-gnu-runtime.json', 'ci/test_napi_gnu_runtime_notices.py', 'scripts/napi_gnu_runtime_notices.py', 'scripts/prepare_js_notices.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/source_license_supplements.py', 'scripts/check-npm-licenses.mjs', 'ci/about.toml', 'ci/licenses/js-source-supplements.json']:
               target = stage / name
               target.parent.mkdir(parents=True, exist_ok=True)
               shutil.copyfile(name, target)
@@ -151,6 +151,32 @@ jobs:
           mkdir -p dist/native
           cp ${{ matrix.addon }} dist/native/${{ matrix.addon }}
           node --input-type=module -e 'import assert from "node:assert/strict";import {createRequire} from "node:module";import {readFileSync,realpathSync,writeFileSync} from "node:fs";import {createHash} from "node:crypto";await import("./dist/ts/node.js");const require=createRequire(import.meta.url);const expected=realpathSync("dist/native/ktav.linux-x64-gnu.node");assert.deepEqual(Object.keys(require.cache).filter(p=>p.endsWith(".node")),[expected]);writeFileSync(process.env.RUNNER_TEMP+"/napi-notices/consumer.json",JSON.stringify({loaded_built_addon:true,binary_sha256:createHash("sha256").update(readFileSync(expected)).digest("hex")}));await import("./tests/node/run-node-napi.mjs");'
+      - name: Stage complete source-bound native npm roles
+        env:
+          NPM_TARGET: ${{ matrix.target }}
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          import subprocess
+          import sys
+          sys.path.insert(0, str(Path('scripts').resolve()))
+          from native_npm_payload import TARGETS
+          target = os.environ['NPM_TARGET']
+          rid = next(name for name, value in TARGETS.items() if value == target)
+          root = Path(os.environ['RUNNER_TEMP'])
+          evidence = root / 'napi-notices'
+          for role in ['napi']:
+              output = root / ('native-npm-' + rid + '-' + role)
+              subprocess.run([sys.executable, '-I', 'scripts/native_npm_payload.py', str(evidence), str(output), rid, role], check=True)
+          with Path(os.environ['GITHUB_ENV']).open('a', encoding='utf-8') as destination:
+              destination.write('NPM_RID=' + rid + '\n')
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NPM_RID }}-napi
+          path: ${{ runner.temp }}/native-npm-${{ env.NPM_RID }}-napi/
+          include-hidden-files: true
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -1,7 +1,7 @@
 name: Native npm payload and assembly guards
 
 on:
-  pull_request:
+  workflow_call:
 
 permissions:
   contents: read
@@ -16,5 +16,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Require the reviewed version for tag-triggered builds
+        shell: python
+        run: |
+          import os
+          ref = os.environ['GITHUB_REF']
+          if ref.startswith('refs/tags/') and ref != 'refs/tags/v0.8.1':
+              raise SystemExit('this source-bound release path requires separate review for a different version')
       - name: Reject missing legal/source roles and altered native identities
         run: python -I -m unittest discover -s ci -p test_native_npm_payload.py -v

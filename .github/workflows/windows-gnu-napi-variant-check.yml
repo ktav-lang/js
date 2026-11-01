@@ -1,7 +1,7 @@
 name: Windows GNU NAPI source-bound notice candidate
 
 on:
-  pull_request:
+  workflow_call:
 
 permissions:
   contents: read
@@ -38,7 +38,7 @@ jobs:
           from pathlib import Path
           stage = Path(os.environ['RUNNER_TEMP']) / 'gnu-napi-tools'
           stage.mkdir()
-          names = ['Cargo.lock', 'scripts/windows_gnu_napi_variant.py', 'ci/test_windows_gnu_napi_variant.py', 'ci/fixtures/windows-gnu-napi/project-build.rs.txt', 'ci/fixtures/windows-gnu-napi/project-Cargo.toml.txt',
+          names = ['scripts/native_npm_payload.py', 'Cargo.lock', 'scripts/windows_gnu_napi_variant.py', 'ci/test_windows_gnu_napi_variant.py', 'ci/fixtures/windows-gnu-napi/project-build.rs.txt', 'ci/fixtures/windows-gnu-napi/project-Cargo.toml.txt',
                    'scripts/prepare_gnu_napi_variant_notices.py', 'scripts/stage_gnu_napi_variant.py', 'scripts/napi_gnullvm_notices.py', 'scripts/rust_compiler_notices.py', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/source_license_supplements.py', 'scripts/patch_napi_notice_source.py', 'scripts/check_embedded_notices.py', 'ci/about.toml', 'ci/licenses/js-source-supplements.json', 'ci/licenses/napi-gnullvm-runtime.json', 'ci/rust-compiler-notices.json', 'ci/test_napi_gnullvm_notices.py', 'ci/fixtures/windows-gnu-napi/project-config.toml.txt', 'ci/fixtures/windows-gnu-napi/resource-build.rs.txt',
                    *[str(path) for path in Path('ci/licenses/rust-compiler-originals').glob('*')]]
           for name in names:
@@ -253,6 +253,32 @@ jobs:
           evidence = Path(os.environ['RUNNER_TEMP']) / 'gnu-napi-evidence'
           binary = Path('target') / os.environ['NAPI_TARGET'] / 'release/ktav_napi.dll'
           subprocess.run([sys.executable, '-I', 'scripts/stage_gnu_napi_variant.py', 'stage', str(evidence), str(binary), os.environ['NAPI_TARGET']], check=True)
+      - name: Stage complete source-bound native npm roles
+        env:
+          NPM_TARGET: ${{ matrix.target }}
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          import subprocess
+          import sys
+          sys.path.insert(0, str(Path('scripts').resolve()))
+          from native_npm_payload import TARGETS
+          target = os.environ['NPM_TARGET']
+          rid = next(name for name, value in TARGETS.items() if value == target)
+          root = Path(os.environ['RUNNER_TEMP'])
+          evidence = root / 'gnu-napi-native-payload'
+          for role in ['napi']:
+              output = root / ('native-npm-' + rid + '-' + role)
+              subprocess.run([sys.executable, '-I', 'scripts/native_npm_payload.py', str(evidence), str(output), rid, role], check=True)
+          with Path(os.environ['GITHUB_ENV']).open('a', encoding='utf-8') as destination:
+              destination.write('NPM_RID=' + rid + '\n')
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NPM_RID }}-napi
+          path: ${{ runner.temp }}/native-npm-${{ env.NPM_RID }}-napi/
+          include-hidden-files: true
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         with:
           name: gnu-napi-native-candidate-${{ matrix.target }}
