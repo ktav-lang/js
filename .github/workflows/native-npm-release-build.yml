@@ -49,7 +49,7 @@ jobs:
           import shutil
           stage = Path(os.environ['RUNNER_TEMP']) / 'native-npm-assembly-tools'
           stage.mkdir()
-          for name in ['scripts/native_npm_payload.py', 'scripts/assemble_native_npm.py', 'scripts/check_native_npm.py', 'scripts/check_release_npm.py', 'scripts/pack_native_npm.py', 'scripts/patch_ffi_package_urls.py', 'scripts/check_wasm_npm.py', 'scripts/check_embedded_notices.py', 'scripts/windows_gnu_napi_variant.py']:
+          for name in ['scripts/rust_compiler_notices.py', 'scripts/native_npm_payload.py', 'scripts/assemble_native_npm.py', 'scripts/check_native_npm.py', 'scripts/check_release_npm.py', 'scripts/pack_native_npm.py', 'scripts/patch_ffi_package_urls.py', 'scripts/check_wasm_npm.py', 'scripts/check_embedded_notices.py', 'scripts/windows_gnu_napi_variant.py']:
               destination = stage / name
               destination.parent.mkdir(parents=True, exist_ok=True)
               shutil.copyfile(name, destination)

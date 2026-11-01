@@ -18,6 +18,7 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 import native_npm_payload as PAYLOAD
 import assemble_native_npm as ASSEMBLY
 import check_native_npm as PACKED
+from prepare_js_notices import stage_compiler
 
 
 @contextlib.contextmanager
@@ -38,7 +39,9 @@ class PayloadTests(unittest.TestCase):
         for name in PAYLOAD.LICENSES:
             (root / name).write_bytes((ROOT / name).read_bytes())
         lock = ('version = 3\n\n[[package]]\nname = "ktav"\nversion = "0.8.1"\nchecksum = "' + PAYLOAD.CORE + '"\n').encode()
-        notice = (json.dumps({'schema_version': 1, 'cargo_lock_sha256': PAYLOAD.sha(lock)}) + '\n').encode()
+        rustc = 'rustc 1.99.1 (fixture)\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\nrelease: 1.99.1\nLLVM version: 23.1.1\n'
+        compiler = stage_compiler(ROOT, evidence, rustc)
+        notice = (json.dumps({'schema_version': 1, 'cargo_lock_sha256': PAYLOAD.sha(lock), 'rustc': rustc, 'rust_compiler_builtins': compiler}) + '\n').encode()
         compressed = gzip.compress(notice, mtime=0)
         raw = bytearray(32)
         raw[:4] = bytes.fromhex('cffaedfe')
@@ -50,7 +53,7 @@ class PayloadTests(unittest.TestCase):
             'NOTICE.json.gz': compressed,
             'Cargo.lock': lock,
             'COPYRIGHT-library.html': b'fixture standard library grant',
-            'rustc.txt': b'fixture compiler identity',
+            'rustc.txt': rustc.encode(),
             'source-provenance.json': json.dumps({'source_ref': PAYLOAD.SOURCE, 'tooling_ref': 'a' * 40}).encode(),
             role + '-macos-verification.json': json.dumps({'target': 'x86_64-apple-darwin', 'role': role, 'binary_sha256': PAYLOAD.sha(binary)}).encode(),
             role + '-embedded-verification.json': b'{}',
@@ -83,7 +86,8 @@ class PayloadTests(unittest.TestCase):
             self.assertEqual(document['package_binary'], 'ktav.darwin-x64.node')
             self.assertEqual((output / 'legal/NOTICE.json').read_bytes(), (evidence / 'NOTICE.json').read_bytes())
             self.assertFalse((output / 'legal/unrelated.json').exists())
-            self.assertEqual(len(document['files']), 12)
+            self.assertEqual(len(document['files']), 27)
+            self.assertEqual(len(list((output / 'legal/ci/licenses/rust-compiler-originals').iterdir())), 14)
 
     def test_missing_legal_role_rejected_even_with_rehashed_manifest(self):
         with tempfile.TemporaryDirectory() as temporary:

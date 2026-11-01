@@ -23,7 +23,7 @@ jobs:
           from pathlib import Path
           stage = Path(os.environ['RUNNER_TEMP']) / 'wasm-notice-tools'
           stage.mkdir()
-          for name in ['scripts/patch_ffi_package_urls.py', 'ci/test_ffi_package_urls.py', 'ci/fixtures/ffi-package-urls/ffi-bun.ts.txt', 'ci/fixtures/ffi-package-urls/ffi-deno.ts.txt', 'root-docs/PLATFORM-README/overview/body-1.md', 'Cargo.lock', 'ci/js-build-lock.json', 'ci/test_js_build_lock.py', 'scripts/wasm-notice-resource.mjs', 'tests/wasm-notice-resource.test.mjs', 'tests/test_wasm_npm.py', 'scripts/prepare_js_notices.py', 'scripts/check_wasm_npm.py', 'scripts/check-npm-licenses.mjs', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/check_embedded_notices.py', 'ci/about.toml', 'scripts/source_license_supplements.py', 'ci/test_js_source_supplements.py', 'ci/licenses/js-source-supplements.json']:
+          for name in ['scripts/rust_compiler_notices.py', 'ci/rust-compiler-notices.json', 'ci/test_js_compiler_materials.py', 'ci/licenses/rust-compiler-originals/compiler-builtins-LICENSE.txt', 'ci/licenses/rust-compiler-originals/compiler-builtins-Cargo.toml.txt', 'ci/licenses/rust-compiler-originals/compiler-builtins-build.rs.txt', 'ci/licenses/rust-compiler-originals/compiler-builtins-aarch64.rs.txt', 'ci/licenses/rust-compiler-originals/compiler-builtins-aarch64-outline-atomics.rs.txt', 'ci/licenses/rust-compiler-originals/compiler-rt-aarch64-lse.S.txt', 'ci/licenses/rust-compiler-originals/compiler-rt-aarch64-cpu-model.c.txt', 'ci/licenses/rust-compiler-originals/compiler-rt-LICENSE.TXT', 'ci/licenses/rust-compiler-originals/compiler-rt-CREDITS.TXT', 'ci/licenses/rust-compiler-originals/compiler-builtins-math-mod.rs.txt', 'ci/licenses/rust-compiler-originals/libm-trunc.rs.txt', 'ci/licenses/rust-compiler-originals/libm-LICENSE.txt', 'ci/licenses/rust-compiler-originals/libm-generic-trunc.rs.txt', 'ci/licenses/rust-compiler-originals/compiler-builtins-float-conv.rs.txt', 'scripts/patch_ffi_package_urls.py', 'ci/test_ffi_package_urls.py', 'ci/fixtures/ffi-package-urls/ffi-bun.ts.txt', 'ci/fixtures/ffi-package-urls/ffi-deno.ts.txt', 'root-docs/PLATFORM-README/overview/body-1.md', 'Cargo.lock', 'ci/js-build-lock.json', 'ci/test_js_build_lock.py', 'scripts/wasm-notice-resource.mjs', 'tests/wasm-notice-resource.test.mjs', 'tests/test_wasm_npm.py', 'scripts/prepare_js_notices.py', 'scripts/check_wasm_npm.py', 'scripts/check-npm-licenses.mjs', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/check_embedded_notices.py', 'ci/about.toml', 'scripts/source_license_supplements.py', 'ci/test_js_source_supplements.py', 'ci/licenses/js-source-supplements.json']:
               target = stage / name
               target.parent.mkdir(parents=True, exist_ok=True)
               shutil.copyfile(name, target)
@@ -94,6 +94,7 @@ jobs:
           python3 -I -m unittest discover -s ci -p test_js_source_supplements.py -v
           python3 -I -m unittest discover -s ci -p test_js_build_lock.py -v
           python3 -I -m unittest discover -s ci -p test_ffi_package_urls.py -v
+          python3 -I -m unittest discover -s ci -p test_js_compiler_materials.py -v
       - name: Prepare source-backed locked notices
         shell: bash
         run: |
@@ -159,6 +160,7 @@ jobs:
           for name in NOTICE.json Cargo.lock COPYRIGHT-library.html source-provenance.json; do
             cp "$RUNNER_TEMP/wasm-notices/$name" "dist/wasm/$name"
           done
+          cp -R "$RUNNER_TEMP/wasm-notices/ci" dist/wasm/ci
       - run: npm run build:ts
       - name: Verify host WASM consumer
         run: npm run test:node-wasm
@@ -190,7 +192,8 @@ jobs:
           shutil.copyfile(archive, stage / archive.name)
           for name in ['NOTICE.json', 'Cargo.lock', 'COPYRIGHT-library.html', 'source-provenance.json', 'npm-verification.json']:
               shutil.copyfile(evidence / name, stage / name)
-          rows = [{'path': path.name, 'bytes': path.stat().st_size, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()} for path in sorted(stage.iterdir())]
+          shutil.copytree(evidence / 'ci', stage / 'ci')
+          rows = [{'path': path.relative_to(stage).as_posix(), 'bytes': path.stat().st_size, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()} for path in sorted(stage.rglob('*'), key=lambda path: path.relative_to(stage).as_posix()) if path.is_file()]
           record = {'package': '@ktav-lang/ktav', 'version': '0.8.1', 'source_ref': os.environ['SOURCE_REF'], 'tooling_ref': os.environ['GITHUB_SHA'], 'archive': archive.name, 'files': rows}
           (stage / 'main-package-manifest.json').write_text(json.dumps(record, sort_keys=True, indent=2) + '\n', encoding='utf-8')
       - uses: actions/upload-artifact@v4

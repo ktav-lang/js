@@ -11,6 +11,23 @@ import tomllib
 
 from cargo_notice_bundle import _build
 from source_license_supplements import supplement_fallbacks
+from rust_compiler_notices import collect as compiler_notices
+
+
+def stage_compiler(root, evidence, rustc):
+    collection = compiler_notices(root, rustc)
+    profile = root / 'ci/rust-compiler-notices.json'
+    raw = profile.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != collection['profile_sha256']:
+        raise ValueError('compiler profile changed after collection')
+    destination = evidence / 'ci/rust-compiler-notices.json'
+    destination.parent.mkdir(parents=True)
+    destination.write_bytes(raw)
+    for item in collection['materials']:
+        destination = evidence / item['path']
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(item['text'].encode('utf-8'))
+    return collection
 
 
 def reviewed_lock(root):
@@ -68,6 +85,7 @@ def prepare(evidence):
     combined['source_license_supplements'] = provenance
     (evidence / 'licenses.json').write_text(json.dumps(combined, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     bundle = json.loads(_build(evidence))
+    bundle['rust_compiler_builtins'] = stage_compiler(root, evidence, bundle['rustc'])
     bundle['source_license_supplements'] = provenance
     bundle['resolution_origin'] = 'Pinned reviewed CI build graph for JS source 0.8.1; not historical published dependency evidence.'
     bundle['reviewed_build_lock'] = lock_provenance

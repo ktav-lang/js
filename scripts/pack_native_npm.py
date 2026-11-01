@@ -13,6 +13,7 @@ from check_native_npm import unpack, verify as verify_native
 from check_wasm_npm import verify as verify_wasm
 from native_npm_payload import LICENSES, LOCK, SOURCE, TARGETS, files, read, relative, sha
 from patch_ffi_package_urls import verify_records as verify_ffi_overlays
+from rust_compiler_notices import collect as compiler_notices
 
 DOC_UNIT = 'root-docs/PLATFORM-README/overview/body-1.md'
 DOC_SHA = '35f1387f0566eea501c65a7f378076afe1a6d9f17725fd8168bf5fc21fa58a58'
@@ -42,7 +43,12 @@ def verify_main(root, tooling):
     if Path(name).name != name or name != 'ktav-lang-ktav-0.8.1.tgz' or manifest['package'] != '@ktav-lang/ktav' or manifest['version'] != '0.8.1' or manifest['source_ref'] != SOURCE or manifest['tooling_ref'] != tooling:
         raise ValueError('main package producer identity differs')
     rows = manifest['files']
-    expected = {name, 'NOTICE.json', 'Cargo.lock', 'COPYRIGHT-library.html', 'source-provenance.json', 'npm-verification.json'}
+    bundle = json.loads(read(root / 'NOTICE.json'))
+    compiler = compiler_notices(root, bundle['rustc'])
+    if bundle['rust_compiler_builtins'] != compiler:
+        raise ValueError('main package compiler collection differs')
+    compiler_paths = {'ci/rust-compiler-notices.json', *[item['path'] for item in compiler['materials']]}
+    expected = {name, 'NOTICE.json', 'Cargo.lock', 'COPYRIGHT-library.html', 'source-provenance.json', 'npm-verification.json'} | compiler_paths
     if len(rows) != len(expected) or {item['path'] for item in rows} != expected or sorted(rows, key=lambda item: item['path']) != [item for item in files(root) if item['path'] != 'main-package-manifest.json']:
         raise ValueError('complete main package producer role set differs')
     lock = read(root / 'Cargo.lock', 4 * 1024 * 1024)
@@ -59,7 +65,7 @@ def verify_main(root, tooling):
         for key in ['package_sha256', 'notice_sha256', 'wasm', 'inline_matches_web']:
             if actual[key] != original[key]:
                 raise ValueError('packed main package differs from producer verification')
-        for filename in ['NOTICE.json', 'Cargo.lock', 'COPYRIGHT-library.html', 'source-provenance.json']:
+        for filename in ['NOTICE.json', 'Cargo.lock', 'COPYRIGHT-library.html', 'source-provenance.json', *sorted(compiler_paths)]:
             if read(package / 'dist/wasm' / filename) != read(root / filename):
                 raise ValueError('packed main source/legal role differs')
         for filename, expected_sha in LICENSES.items():

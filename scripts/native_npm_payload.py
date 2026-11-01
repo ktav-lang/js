@@ -11,6 +11,7 @@ import tomllib
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from check_embedded_notices import MARKER, _extract
 from windows_gnu_napi_variant import verify_lock
+from rust_compiler_notices import collect as compiler_notices
 
 SOURCE = '562deb3fde092d63a78f359be095e5079929d0d1'
 LOCK = 'c09c21c421fda8a5411f756f5df5718de41d4cf92ad237150592011f9f785932'
@@ -26,7 +27,7 @@ TARGETS = {
     'win32-x64-msvc': 'x86_64-pc-windows-gnullvm',
     'win32-arm64-msvc': 'aarch64-pc-windows-gnullvm',
 }
-COMMON = ['NOTICE.json', 'NOTICE.json.gz', 'Cargo.lock', 'COPYRIGHT-library.html', 'rustc.txt', 'source-provenance.json']
+COMMON = ['NOTICE.json', 'NOTICE.json.gz', 'Cargo.lock', 'COPYRIGHT-library.html', 'rustc.txt', 'source-provenance.json', 'ci/rust-compiler-notices.json']
 GNU_NAPI = ['GNU-RUNTIME-NOTICE.json', 'GNU-RUNTIME-NOTICE.txt', 'napi-gnu-sdk-inputs.json', 'sdk-notice-files.json', 'gnu-runtime-verification.json', 'rust-builtins-verification.json', 'native-link.map', 'native-link-inputs.json', 'native-link-command.json']
 GNU_CABI = ['NOTICE.cargo-std.json', 'NOTICE.zig-runtime.txt', 'zig-runtime-catalog.json', 'zig-runtime-members.json', 'native-gnu-verification.json', 'native-link.map', 'native-link-command.json']
 WINDOWS_CABI = ['NOTICE.cargo-std.json', 'NOTICE.windows-runtime.txt', 'cabi-gnullvm-runtime.json', 'native-runtime-verification.json', 'native-verification.json', 'link-input-fingerprints.json', 'native-link.map', 'sdk-legal.json']
@@ -127,7 +128,7 @@ def contract(root, rid, role):
         if sha(read(root / name, 64 * 1024)) != expected:
             raise ValueError('original first-party license differs')
     required = set(COMMON)
-    trees = {}
+    trees = {} if target.endswith('-gnullvm') and role == 'napi' else {'ci/licenses/rust-compiler-originals': 14}
     if target.endswith('-gnullvm') and role == 'napi':
         original = json.loads(read(root / 'legal/native-payload-manifest.json', 4 * 1024 * 1024))
         original_paths = {item['path'] for item in original['files']}
@@ -145,10 +146,10 @@ def contract(root, rid, role):
     elif target.endswith('-musl'):
         required.update(MUSL)
         required.update(role + '/' + name for name in ['Cargo.lock', 'NOTICE.json', 'NOTICE.json.gz', 'NOTICE.cargo-std.json', 'NOTICE.musl-runtime.txt', 'musl-runtime-catalog.json', 'source-provenance.json', 'native-verification.json', 'retained-runtime-verification.json', 'embedded-verification.json', 'native-link-command.json', 'native-link.map'])
-        trees = {'runtime-rust-originals': 13}
+        trees['runtime-rust-originals'] = 13
     elif target.endswith('-gnullvm'):
         required.update(WINDOWS_CABI)
-        trees = {'runtime-originals': 64}
+        trees['runtime-originals'] = 64
     else:
         required.update(GNU_NAPI if role == 'napi' else GNU_CABI)
     actual = {item['path'] for item in document['files']}
@@ -167,6 +168,8 @@ def contract(root, rid, role):
     windows_napi = target.endswith('-gnullvm') and role == 'napi'
     if not windows_napi and sha(lock) != LOCK:
         raise ValueError('original reviewed native lock differs')
+    if not windows_napi and bundle['rust_compiler_builtins'] != compiler_notices(root / 'legal', bundle['rustc']):
+        raise ValueError('complete exact compiler grant collection differs')
     provenance = json.loads(read(root / 'legal' / ('source-variant.json' if windows_napi else 'source-provenance.json')))
     if windows_napi:
         original_lock = read(root / 'legal/Cargo.original.lock', 4 * 1024 * 1024)
@@ -206,7 +209,7 @@ def stage(evidence, output, rid, role):
     if len(cores) != 1 or cores[0]['version'] != '0.8.1' or cores[0].get('checksum') != CORE:
         raise ValueError('native resource registry core differs')
     selected = list(COMMON)
-    trees = []
+    trees = [] if windows_napi else ['ci/licenses/rust-compiler-originals']
     if windows_napi:
         producer = check_manifest(evidence, 'native-payload-manifest.json')
         if producer['target'] != target or producer['source_ref'] != SOURCE or producer['binary_sha256'] != sha(raw) or producer['notice_sha256'] != sha(notice):
@@ -225,14 +228,14 @@ def stage(evidence, output, rid, role):
             proof = json.loads(read(evidence / (role + '-macos-verification.json')))
         elif target.endswith('-musl'):
             selected += MUSL
-            trees = ['runtime-rust-originals']
+            trees.append('runtime-rust-originals')
             selected += [role + '/' + name for name in ['Cargo.lock', 'NOTICE.json', 'NOTICE.json.gz', 'NOTICE.cargo-std.json', 'NOTICE.musl-runtime.txt', 'musl-runtime-catalog.json', 'source-provenance.json', 'native-verification.json', 'retained-runtime-verification.json', 'embedded-verification.json', 'native-link-command.json', 'native-link.map']]
             proof = json.loads(read(evidence / role / 'retained-runtime-verification.json'))
             if read(evidence / role / 'NOTICE.json') != notice:
                 raise ValueError('musl role notice differs from complete source collection')
         elif target.endswith('-gnullvm'):
             selected += WINDOWS_CABI
-            trees = ['runtime-originals']
+            trees.append('runtime-originals')
             proof = json.loads(read(evidence / 'native-runtime-verification.json'))
         elif role == 'napi':
             selected += GNU_NAPI
