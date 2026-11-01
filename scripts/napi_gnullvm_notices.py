@@ -153,7 +153,7 @@ def sdk_inputs(items, target):
         if marker not in name:
             cargo = r'/target/' + re.escape(target) + r'/release/deps/'
             rust = r'/[.]rustup/toolchains/1[.]99[.]1-x86_64-pc-windows-msvc/lib/rustlib/' + re.escape(target) + r'/lib/'
-            accepted = re.search(cargo + r'ktav_napi[.][^/]+[.]rcgu[.]o$', name) or re.search(cargo + r'rustc[^/]+/libstd-[0-9a-f]+[.]rlib$', name) or re.search(rust + r'libcompiler_builtins-[0-9a-f]+[.]rlib$', name)
+            accepted = re.search(cargo + r'ktav_napi[.][^/]+[.]rcgu[.]o$', name) or re.search(cargo + r'rustc[^/]+/lib(?:std|libloading)-[0-9a-f]+[.]rlib$', name) or re.search(rust + r'libcompiler_builtins-[0-9a-f]+[.]rlib$', name)
             if not accepted:
                 raise ValueError('native linker input outside reviewed SDK/Rust boundary')
             continue
@@ -188,6 +188,9 @@ def verify(evidence, binary, target):
     raw = read(binary, 128 * 1024 * 1024)
     notice = read(evidence / 'NOTICE.json', MAX_TOTAL)
     before = json.loads(read(evidence / 'NOTICE.cargo-std.json', MAX_TOTAL))
+    loading = [item for item in before['packages'] if item['name'] == 'libloading']
+    if loading != [{'name': 'libloading', 'version': '0.9.0', 'source': 'registry+https://github.com/rust-lang/crates.io-index'}]:
+        raise ValueError('GNU NAPI dynamic-loader Cargo identity differs')
     if json.loads(notice) != augment(before, document, target) or scanner._extract(raw)[0] != notice:
         raise ValueError('actual GNU NAPI runtime resource differs')
     if read(evidence / 'NOTICE.windows-runtime.txt', MAX_TOTAL) != plain_notice(document):

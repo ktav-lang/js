@@ -65,6 +65,15 @@ class NapiRuntimeTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'SDK bytes or retained objects differ'):
                 RUNTIME.verify_inputs(inputs, mapping, document, target)
 
+    def test_exact_target_libloading_rust_output_is_accepted(self):
+        for target in ['x86_64-pc-windows-gnullvm', 'aarch64-pc-windows-gnullvm']:
+            document, inputs, mapping, target = self.fixture(target)
+            inputs.append({'path': 'repro/target/' + target + '/release/deps/rustcABC/liblibloading-0123456789abcdef.rlib', 'bytes': 2122, 'sha256': '0' * 64})
+            RUNTIME.verify_inputs(inputs, mapping, document, target)
+            for path in ['repro/target/' + target + '/release/deps/rustcABC/libforeign-0123456789abcdef.rlib', 'repro/target/foreign-target/release/deps/rustcABC/liblibloading-0123456789abcdef.rlib', 'repro/foreign/liblibloading-0123456789abcdef.rlib']:
+                with self.subTest(path=path), self.assertRaisesRegex(ValueError, 'outside reviewed SDK/Rust boundary'):
+                    RUNTIME.verify_inputs(inputs + [{'path': path, 'bytes': 2122, 'sha256': '0' * 64}], mapping, document, target)
+
     def test_unknown_native_input_is_rejected(self):
         document, inputs, mapping, target = self.fixture()
         inputs.append({'path': 'foreign/foreign.lib', 'bytes': 1, 'sha256': '0' * 64})
