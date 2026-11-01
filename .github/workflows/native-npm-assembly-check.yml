@@ -1,0 +1,20 @@
+name: Native npm payload and assembly guards
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  payload-contract:
+    name: Complete native npm role contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reject missing legal/source roles and altered native identities
+        run: python -I -m unittest discover -s ci -p test_native_npm_payload.py -v
