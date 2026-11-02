@@ -5,6 +5,8 @@
 // On Node, Deno, and the browser this module is unreachable: the
 // package.json `exports` map routes those runtimes elsewhere.
 
+import { fileURLToPath } from "node:url";
+
 import { ktavMessageError, toKtavError } from "./internal/api.js";
 import type { Ktav, KtavInput, KtavValue } from "./internal/api.js";
 export type { KtavArray, KtavErrorEnvelope, KtavInput, KtavObject, KtavValue, Ktav } from "./internal/api.js";
@@ -74,7 +76,7 @@ async function getLib(): Promise<FFILib> {
                 const resolved = (import.meta as unknown as {
                     resolve(spec: string): string;
                 }).resolve(`${subpkg}/${file}`);
-                return new URL(resolved).pathname;
+                return fileURLToPath(resolved);
             },
             exists: async p => {
                 try {

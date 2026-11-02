@@ -1,0 +1,209 @@
+name: WASM notice evidence
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_REF: 562deb3fde092d63a78f359be095e5079929d0d1
+
+jobs:
+  wasm-notices:
+    name: WASM notice / actual npm package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preserve notice tools
+        shell: python
+        run: |
+          import os
+          import shutil
+          from pathlib import Path
+          stage = Path(os.environ['RUNNER_TEMP']) / 'wasm-notice-tools'
+          stage.mkdir()
+          for name in ['scripts/rust_compiler_notices.py', 'ci/rust-compiler-notices.json', 'ci/test_js_compiler_materials.py', 'ci/licenses/rust-compiler-originals/compiler-builtins-LICENSE.txt', 'ci/licenses/rust-compiler-originals/compiler-builtins-Cargo.toml.txt', 'ci/licenses/rust-compiler-originals/compiler-builtins-build.rs.txt', 'ci/licenses/rust-compiler-originals/compiler-builtins-aarch64.rs.txt', 'ci/licenses/rust-compiler-originals/compiler-builtins-aarch64-outline-atomics.rs.txt', 'ci/licenses/rust-compiler-originals/compiler-rt-aarch64-lse.S.txt', 'ci/licenses/rust-compiler-originals/compiler-rt-aarch64-cpu-model.c.txt', 'ci/licenses/rust-compiler-originals/compiler-rt-LICENSE.TXT', 'ci/licenses/rust-compiler-originals/compiler-rt-CREDITS.TXT', 'ci/licenses/rust-compiler-originals/compiler-builtins-math-mod.rs.txt', 'ci/licenses/rust-compiler-originals/libm-trunc.rs.txt', 'ci/licenses/rust-compiler-originals/libm-LICENSE.txt', 'ci/licenses/rust-compiler-originals/libm-generic-trunc.rs.txt', 'ci/licenses/rust-compiler-originals/compiler-builtins-float-conv.rs.txt', 'scripts/patch_ffi_package_urls.py', 'ci/test_ffi_package_urls.py', 'ci/fixtures/ffi-package-urls/ffi-bun.ts.txt', 'ci/fixtures/ffi-package-urls/ffi-deno.ts.txt', 'root-docs/PLATFORM-README/overview/body-1.md', 'Cargo.lock', 'ci/js-build-lock.json', 'ci/test_js_build_lock.py', 'scripts/wasm-notice-resource.mjs', 'tests/wasm-notice-resource.test.mjs', 'tests/test_wasm_npm.py', 'scripts/prepare_js_notices.py', 'scripts/check_wasm_npm.py', 'scripts/check-npm-licenses.mjs', 'scripts/cargo_notice_bundle.py', 'scripts/collect_cargo_notices.py', 'scripts/check_embedded_notices.py', 'ci/about.toml', 'scripts/source_license_supplements.py', 'ci/test_js_source_supplements.py', 'ci/licenses/js-source-supplements.json']:
+              target = stage / name
+              target.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(name, target)
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_REF }}
+          submodules: recursive
+          persist-credentials: false
+      - name: Apply reviewed resource, documentation and FFI URL compatibility overlays
+        shell: python
+        run: |
+          import hashlib
+          import json
+          import os
+          import shutil
+          import subprocess
+          from pathlib import Path
+          if subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() != os.environ['SOURCE_REF']:
+              raise SystemExit('unexpected WASM source revision')
+          stage = Path(os.environ['RUNNER_TEMP']) / 'wasm-notice-tools'
+          document = Path('root-docs/PLATFORM-README/overview/body-1.md')
+          document_before = hashlib.sha256(document.read_bytes()).hexdigest()
+          if document_before != '86f38b1e176b5a9b7365e72f1f87192fb56bbf7e68945917b6ffa816cd6085d4':
+              raise SystemExit('original platform documentation source differs')
+          for path in stage.rglob('*'):
+              if path.is_file():
+                  target = Path(path.relative_to(stage))
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copyfile(path, target)
+          if hashlib.sha256(document.read_bytes()).hexdigest() != '35f1387f0566eea501c65a7f378076afe1a6d9f17725fd8168bf5fc21fa58a58':
+              raise SystemExit('reviewed platform documentation overlay differs')
+          import sys
+          ffi_overlays = json.loads(subprocess.check_output([sys.executable, '-I', 'scripts/patch_ffi_package_urls.py', '.']))
+          script = Path('scripts/build-wasm.mjs')
+          original = script.read_bytes()
+          anchor = b'buildWebInline();'
+          if original.count(anchor) != 1:
+              raise SystemExit('WASM inline boundary changed')
+          hook = b'for (const subdir of ["web", "bundler"]) addNoticeFile(resolve(outRoot, subdir, "ktav_bg.wasm"), process.env.KTAV_NATIVE_NOTICES);'
+          shebang, body = original.split(bytes([10]), 1)
+          if shebang != b'#!/usr/bin/env node':
+              raise SystemExit('WASM build script interpreter changed')
+          packaged = shebang + bytes([10]) + b'import { addNoticeFile } from "./wasm-notice-resource.mjs";' + bytes([10]) + body.replace(anchor, hook + bytes([10, 10]) + anchor)
+          script.write_bytes(packaged)
+          record = {'source_ref': os.environ['SOURCE_REF'], 'tooling_ref': os.environ['GITHUB_SHA'], 'original_build_script_sha256': hashlib.sha256(original).hexdigest(), 'packaged_build_script_sha256': hashlib.sha256(packaged).hexdigest(), 'reviewed_lock_sha256': hashlib.sha256(Path('Cargo.lock').read_bytes()).hexdigest(), 'platform_documentation_overlay': {'path': 'root-docs/PLATFORM-README/overview/body-1.md', 'original_sha256': document_before, 'compiled_sha256': '35f1387f0566eea501c65a7f378076afe1a6d9f17725fd8168bf5fc21fa58a58'}, 'coverage': 'Audit-only Cargo/std prototype, not historical npm or non-Cargo runtime compliance.'}
+          record['ffi_url_overlays'] = ffi_overlays
+          record['coverage'] = 'Original 0.8.1 parser/ABI with explicit resource, documentation and file-URL compatibility overlays. Not historical dependency or blanket SDK evidence.'
+          (Path(os.environ['RUNNER_TEMP']) / 'wasm-source-provenance.json').write_text(json.dumps(record, sort_keys=True, indent=2))
+          changed = subprocess.check_output(['git', 'diff', '--name-only', '--', 'Cargo.toml', 'crates', 'ts', 'tests/node', 'root-docs', 'package.json', 'package-lock.json'], text=True).splitlines()
+          if set(changed) != {'root-docs/PLATFORM-README/overview/body-1.md', 'ts/ffi-bun.ts', 'ts/ffi-deno.ts'}:
+              raise SystemExit('WASM source changed beyond reviewed documentation/FFI URL overlays')
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify notice-only build overlay syntax
+        run: node --check scripts/build-wasm.mjs
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          targets: wasm32-unknown-unknown
+          components: rust-docs
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about@0.9.3,wasm-pack
+      - name: Verify notice section and tarball guards
+        run: |
+          node --test tests/wasm-notice-resource.test.mjs
+          python3 -I -m unittest discover -s tests -p test_wasm_npm.py -v
+          python3 -I -m unittest discover -s ci -p test_js_source_supplements.py -v
+          python3 -I -m unittest discover -s ci -p test_js_build_lock.py -v
+          python3 -I -m unittest discover -s ci -p test_ffi_package_urls.py -v
+          python3 -I -m unittest discover -s ci -p test_js_compiler_materials.py -v
+      - name: Prepare source-backed locked notices
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/prepare_js_notices.py "$RUNNER_TEMP/wasm-notices"
+          cp "$RUNNER_TEMP/wasm-source-provenance.json" "$RUNNER_TEMP/wasm-notices/source-provenance.json"
+          printf 'KTAV_NATIVE_NOTICES=%s\n' "$RUNNER_TEMP/wasm-notices/NOTICE.json.gz" >> "$GITHUB_ENV"
+          wasm-pack --version > "$RUNNER_TEMP/wasm-notices/wasm-pack-version.txt"
+      - name: Resolve original npm release graph without lifecycle scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp package-lock.json "$RUNNER_TEMP/wasm-notices/npm-lock-source.json"
+          npm install --ignore-scripts --no-audit --no-fund
+          git diff --exit-code -- package.json
+          cp package-lock.json "$RUNNER_TEMP/wasm-notices/npm-lock-resolved.json"
+          node scripts/check-npm-licenses.mjs
+      - name: Generate the EN/RU/ZH platform documentation from its reviewed unit
+        shell: python
+        run: |
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import shutil
+          import subprocess
+          source = Path('root-docs/PLATFORM-README/overview/body-1.md')
+          if hashlib.sha256(source.read_bytes()).hexdigest() != '35f1387f0566eea501c65a7f378076afe1a6d9f17725fd8168bf5fc21fa58a58':
+              raise SystemExit('platform documentation source changed before generation')
+          subprocess.run(['node', 'scripts/build-docs.mjs'], check=True)
+          subprocess.run(['node', 'scripts/build-docs.mjs', '--check'], check=True)
+          stage = Path(os.environ['RUNNER_TEMP']) / 'platform-readmes-generated'
+          stage.mkdir()
+          rows = []
+          for rid in ['darwin-x64', 'darwin-arm64', 'linux-x64-gnu', 'linux-arm64-gnu', 'linux-x64-musl', 'linux-arm64-musl', 'win32-x64-msvc', 'win32-arm64-msvc']:
+              for name in ['README.md', 'README.ru.md', 'README.zh.md']:
+                  path = Path('npm') / rid / name
+                  raw = path.read_bytes()
+                  destination = stage / path
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  destination.write_bytes(raw)
+                  rows.append({'path': path.as_posix(), 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()})
+          record = {'source_ref': os.environ['SOURCE_REF'], 'tooling_ref': os.environ['GITHUB_SHA'], 'unit': 'root-docs/PLATFORM-README/overview/body-1.md', 'unit_sha256': '35f1387f0566eea501c65a7f378076afe1a6d9f17725fd8168bf5fc21fa58a58', 'files': rows}
+          (stage / 'platform-readme-manifest.json').write_text(json.dumps(record, ensure_ascii=False, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+      - uses: actions/upload-artifact@v4
+        with:
+          name: platform-readmes-generated
+          path: ${{ runner.temp }}/platform-readmes-generated/
+          if-no-files-found: error
+      - name: Build final WASM before inline generation
+        env:
+          CARGO_NET_OFFLINE: 'true'
+        run: node scripts/build-wasm.mjs
+      - name: Verify final WASM resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmp Cargo.lock "$RUNNER_TEMP/wasm-notices/Cargo.lock"
+          for target in web bundler; do
+            node --input-type=module -e 'import {readFileSync} from "node:fs"; import {verifyNotice} from "./scripts/wasm-notice-resource.mjs"; verifyNotice(readFileSync(process.argv[1]),readFileSync(process.env.KTAV_NATIVE_NOTICES));' "dist/wasm/$target/ktav_bg.wasm"
+            python3 -I scripts/check_embedded_notices.py "dist/wasm/$target/ktav_bg.wasm" "$RUNNER_TEMP/wasm-notices/NOTICE.json" > "$RUNNER_TEMP/wasm-notices/resource-$target.json"
+          done
+          for name in NOTICE.json Cargo.lock COPYRIGHT-library.html source-provenance.json; do
+            cp "$RUNNER_TEMP/wasm-notices/$name" "dist/wasm/$name"
+          done
+          cp -R "$RUNNER_TEMP/wasm-notices/ci" dist/wasm/ci
+      - run: npm run build:ts
+      - name: Verify host WASM consumer
+        run: npm run test:node-wasm
+      - name: Inspect actual packed main package
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm pack --ignore-scripts --json --pack-destination "$RUNNER_TEMP" > "$RUNNER_TEMP/wasm-notices/npm-pack.json"
+          python3 -c 'import json,os,subprocess,sys; from pathlib import Path; e=Path(os.environ["RUNNER_TEMP"])/"wasm-notices"; p=json.loads((e/"npm-pack.json").read_text()); assert len(p)==1; name=p[0]["filename"]; assert Path(name).name==name; output=subprocess.check_output([sys.executable,"scripts/check_wasm_npm.py",str(e.parent/name),str(e),"."]); (e/"npm-verification.json").write_bytes(output)'
+      - name: Stage the exact verified main npm tarball without publication
+        shell: python
+        run: |
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import shutil
+          root = Path(os.environ['RUNNER_TEMP'])
+          evidence = root / 'wasm-notices'
+          packed = json.loads((evidence / 'npm-pack.json').read_bytes())
+          if len(packed) != 1 or Path(packed[0]['filename']).name != packed[0]['filename']:
+              raise SystemExit('one exact main npm package required')
+          archive = root / packed[0]['filename']
+          verification = json.loads((evidence / 'npm-verification.json').read_bytes())
+          if hashlib.sha256(archive.read_bytes()).hexdigest() != verification['package_sha256']:
+              raise SystemExit('main package changed after verification')
+          stage = root / 'main-npm-package'
+          stage.mkdir()
+          shutil.copyfile(archive, stage / archive.name)
+          for name in ['NOTICE.json', 'Cargo.lock', 'COPYRIGHT-library.html', 'source-provenance.json', 'npm-verification.json']:
+              shutil.copyfile(evidence / name, stage / name)
+          shutil.copytree(evidence / 'ci', stage / 'ci')
+          rows = [{'path': path.relative_to(stage).as_posix(), 'bytes': path.stat().st_size, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()} for path in sorted(stage.rglob('*'), key=lambda path: path.relative_to(stage).as_posix()) if path.is_file()]
+          record = {'package': '@ktav-lang/ktav', 'version': '0.8.1', 'source_ref': os.environ['SOURCE_REF'], 'tooling_ref': os.environ['GITHUB_SHA'], 'archive': archive.name, 'files': rows}
+          (stage / 'main-package-manifest.json').write_text(json.dumps(record, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+      - uses: actions/upload-artifact@v4
+        with:
+          name: main-npm-package
+          path: ${{ runner.temp }}/main-npm-package/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wasm-license-evidence
+          path: ${{ runner.temp }}/wasm-notices/
+          if-no-files-found: warn

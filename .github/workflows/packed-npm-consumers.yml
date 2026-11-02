@@ -1,0 +1,192 @@
+name: Installed native npm consumers
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: Packed consumers / ${{ matrix.rid }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-x64-gnu
+            runner: ubuntu-24.04
+            arch: x64
+          - rid: linux-arm64-gnu
+            runner: ubuntu-24.04-arm
+            arch: arm64
+          - rid: darwin-x64
+            runner: macos-15-intel
+            arch: x64
+          - rid: darwin-arm64
+            runner: macos-latest
+            arch: arm64
+          - rid: win32-x64-msvc
+            runner: windows-latest
+            arch: x64
+          - rid: win32-arm64-msvc
+            runner: windows-11-arm
+            arch: arm64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preserve only the installed-package consumer tooling
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          import shutil
+          destination = Path(os.environ['RUNNER_TEMP']) / 'consume_packed_native.mjs'
+          if destination.exists():
+              raise SystemExit('consumer tool staging must be new')
+          shutil.copyfile('scripts/consume_packed_native.mjs', destination)
+      - uses: actions/checkout@v4
+        with:
+          ref: 562deb3fde092d63a78f359be095e5079929d0d1
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          architecture: ${{ matrix.arch }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.4'
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: 'v2.9.8'
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-npm-release-packages
+          path: ${{ runner.temp }}/packed-release
+      - name: Run default package locators and the original complete corpus
+        env:
+          PACKED_RID: ${{ matrix.rid }}
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          import subprocess
+          root = Path(os.environ['RUNNER_TEMP'])
+          subprocess.run(['node', '--check', str(root / 'consume_packed_native.mjs')], check=True)
+          subprocess.run(['node', str(root / 'consume_packed_native.mjs'), str(root / 'packed-release'), str(Path.cwd()), str(root / 'ktav packed consumer'), os.environ['PACKED_RID']], check=True)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: packed-consumer-${{ matrix.rid }}
+          path: ${{ runner.temp }}/ktav packed consumer/proof/
+          if-no-files-found: warn
+
+  musl:
+    name: Packed consumers / ${{ matrix.rid }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-x64-musl
+            runner: ubuntu-24.04
+            platform: linux/amd64
+            arch: x64
+            machine: x86_64
+            bun: bun-linux-x64-musl
+            bun_sha: a5a8ccc5e74dcb883fe974f125a7bdb3b41e5195ed1b870e73f17effd3eb2b2d
+          - rid: linux-arm64-musl
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            arch: arm64
+            machine: aarch64
+            bun: bun-linux-aarch64-musl
+            bun_sha: 57f01b02ac7113c61c935f28f38c2eab849e3c970dab21f8b640a87b1ef65009
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preserve the reviewed consumer tool
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          import shutil
+          destination = Path(os.environ['RUNNER_TEMP']) / 'consume_packed_native.mjs'
+          if destination.exists():
+              raise SystemExit('consumer tool staging must be new')
+          shutil.copyfile('scripts/consume_packed_native.mjs', destination)
+      - uses: actions/checkout@v4
+        with:
+          ref: 562deb3fde092d63a78f359be095e5079929d0d1
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-npm-release-packages
+          path: ${{ runner.temp }}/packed-release
+      - name: Run actual installed-tarball Node and Bun consumers in pinned Alpine
+        env:
+          PACKED_RID: ${{ matrix.rid }}
+          PACKED_PLATFORM: ${{ matrix.platform }}
+          PACKED_MACHINE: ${{ matrix.machine }}
+          PACKED_BUN: ${{ matrix.bun }}
+          PACKED_BUN_SHA: ${{ matrix.bun_sha }}
+        shell: python
+        run: |
+          import hashlib
+          import os
+          from pathlib import Path
+          import platform
+          import shutil
+          import stat
+          import subprocess
+          import urllib.request
+          import zipfile
+          if platform.machine() != os.environ['PACKED_MACHINE']:
+              raise SystemExit('native matching-CPU runner required; no emulation')
+          root = Path(os.environ['RUNNER_TEMP'])
+          downloaded = root / 'packed-consumer-bun-original'
+          downloaded.mkdir()
+          archive = downloaded / 'bun.zip'
+          url = 'https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/' + os.environ['PACKED_BUN'] + '.zip'
+          digest = hashlib.sha256()
+          size = 0
+          with urllib.request.urlopen(url, timeout=120) as source, archive.open('xb') as destination:
+              while chunk := source.read(1024 * 1024):
+                  size += len(chunk)
+                  if size > 128 * 1024 * 1024:
+                      raise SystemExit('Bun archive bound')
+                  digest.update(chunk)
+                  destination.write(chunk)
+          if digest.hexdigest() != os.environ['PACKED_BUN_SHA']:
+              raise SystemExit('Bun tool archive differs from reviewed bytes')
+          tools = root / 'packed-consumer-tools'
+          tools.mkdir()
+          shutil.copyfile(root / 'consume_packed_native.mjs', tools / 'consume_packed_native.mjs')
+          with zipfile.ZipFile(archive) as source:
+              member = source.getinfo(os.environ['PACKED_BUN'] + '/bun')
+              if member.is_dir() or member.file_size > 256 * 1024 * 1024 or stat.S_ISLNK(member.external_attr >> 16):
+                  raise SystemExit('invalid Bun tool executable member')
+              with source.open(member) as input_file, (tools / 'bun').open('xb') as destination:
+                  shutil.copyfileobj(input_file, destination, 1024 * 1024)
+          (tools / 'bun').chmod(0o755)
+          work = root / 'packed-musl-work'
+          work.mkdir()
+          image = 'node@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914'
+          subprocess.run(['docker', 'pull', '--platform', os.environ['PACKED_PLATFORM'], image], check=True)
+          result = subprocess.run(['docker', 'run', '--rm', '--platform', os.environ['PACKED_PLATFORM'], '--network', 'none', '--mount', 'type=bind,source=' + str(root / 'packed-release') + ',target=/artifacts,readonly', '--mount', 'type=bind,source=' + str(Path.cwd()) + ',target=/source,readonly', '--mount', 'type=bind,source=' + str(tools) + ',target=/tools,readonly', '--mount', 'type=bind,source=' + str(work) + ',target=/work', '--workdir', '/work', '--env', 'RUNNER_ARCH=' + os.environ['RUNNER_ARCH'], '--env', 'BUN_EXECUTABLE=/tools/bun', image, 'node', '/tools/consume_packed_native.mjs', '/artifacts', '/source', '/work/ktav packed consumer', os.environ['PACKED_RID']], capture_output=True)
+          import sys
+          sys.stdout.buffer.write(result.stdout)
+          sys.stderr.buffer.write(result.stderr)
+          if result.returncode:
+              raise SystemExit('actual offline musl packaged consumer failed')
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: packed-consumer-${{ matrix.rid }}
+          path: ${{ runner.temp }}/packed-musl-work/ktav packed consumer/proof/
+          if-no-files-found: warn

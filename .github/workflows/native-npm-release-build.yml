@@ -1,0 +1,110 @@
+name: Source-bound native npm release build
+
+on:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    uses: ./.github/workflows/native-npm-assembly-check.yml
+  gnu-napi:
+    needs: contracts
+    uses: ./.github/workflows/napi-notice-check.yml
+  gnu-cabi:
+    needs: contracts
+    uses: ./.github/workflows/gnu-cabi-notice-check.yml
+  macos-native:
+    needs: contracts
+    uses: ./.github/workflows/macos-native-notice-check.yml
+  musl-native:
+    needs: contracts
+    uses: ./.github/workflows/musl-native-notice-check.yml
+  windows-cabi:
+    needs: contracts
+    uses: ./.github/workflows/windows-cabi-gnullvm-check.yml
+  windows-napi:
+    needs: contracts
+    uses: ./.github/workflows/windows-gnu-napi-variant-check.yml
+  wasm:
+    needs: contracts
+    uses: ./.github/workflows/wasm-notice-check.yml
+  installed-consumers:
+    needs: assemble
+    uses: ./.github/workflows/packed-npm-consumers.yml
+  assemble:
+    name: Pack eight native packages and the main package
+    needs: [gnu-napi, gnu-cabi, macos-native, musl-native, windows-cabi, windows-napi, wasm]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preserve only the shared assembly and validation tooling
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          import shutil
+          stage = Path(os.environ['RUNNER_TEMP']) / 'native-npm-assembly-tools'
+          stage.mkdir()
+          for name in ['scripts/rust_compiler_notices.py', 'scripts/native_npm_payload.py', 'scripts/assemble_native_npm.py', 'scripts/check_native_npm.py', 'scripts/check_release_npm.py', 'scripts/pack_native_npm.py', 'scripts/patch_ffi_package_urls.py', 'scripts/check_wasm_npm.py', 'scripts/check_embedded_notices.py', 'scripts/windows_gnu_napi_variant.py']:
+              destination = stage / name
+              destination.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(name, destination)
+      - uses: actions/checkout@v4
+        with:
+          ref: 562deb3fde092d63a78f359be095e5079929d0d1
+          persist-credentials: false
+      - name: Restore metadata tooling without copying current binding APIs
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          import shutil
+          import subprocess
+          stage = Path(os.environ['RUNNER_TEMP']) / 'native-npm-assembly-tools'
+          for path in stage.rglob('*'):
+              if path.is_file():
+                  destination = Path(path.relative_to(stage))
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copyfile(path, destination)
+          subprocess.run(['git', 'diff', '--exit-code', '--', 'Cargo.toml', 'crates', 'ts', 'tests', 'package.json', 'package-lock.json'], check=True)
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*-napi'
+          path: ${{ runner.temp }}/native-npm-role-inputs
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*-cabi'
+          path: ${{ runner.temp }}/native-npm-role-inputs
+      - uses: actions/download-artifact@v4
+        with:
+          name: platform-readmes-generated
+          path: ${{ runner.temp }}/native-npm-documentation
+      - uses: actions/download-artifact@v4
+        with:
+          name: main-npm-package
+          path: ${{ runner.temp }}/native-npm-main-input
+      - name: Assemble complete roles and inspect every actual npm tarball
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          import subprocess
+          import sys
+          root = Path(os.environ['RUNNER_TEMP'])
+          subprocess.run([sys.executable, '-I', 'scripts/pack_native_npm.py', str(root / 'native-npm-role-inputs'), str(root / 'native-npm-documentation'), str(root / 'native-npm-main-input'), str(root / 'native-npm-layout'), str(root / 'native-npm-release-packages')], check=True)
+          subprocess.run([sys.executable, '-I', 'scripts/check_release_npm.py', str(root / 'native-npm-release-packages')], check=True)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-npm-release-packages
+          path: ${{ runner.temp }}/native-npm-release-packages/
+          if-no-files-found: error

@@ -11,6 +11,8 @@
 // On Node and the browser this module is unreachable: the package.json
 // `exports` map routes those runtimes to `./ffi-error.js`.
 
+import { fileURLToPath } from "node:url";
+
 import { ktavMessageError, toKtavError } from "./internal/api.js";
 import type { Ktav, KtavInput, KtavValue } from "./internal/api.js";
 export type { KtavArray, KtavErrorEnvelope, KtavInput, KtavObject, KtavValue, Ktav } from "./internal/api.js";
@@ -106,7 +108,7 @@ async function getLib() {
                 // latter — works for any deno project that runs
                 // `npm install @ktav-lang/ktav` first.
                 const url = await import.meta.resolve(`${subpkg}/${file}`);
-                return new URL(url).pathname;
+                return fileURLToPath(url);
             },
             exists: async p => {
                 try { await Deno.stat(p); return true; } catch { return false; }

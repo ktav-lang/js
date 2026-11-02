@@ -1,0 +1,784 @@
+{
+  "coverage": "Reviewed C ABI DLL startup/MinGW runtime/libunwind source grants. Exact target-specific SDK fingerprints and retained objects are separate fixed roles. The original source/header notice collection is conservative and does not assert that all source records or SDK components are linked. Not an SDK source-build reproducibility claim.",
+  "llvm_revision": "7a941dfb2877a0b8cf30323fefa85ad019e0b0f5",
+  "mingw_revision": "0d6dfbc348dfad714761c0a7151615767f96bcb5",
+  "original_documents": [
+    {
+      "git_blob": "fa6ac540007032cbd0ec772a1c72e6cb5527a4fe",
+      "path": "LICENSE.TXT",
+      "sha256": "8d85c1057d742e597985c7d4e6320b015a9139385cff4cbae06ffc0ebe89afee",
+      "source": "https://raw.githubusercontent.com/llvm/llvm-project/7a941dfb2877a0b8cf30323fefa85ad019e0b0f5/LICENSE.TXT",
+      "text": "==============================================================================\nThe LLVM Project is under the Apache License v2.0 with LLVM Exceptions:\n==============================================================================\n\n                                 Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n    TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n    1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an example is provided in the Appendix below).\n\n      \"Derivative Works\" shall mean any work, whether in Source or Object\n      form, that is based on (or derived from) the Work and for which the\n      editorial revisions, annotations, elaborations, or other modifications\n      represent, as a whole, an original work of authorship. For the purposes\n      of this License, Derivative Works shall not include works that remain\n      separable from, or merely link (or bind by name) to the interfaces of,\n      the Work and Derivative Works thereof.\n\n      \"Contribution\" shall mean any work of authorship, including\n      the original version of the Work and any modifications or additions\n      to that Work or Derivative Works thereof, that is intentionally\n      submitted to Licensor for inclusion in the Work by the copyright owner\n      or by an individual or Legal Entity authorized to submit on behalf of\n      the copyright owner. For the purposes of this definition, \"submitted\"\n      means any form of electronic, verbal, or written communication sent\n      to the Licensor or its representatives, including but not limited to\n      communication on electronic mailing lists, source code control systems,\n      and issue tracking systems that are managed by, or on behalf of, the\n      Licensor for the purpose of discussing and improving the Work, but\n      excluding communication that is conspicuously marked or otherwise\n      designated in writing by the copyright owner as \"Not a Contribution.\"\n\n      \"Contributor\" shall mean Licensor and any individual or Legal Entity\n      on behalf of whom a Contribution has been received by Licensor and\n      subsequently incorporated within the Work.\n\n    2. Grant of Copyright License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      copyright license to reproduce, prepare Derivative Works of,\n      publicly display, publicly perform, sublicense, and distribute the\n      Work and such Derivative Works in Source or Object form.\n\n    3. Grant of Patent License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      (except as stated in this section) patent license to make, have made,\n      use, offer to sell, sell, import, and otherwise transfer the Work,\n      where such license applies only to those patent claims licensable\n      by such Contributor that are necessarily infringed by their\n      Contribution(s) alone or by combination of their Contribution(s)\n      with the Work to which such Contribution(s) was submitted. If You\n      institute patent litigation against any entity (including a\n      cross-claim or counterclaim in a lawsuit) alleging that the Work\n      or a Contribution incorporated within the Work constitutes direct\n      or contributory patent infringement, then any patent licenses\n      granted to You under this License for that Work shall terminate\n      as of the date such litigation is filed.\n\n    4. Redistribution. You may reproduce and distribute copies of the\n      Work or Derivative Works thereof in any medium, with or without\n      modifications, and in Source or Object form, provided that You\n      meet the following conditions:\n\n      (a) You must give any other recipients of the Work or\n          Derivative Works a copy of this License; and\n\n      (b) You must cause any modified files to carry prominent notices\n          stating that You changed the files; and\n\n      (c) You must retain, in the Source form of any Derivative Works\n          that You distribute, all copyright, patent, trademark, and\n          attribution notices from the Source form of the Work,\n          excluding those notices that do not pertain to any part of\n          the Derivative Works; and\n\n      (d) If the Work includes a \"NOTICE\" text file as part of its\n          distribution, then any Derivative Works that You distribute must\n          include a readable copy of the attribution notices contained\n          within such NOTICE file, excluding those notices that do not\n          pertain to any part of the Derivative Works, in at least one\n          of the following places: within a NOTICE text file distributed\n          as part of the Derivative Works; within the Source form or\n          documentation, if provided along with the Derivative Works; or,\n          within a display generated by the Derivative Works, if and\n          wherever such third-party notices normally appear. The contents\n          of the NOTICE file are for informational purposes only and\n          do not modify the License. You may add Your own attribution\n          notices within Derivative Works that You distribute, alongside\n          or as an addendum to the NOTICE text from the Work, provided\n          that such additional attribution notices cannot be construed\n          as modifying the License.\n\n      You may add Your own copyright statement to Your modifications and\n      may provide additional or different license terms and conditions\n      for use, reproduction, or distribution of Your modifications, or\n      for any such Derivative Works as a whole, provided Your use,\n      reproduction, and distribution of the Work otherwise complies with\n      the conditions stated in this License.\n\n    5. Submission of Contributions. Unless You explicitly state otherwise,\n      any Contribution intentionally submitted for inclusion in the Work\n      by You to the Licensor shall be under the terms and conditions of\n      this License, without any additional terms or conditions.\n      Notwithstanding the above, nothing herein shall supersede or modify\n      the terms of any separate license agreement you may have executed\n      with Licensor regarding such Contributions.\n\n    6. Trademarks. This License does not grant permission to use the trade\n      names, trademarks, service marks, or product names of the Licensor,\n      except as required for reasonable and customary use in describing the\n      origin of the Work and reproducing the content of the NOTICE file.\n\n    7. Disclaimer of Warranty. Unless required by applicable law or\n      agreed to in writing, Licensor provides the Work (and each\n      Contributor provides its Contributions) on an \"AS IS\" BASIS,\n      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or\n      implied, including, without limitation, any warranties or conditions\n      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A\n      PARTICULAR PURPOSE. You are solely responsible for determining the\n      appropriateness of using or redistributing the Work and assume any\n      risks associated with Your exercise of permissions under this License.\n\n    8. Limitation of Liability. In no event and under no legal theory,\n      whether in tort (including negligence), contract, or otherwise,\n      unless required by applicable law (such as deliberate and grossly\n      negligent acts) or agreed to in writing, shall any Contributor be\n      liable to You for damages, including any direct, indirect, special,\n      incidental, or consequential damages of any character arising as a\n      result of this License or out of the use or inability to use the\n      Work (including but not limited to damages for loss of goodwill,\n      work stoppage, computer failure or malfunction, or any and all\n      other commercial damages or losses), even if such Contributor\n      has been advised of the possibility of such damages.\n\n    9. Accepting Warranty or Additional Liability. While redistributing\n      the Work or Derivative Works thereof, You may choose to offer,\n      and charge a fee for, acceptance of support, warranty, indemnity,\n      or other liability obligations and/or rights consistent with this\n      License. However, in accepting such obligations, You may act only\n      on Your own behalf and on Your sole responsibility, not on behalf\n      of any other Contributor, and only if You agree to indemnify,\n      defend, and hold each Contributor harmless for any liability\n      incurred by, or claims asserted against, such Contributor by reason\n      of your accepting any such warranty or additional liability.\n\n    END OF TERMS AND CONDITIONS\n\n    APPENDIX: How to apply the Apache License to your work.\n\n      To apply the Apache License to your work, attach the following\n      boilerplate notice, with the fields enclosed by brackets \"[]\"\n      replaced with your own identifying information. (Don't include\n      the brackets!)  The text should be enclosed in the appropriate\n      comment syntax for the file format. We also recommend that a\n      file or class name and description of purpose be included on the\n      same \"printed page\" as the copyright notice for easier\n      identification within third-party archives.\n\n    Copyright [yyyy] [name of copyright owner]\n\n    Licensed under the Apache License, Version 2.0 (the \"License\");\n    you may not use this file except in compliance with the License.\n    You may obtain a copy of the License at\n\n       http://www.apache.org/licenses/LICENSE-2.0\n\n    Unless required by applicable law or agreed to in writing, software\n    distributed under the License is distributed on an \"AS IS\" BASIS,\n    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n    See the License for the specific language governing permissions and\n    limitations under the License.\n\n\n---- LLVM Exceptions to the Apache 2.0 License ----\n\nAs an exception, if, as a result of your compiling your source code, portions\nof this Software are embedded into an Object form of such source code, you\nmay redistribute such embedded portions in such Object form without complying\nwith the conditions of Sections 4(a), 4(b) and 4(d) of the License.\n\nIn addition, if you combine or link compiled forms of this Software with\nsoftware that is licensed under the GPLv2 (\"Combined Software\") and if a\ncourt of competent jurisdiction determines that the patent provision (Section\n3), the indemnity provision (Section 9) or other Section of the License\nconflicts with the conditions of the GPLv2, you may retroactively and\nprospectively choose to deem waived or otherwise exclude such Section(s) of\nthe License, but only in their entirety and only with respect to the Combined\nSoftware.\n\n==============================================================================\nSoftware from third parties included in the LLVM Project:\n==============================================================================\nThe LLVM Project contains third party software which is under different license\nterms. All such code will be identified clearly using at least one of two\nmechanisms:\n1) It will be in a separate directory tree with its own `LICENSE.txt` or\n   `LICENSE` file at the top containing the specific license and restrictions\n   which apply to that software, or\n2) It will contain specific license and restriction terms at the top of every\n   file.\n\n==============================================================================\nLegacy LLVM License (https://llvm.org/docs/DeveloperPolicy.html#legacy):\n==============================================================================\nUniversity of Illinois/NCSA\nOpen Source License\n\nCopyright (c) 2003-2019 University of Illinois at Urbana-Champaign.\nAll rights reserved.\n\nDeveloped by:\n\n    LLVM Team\n\n    University of Illinois at Urbana-Champaign\n\n    http://llvm.org\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of\nthis software and associated documentation files (the \"Software\"), to deal with\nthe Software without restriction, including without limitation the rights to\nuse, copy, modify, merge, publish, distribute, sublicense, and/or sell copies\nof the Software, and to permit persons to whom the Software is furnished to do\nso, subject to the following conditions:\n\n    * Redistributions of source code must retain the above copyright notice,\n      this list of conditions and the following disclaimers.\n\n    * Redistributions in binary form must reproduce the above copyright notice,\n      this list of conditions and the following disclaimers in the\n      documentation and/or other materials provided with the distribution.\n\n    * Neither the names of the LLVM Team, University of Illinois at\n      Urbana-Champaign, nor the names of its contributors may be used to\n      endorse or promote products derived from this Software without specific\n      prior written permission.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS\nFOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE\nCONTRIBUTORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS WITH THE\nSOFTWARE.\n\n"
+    },
+    {
+      "git_blob": "1e3120621caeb62648745a42f7a9a25d1e2731ab",
+      "path": "libunwind/LICENSE.TXT",
+      "sha256": "b5efebcaca80879234098e52d1725e6d9eb8fb96a19fce625d39184b705f7b6d",
+      "source": "https://raw.githubusercontent.com/llvm/llvm-project/7a941dfb2877a0b8cf30323fefa85ad019e0b0f5/libunwind/LICENSE.TXT",
+      "text": "==============================================================================\nThe LLVM Project is under the Apache License v2.0 with LLVM Exceptions:\n==============================================================================\n\n                                 Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n    TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n    1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an example is provided in the Appendix below).\n\n      \"Derivative Works\" shall mean any work, whether in Source or Object\n      form, that is based on (or derived from) the Work and for which the\n      editorial revisions, annotations, elaborations, or other modifications\n      represent, as a whole, an original work of authorship. For the purposes\n      of this License, Derivative Works shall not include works that remain\n      separable from, or merely link (or bind by name) to the interfaces of,\n      the Work and Derivative Works thereof.\n\n      \"Contribution\" shall mean any work of authorship, including\n      the original version of the Work and any modifications or additions\n      to that Work or Derivative Works thereof, that is intentionally\n      submitted to Licensor for inclusion in the Work by the copyright owner\n      or by an individual or Legal Entity authorized to submit on behalf of\n      the copyright owner. For the purposes of this definition, \"submitted\"\n      means any form of electronic, verbal, or written communication sent\n      to the Licensor or its representatives, including but not limited to\n      communication on electronic mailing lists, source code control systems,\n      and issue tracking systems that are managed by, or on behalf of, the\n      Licensor for the purpose of discussing and improving the Work, but\n      excluding communication that is conspicuously marked or otherwise\n      designated in writing by the copyright owner as \"Not a Contribution.\"\n\n      \"Contributor\" shall mean Licensor and any individual or Legal Entity\n      on behalf of whom a Contribution has been received by Licensor and\n      subsequently incorporated within the Work.\n\n    2. Grant of Copyright License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      copyright license to reproduce, prepare Derivative Works of,\n      publicly display, publicly perform, sublicense, and distribute the\n      Work and such Derivative Works in Source or Object form.\n\n    3. Grant of Patent License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      (except as stated in this section) patent license to make, have made,\n      use, offer to sell, sell, import, and otherwise transfer the Work,\n      where such license applies only to those patent claims licensable\n      by such Contributor that are necessarily infringed by their\n      Contribution(s) alone or by combination of their Contribution(s)\n      with the Work to which such Contribution(s) was submitted. If You\n      institute patent litigation against any entity (including a\n      cross-claim or counterclaim in a lawsuit) alleging that the Work\n      or a Contribution incorporated within the Work constitutes direct\n      or contributory patent infringement, then any patent licenses\n      granted to You under this License for that Work shall terminate\n      as of the date such litigation is filed.\n\n    4. Redistribution. You may reproduce and distribute copies of the\n      Work or Derivative Works thereof in any medium, with or without\n      modifications, and in Source or Object form, provided that You\n      meet the following conditions:\n\n      (a) You must give any other recipients of the Work or\n          Derivative Works a copy of this License; and\n\n      (b) You must cause any modified files to carry prominent notices\n          stating that You changed the files; and\n\n      (c) You must retain, in the Source form of any Derivative Works\n          that You distribute, all copyright, patent, trademark, and\n          attribution notices from the Source form of the Work,\n          excluding those notices that do not pertain to any part of\n          the Derivative Works; and\n\n      (d) If the Work includes a \"NOTICE\" text file as part of its\n          distribution, then any Derivative Works that You distribute must\n          include a readable copy of the attribution notices contained\n          within such NOTICE file, excluding those notices that do not\n          pertain to any part of the Derivative Works, in at least one\n          of the following places: within a NOTICE text file distributed\n          as part of the Derivative Works; within the Source form or\n          documentation, if provided along with the Derivative Works; or,\n          within a display generated by the Derivative Works, if and\n          wherever such third-party notices normally appear. The contents\n          of the NOTICE file are for informational purposes only and\n          do not modify the License. You may add Your own attribution\n          notices within Derivative Works that You distribute, alongside\n          or as an addendum to the NOTICE text from the Work, provided\n          that such additional attribution notices cannot be construed\n          as modifying the License.\n\n      You may add Your own copyright statement to Your modifications and\n      may provide additional or different license terms and conditions\n      for use, reproduction, or distribution of Your modifications, or\n      for any such Derivative Works as a whole, provided Your use,\n      reproduction, and distribution of the Work otherwise complies with\n      the conditions stated in this License.\n\n    5. Submission of Contributions. Unless You explicitly state otherwise,\n      any Contribution intentionally submitted for inclusion in the Work\n      by You to the Licensor shall be under the terms and conditions of\n      this License, without any additional terms or conditions.\n      Notwithstanding the above, nothing herein shall supersede or modify\n      the terms of any separate license agreement you may have executed\n      with Licensor regarding such Contributions.\n\n    6. Trademarks. This License does not grant permission to use the trade\n      names, trademarks, service marks, or product names of the Licensor,\n      except as required for reasonable and customary use in describing the\n      origin of the Work and reproducing the content of the NOTICE file.\n\n    7. Disclaimer of Warranty. Unless required by applicable law or\n      agreed to in writing, Licensor provides the Work (and each\n      Contributor provides its Contributions) on an \"AS IS\" BASIS,\n      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or\n      implied, including, without limitation, any warranties or conditions\n      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A\n      PARTICULAR PURPOSE. You are solely responsible for determining the\n      appropriateness of using or redistributing the Work and assume any\n      risks associated with Your exercise of permissions under this License.\n\n    8. Limitation of Liability. In no event and under no legal theory,\n      whether in tort (including negligence), contract, or otherwise,\n      unless required by applicable law (such as deliberate and grossly\n      negligent acts) or agreed to in writing, shall any Contributor be\n      liable to You for damages, including any direct, indirect, special,\n      incidental, or consequential damages of any character arising as a\n      result of this License or out of the use or inability to use the\n      Work (including but not limited to damages for loss of goodwill,\n      work stoppage, computer failure or malfunction, or any and all\n      other commercial damages or losses), even if such Contributor\n      has been advised of the possibility of such damages.\n\n    9. Accepting Warranty or Additional Liability. While redistributing\n      the Work or Derivative Works thereof, You may choose to offer,\n      and charge a fee for, acceptance of support, warranty, indemnity,\n      or other liability obligations and/or rights consistent with this\n      License. However, in accepting such obligations, You may act only\n      on Your own behalf and on Your sole responsibility, not on behalf\n      of any other Contributor, and only if You agree to indemnify,\n      defend, and hold each Contributor harmless for any liability\n      incurred by, or claims asserted against, such Contributor by reason\n      of your accepting any such warranty or additional liability.\n\n    END OF TERMS AND CONDITIONS\n\n    APPENDIX: How to apply the Apache License to your work.\n\n      To apply the Apache License to your work, attach the following\n      boilerplate notice, with the fields enclosed by brackets \"[]\"\n      replaced with your own identifying information. (Don't include\n      the brackets!)  The text should be enclosed in the appropriate\n      comment syntax for the file format. We also recommend that a\n      file or class name and description of purpose be included on the\n      same \"printed page\" as the copyright notice for easier\n      identification within third-party archives.\n\n    Copyright [yyyy] [name of copyright owner]\n\n    Licensed under the Apache License, Version 2.0 (the \"License\");\n    you may not use this file except in compliance with the License.\n    You may obtain a copy of the License at\n\n       http://www.apache.org/licenses/LICENSE-2.0\n\n    Unless required by applicable law or agreed to in writing, software\n    distributed under the License is distributed on an \"AS IS\" BASIS,\n    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n    See the License for the specific language governing permissions and\n    limitations under the License.\n\n\n---- LLVM Exceptions to the Apache 2.0 License ----\n\nAs an exception, if, as a result of your compiling your source code, portions\nof this Software are embedded into an Object form of such source code, you\nmay redistribute such embedded portions in such Object form without complying\nwith the conditions of Sections 4(a), 4(b) and 4(d) of the License.\n\nIn addition, if you combine or link compiled forms of this Software with\nsoftware that is licensed under the GPLv2 (\"Combined Software\") and if a\ncourt of competent jurisdiction determines that the patent provision (Section\n3), the indemnity provision (Section 9) or other Section of the License\nconflicts with the conditions of the GPLv2, you may retroactively and\nprospectively choose to deem waived or otherwise exclude such Section(s) of\nthe License, but only in their entirety and only with respect to the Combined\nSoftware.\n\n==============================================================================\nSoftware from third parties included in the LLVM Project:\n==============================================================================\nThe LLVM Project contains third party software which is under different license\nterms. All such code will be identified clearly using at least one of two\nmechanisms:\n1) It will be in a separate directory tree with its own `LICENSE.txt` or\n   `LICENSE` file at the top containing the specific license and restrictions\n   which apply to that software, or\n2) It will contain specific license and restriction terms at the top of every\n   file.\n\n==============================================================================\nLegacy LLVM License (https://llvm.org/docs/DeveloperPolicy.html#legacy):\n==============================================================================\n\nThe libunwind library is dual licensed under both the University of Illinois\n\"BSD-Like\" license and the MIT license.  As a user of this code you may choose\nto use it under either license.  As a contributor, you agree to allow your code\nto be used under both.\n\nFull text of the relevant licenses is included below.\n\n==============================================================================\n\nUniversity of Illinois/NCSA\nOpen Source License\n\nCopyright (c) 2009-2019 by the contributors listed in CREDITS.TXT\n\nAll rights reserved.\n\nDeveloped by:\n\n    LLVM Team\n\n    University of Illinois at Urbana-Champaign\n\n    http://llvm.org\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of\nthis software and associated documentation files (the \"Software\"), to deal with\nthe Software without restriction, including without limitation the rights to\nuse, copy, modify, merge, publish, distribute, sublicense, and/or sell copies\nof the Software, and to permit persons to whom the Software is furnished to do\nso, subject to the following conditions:\n\n    * Redistributions of source code must retain the above copyright notice,\n      this list of conditions and the following disclaimers.\n\n    * Redistributions in binary form must reproduce the above copyright notice,\n      this list of conditions and the following disclaimers in the\n      documentation and/or other materials provided with the distribution.\n\n    * Neither the names of the LLVM Team, University of Illinois at\n      Urbana-Champaign, nor the names of its contributors may be used to\n      endorse or promote products derived from this Software without specific\n      prior written permission.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS\nFOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE\nCONTRIBUTORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS WITH THE\nSOFTWARE.\n\n==============================================================================\n\nCopyright (c) 2009-2014 by the contributors listed in CREDITS.TXT\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in\nall copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN\nTHE SOFTWARE.\n"
+    },
+    {
+      "git_blob": "776d5f1034240f6dae0ce59d592f9c6f4ad29e7d",
+      "path": "COPYING.MinGW-w64-runtime/COPYING.MinGW-w64-runtime.txt",
+      "sha256": "1db8da07b436c68833c0673ffee3d9fcb2526047f3820b81661865dfedc79a1f",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/COPYING.MinGW-w64-runtime/COPYING.MinGW-w64-runtime.txt",
+      "text": "MinGW-w64 runtime licensing\n***************************\n\nThis program or library was built using MinGW-w64 and statically\nlinked against the MinGW-w64 runtime. Some parts of the runtime\nare under licenses which require that the copyright and license\nnotices are included when distributing the code in binary form.\nThese notices are listed below.\n\n\n========================\nOverall copyright notice\n========================\n\nCopyright (c) 2009, 2010, 2011, 2012, 2013 by the mingw-w64 project\n\nThis license has been certified as open source. It has also been designated\nas GPL compatible by the Free Software Foundation (FSF).\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions are met:\n\n   1. Redistributions in source code must retain the accompanying copyright\n      notice, this list of conditions, and the following disclaimer.\n   2. Redistributions in binary form must reproduce the accompanying\n      copyright notice, this list of conditions, and the following disclaimer\n      in the documentation and/or other materials provided with the\n      distribution.\n   3. Names of the copyright holders must not be used to endorse or promote\n      products derived from this software without prior written permission\n      from the copyright holders.\n   4. The right to distribute this software or to use it for any purpose does\n      not give you the right to use Servicemarks (sm) or Trademarks (tm) of\n      the copyright holders.  Use of them is covered by separate agreement\n      with the copyright holders.\n   5. If any files are modified, you must cause the modified files to carry\n      prominent notices stating that you changed the files and the date of\n      any change.\n\nDisclaimer\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY EXPRESSED\nOR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES\nOF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO\nEVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY DIRECT, INDIRECT,\nINCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT\nLIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,\nOR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF\nLIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING\nNEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,\nEVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n\n======================================== \ngetopt, getopt_long, and getop_long_only\n======================================== \n\nCopyright (c) 2002 Todd C. Miller <Todd.Miller@courtesan.com> \n \nPermission to use, copy, modify, and distribute this software for any \npurpose with or without fee is hereby granted, provided that the above \ncopyright notice and this permission notice appear in all copies. \n \t \nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES\nWITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF\nMERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR\nANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES\nWHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN\nACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF\nOR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.\n\nSponsored in part by the Defense Advanced Research Projects\nAgency (DARPA) and Air Force Research Laboratory, Air Force\nMateriel Command, USAF, under agreement number F39502-99-1-0512.\n\n        *       *       *       *       *       *       * \n\nCopyright (c) 2000 The NetBSD Foundation, Inc.\nAll rights reserved.\n\nThis code is derived from software contributed to The NetBSD Foundation\nby Dieter Baron and Thomas Klausner.\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions\nare met:\n 1. Redistributions of source code must retain the above copyright\n    notice, this list of conditions and the following disclaimer.\n 2. Redistributions in binary form must reproduce the above copyright\n    notice, this list of conditions and the following disclaimer in the\n    documentation and/or other materials provided with the distribution.\n\nTHIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS\n``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED\nTO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR\nPURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS\nBE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR\nCONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF\nSUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS\nINTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN\nCONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)\nARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE\nPOSSIBILITY OF SUCH DAMAGE.\n\n\n===============================================================\ngdtoa: Converting between IEEE floating point numbers and ASCII\n===============================================================\n\nThe author of this software is David M. Gay.\n\nCopyright (C) 1997, 1998, 1999, 2000, 2001 by Lucent Technologies\nAll Rights Reserved\n\nPermission to use, copy, modify, and distribute this software and\nits documentation for any purpose and without fee is hereby\ngranted, provided that the above copyright notice appear in all\ncopies and that both that the copyright notice and this\npermission notice and warranty disclaimer appear in supporting\ndocumentation, and that the name of Lucent or any of its entities\nnot be used in advertising or publicity pertaining to\ndistribution of the software without specific, written prior\npermission.\n\nLUCENT DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,\nINCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.\nIN NO EVENT SHALL LUCENT OR ANY OF ITS ENTITIES BE LIABLE FOR ANY\nSPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES\nWHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER\nIN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,\nARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.\n\n        *       *       *       *       *       *       *\n\nThe author of this software is David M. Gay.\n\nCopyright (C) 2005 by David M. Gay\nAll Rights Reserved\n\nPermission to use, copy, modify, and distribute this software and its\ndocumentation for any purpose and without fee is hereby granted,\nprovided that the above copyright notice appear in all copies and that\nboth that the copyright notice and this permission notice and warranty\ndisclaimer appear in supporting documentation, and that the name of\nthe author or any of his current or former employers not be used in\nadvertising or publicity pertaining to distribution of the software\nwithout specific, written prior permission.\n\nTHE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,\nINCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.  IN\nNO EVENT SHALL THE AUTHOR OR ANY OF HIS CURRENT OR FORMER EMPLOYERS BE\nLIABLE FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY\nDAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,\nWHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,\nARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS\nSOFTWARE.\n\n        *       *       *       *       *       *       *\n\nThe author of this software is David M. Gay.\n\nCopyright (C) 2004 by David M. Gay.\nAll Rights Reserved\nBased on material in the rest of /netlib/fp/gdota.tar.gz,\nwhich is copyright (C) 1998, 2000 by Lucent Technologies.\n\nPermission to use, copy, modify, and distribute this software and\nits documentation for any purpose and without fee is hereby\ngranted, provided that the above copyright notice appear in all\ncopies and that both that the copyright notice and this\npermission notice and warranty disclaimer appear in supporting\ndocumentation, and that the name of Lucent or any of its entities\nnot be used in advertising or publicity pertaining to\ndistribution of the software without specific, written prior\npermission.\n\nLUCENT DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,\nINCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.\nIN NO EVENT SHALL LUCENT OR ANY OF ITS ENTITIES BE LIABLE FOR ANY\nSPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES\nWHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER\nIN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,\nARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.\n\n\n=========================\nParts of the math library\n=========================\n\nCopyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.\n\nDeveloped at SunSoft, a Sun Microsystems, Inc. business.\nPermission to use, copy, modify, and distribute this\nsoftware is freely granted, provided that this notice\nis preserved.\n\n        *       *       *       *       *       *       *\n\nCopyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.\n\nDeveloped at SunPro, a Sun Microsystems, Inc. business.\nPermission to use, copy, modify, and distribute this\nsoftware is freely granted, provided that this notice\nis preserved.\n\n        *       *       *       *       *       *       *\n\nFIXME: Cephes math lib\nCopyright (C) 1984-1998 Stephen L. Moshier\n\nIt sounds vague, but as to be found at\n<http://lists.debian.org/debian-legal/2004/12/msg00295.html>, it gives an\nimpression that the author could be willing to give an explicit\npermission to distribute those files e.g. under a BSD style license. So\nprobably there is no problem here, although it could be good to get a\npermission from the author and then add a license into the Cephes files\nin MinGW runtime. At least on follow-up it is marked that debian sees the\nversion a-like BSD one. As MinGW.org (where those cephes parts are coming\nfrom) distributes them now over 6 years, it should be fine.\n\n=================================================\nSome string, memory and time conversion functions\n=================================================\n\nCopyright © 2005-2020 Rich Felker, et al.\n\nPermission is hereby granted, free of charge, to any person obtaining\na copy of this software and associated documentation files (the\n\"Software\"), to deal in the Software without restriction, including\nwithout limitation the rights to use, copy, modify, merge, publish,\ndistribute, sublicense, and/or sell copies of the Software, and to\npermit persons to whom the Software is furnished to do so, subject to\nthe following conditions:\n\nThe above copyright notice and this permission notice shall be\nincluded in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND,\nEXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF\nMERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.\nIN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY\nCLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,\nTORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE\nSOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n\n===================================\nHeaders and IDLs imported from Wine\n===================================\n\nSome header and IDL files were imported from the Wine project. These files\nare prominent maked in source. Their copyright belongs to contributors and\nthey are distributed under LGPL license.\n\nDisclaimer\n\nThis library is free software; you can redistribute it and/or\nmodify it under the terms of the GNU Lesser General Public\nLicense as published by the Free Software Foundation; either\nversion 2.1 of the License, or (at your option) any later version.\n\nThis library is distributed in the hope that it will be useful,\nbut WITHOUT ANY WARRANTY; without even the implied warranty of\nMERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU\nLesser General Public License for more details.\n"
+    },
+    {
+      "git_blob": "51261a8ec4b5c5b6b074317fab1d7f506eb30425",
+      "path": "DISCLAIMER",
+      "sha256": "039ed6b4f31bb7fb97e733170b58cc435335352e4745734fcfd113877fdaf340",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/DISCLAIMER",
+      "source_revision": "0d6dfbc348dfad714761c0a7151615767f96bcb5",
+      "text": "/*\n This Software is provided under the Zope Public License (ZPL) Version 2.1.\n\n Copyright (c) 2009, 2010 by the mingw-w64 project\n\n See the AUTHORS file for the list of contributors to the mingw-w64 project.\n\n This license has been certified as open source. It has also been designated\n as GPL compatible by the Free Software Foundation (FSF).\n\n Redistribution and use in source and binary forms, with or without\n modification, are permitted provided that the following conditions are met:\n\n   1. Redistributions in source code must retain the accompanying copyright\n      notice, this list of conditions, and the following disclaimer.\n   2. Redistributions in binary form must reproduce the accompanying\n      copyright notice, this list of conditions, and the following disclaimer\n      in the documentation and/or other materials provided with the\n      distribution.\n   3. Names of the copyright holders must not be used to endorse or promote\n      products derived from this software without prior written permission\n      from the copyright holders.\n   4. The right to distribute this software or to use it for any purpose does\n      not give you the right to use Servicemarks (sm) or Trademarks (tm) of\n      the copyright holders.  Use of them is covered by separate agreement\n      with the copyright holders.\n   5. If any files are modified, you must cause the modified files to carry\n      prominent notices stating that you changed the files and the date of\n      any change.\n\n Disclaimer\n\n THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY EXPRESSED\n OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES\n OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO\n EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY DIRECT, INDIRECT,\n INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT\n LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, \n OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF\n LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING\n NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,\n EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n*/\n"
+    },
+    {
+      "git_blob": "91fb0d6dc9d1f65394cbec575a857e635868ed74",
+      "path": "DISCLAIMER.PD",
+      "sha256": "87f33608570312a0f2a9745edcb2527275df813b13982e8c3b3f893d88a4141a",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/DISCLAIMER.PD",
+      "source_revision": "0d6dfbc348dfad714761c0a7151615767f96bcb5",
+      "text": "/**\n * DISCLAIMER\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n *\n * The mingw-w64 runtime package and its code is distributed in the hope that it \n * will be useful but WITHOUT ANY WARRANTY.  ALL WARRANTIES, EXPRESSED OR \n * IMPLIED ARE HEREBY DISCLAIMED.  This includes but is not limited to \n * warranties of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n */\n"
+    },
+    {
+      "git_blob": "4b40f2beb3cac255a09ff12616c22aa89aa9d80f",
+      "path": "AUTHORS",
+      "sha256": "8f308316e7a94b8410f871868bd3948f126526dc1775aeee97a0e365f9a0fd9f",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/AUTHORS",
+      "source_revision": "0d6dfbc348dfad714761c0a7151615767f96bcb5",
+      "text": "Note\n====\n\nThis file contains information about people who are permitted to make\nchanges to various parts of the runtimes, headers, associated tools,\nand associated libraries. Also the list of contributors to mingw-w64\nare listed here, too.\n\nPlease do not contact the people in this file directly to report\nproblems in mingw-w64.\n\nFor general information about mingw-w64, please visit:\n\n  http://sourceforge.net/projects/mingw-w64/\n\nTo report problems in mingw-w64, please visit bug-tracker on:\n\n  http://sourceforge.net/projects/mingw-w64/\n\nMaintainers\n===========\n\nMook         <mook dot gcc at gmail dot com>\nNightStrike  <nightstrike at gmail dot com>\nKai Tietz    <kai dot tietz at redhat dot com>\n\nDevelopers with write after approval\n====================================\n\nkjk_hyperion      <hackbunny at reactos dot org>\nTor Lillqvist     <tlillqvist at gmail dot com>\nAlexey Pushkin    <Alexey dot Pushkin at mererand dot com>\nRoland Schwingel  <roland dot schwingel at onevision dot com>\nOzkan Sezer       <sezeroz at gmail dot com>\nFridrich Strba    <fridrich dot strba at bluewin dot ch>\nChris Sutcliffe   <ir0nh34d at gmail dot com>\nJonathan Yong     <jon_y at users dot sourceforge dot net>\nJarrod Chesney    <jarrod dot chesney at gmail dot com>\nDoug Semler       <dougsemler at gmail dot com>\nJacek Caban       <jacek at codeweavers dor com>\nCorinna Vinschen  <vinschen at redhat dot com>\nAndré Hentschel   <nerv at dawncrow dot de>\nLiu Hao           <lh_mouse at 126 dot com>\nRuslan Garipov    <ruslanngaripov at gmail dot com>\n\nProject members without SVN/Git access\n==================================\n\nxenofears         <peter at cadforte dot com>\n\nContributors\n============\n\nWe want to thank the following list of people for supporting us\nby contributions:\n\n20-40                   <annonymous>\nProfessor Brian Ripley  <ripley at stats dot ox dot ac dot uk>\nsduplichan              <sduplichan at users dot sourceforge dot net>\nWesley W. Terpstra      <wesley at terpstra dot ca>\nzhou drangon            <drangon dot mail at gmail dot com>\nPiotr Caban             <piotr at codeweavers dot com>\n\nand additional thanks to the following organizations:\n\nOneVision Software AG\nReactos project\nWine project\n\nand many others, we possibly missed to mention here and are sorry for this.\n\nIf you think your name is missing and should be mentioned here, please\ncontact us for adding you.\n"
+    }
+  ],
+  "reviewed_cabi_evidence": {
+    "repository": "ktav-lang/js",
+    "run": 41245571952,
+    "source_ref": "562deb3fde092d63a78f359be095e5079929d0d1",
+    "tooling_head": "7d8148acc7681196283bd7e63593e5aa7863a12d"
+  },
+  "schema_version": 1,
+  "sdk_archive_sha256": "fd5462b7f5d93b2ff981fcd3f9c7e427e47f3203c64ea91c27bcc444eebd74cd",
+  "sdk_recipe_revision": "e08a31fbfe5cfdad07b698299af22d66e5608383",
+  "sdk_version": "20261020",
+  "source_files": [
+    {
+      "git_blob": "a1179c73c5906b2df9bb3973cd7918ad1f42b28a",
+      "path": "libunwind/include/__libunwind_config.h",
+      "sha256": "0bb004911d967d5cc2d87d07f81e03668d1cf42c6b9347a95285d9e18f82954c",
+      "source": "https://raw.githubusercontent.com/llvm/llvm-project/7a941dfb2877a0b8cf30323fefa85ad019e0b0f5/libunwind/include/__libunwind_config.h",
+      "source_notices": [
+        "//===----------------------------------------------------------------------===//\n//\n// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.\n// See https://llvm.org/LICENSE.txt for license information.\n// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception\n//\n//===----------------------------------------------------------------------===//\n"
+      ]
+    },
+    {
+      "git_blob": "6c2dfe58e53bf1f97bca6c78dacb47cc3676b8dc",
+      "path": "libunwind/include/libunwind.h",
+      "sha256": "3b411eb68de64e829937faaeec942bbc8e3e3a1c013b55107be2c679df64173c",
+      "source": "https://raw.githubusercontent.com/llvm/llvm-project/7a941dfb2877a0b8cf30323fefa85ad019e0b0f5/libunwind/include/libunwind.h",
+      "source_notices": [
+        "//===----------------------------------------------------------------------===//\n//\n// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.\n// See https://llvm.org/LICENSE.txt for license information.\n// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception\n//\n//\n// Compatible with libunwind API documented at:\n//   http://www.nongnu.org/libunwind/man/libunwind(3).html\n//\n//===----------------------------------------------------------------------===//\n"
+      ]
+    },
+    {
+      "git_blob": "c495b83c40b90ae517e390fe659061a7bbbe2603",
+      "path": "libunwind/include/mach-o/compact_unwind_encoding.h",
+      "sha256": "a458a96b1257048618e22688e3ad6fc4c36f99e1229b1492b7b800911e651a68",
+      "source": "https://raw.githubusercontent.com/llvm/llvm-project/7a941dfb2877a0b8cf30323fefa85ad019e0b0f5/libunwind/include/mach-o/compact_unwind_encoding.h",
+      "source_notices": [
+        "//===----------------------------------------------------------------------===//\n//\n// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.\n// See https://llvm.org/LICENSE.txt for license information.\n// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception\n//\n//\n// Darwin's alternative to DWARF based unwind encodings.\n//\n//===----------------------------------------------------------------------===//\n"
+      ]
+    },
+    {
+      "git_blob": "b1775d3a3decc76e1a0916fead1aafbc6fa0fb51",
+      "path": "libunwind/include/unwind.h",
+      "sha256": "e4a58637fc8ca1d29cd600c3c4416aafed50085edf276fa076214c8d81c263f0",
+      "source": "https://raw.githubusercontent.com/llvm/llvm-project/7a941dfb2877a0b8cf30323fefa85ad019e0b0f5/libunwind/include/unwind.h",
+      "source_notices": [
+        "//===----------------------------------------------------------------------===//\n//\n// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.\n// See https://llvm.org/LICENSE.txt for license information.\n// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception\n//\n//\n// C++ ABI Level 1 ABI documented at:\n//   https://itanium-cxx-abi.github.io/cxx-abi/abi-eh.html\n//\n//===----------------------------------------------------------------------===//\n"
+      ]
+    },
+    {
+      "git_blob": "68e02e47602d60de9f9d33267e270cb5f73fc5aa",
+      "path": "libunwind/include/unwind_arm_ehabi.h",
+      "sha256": "04cf22a069866ae35bf075c36f8d9112700bb9772653d80d9c6c4c856f4e7dbb",
+      "source": "https://raw.githubusercontent.com/llvm/llvm-project/7a941dfb2877a0b8cf30323fefa85ad019e0b0f5/libunwind/include/unwind_arm_ehabi.h",
+      "source_notices": [
+        "//===----------------------------------------------------------------------===//\n//\n// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.\n// See https://llvm.org/LICENSE.txt for license information.\n// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception\n//\n//\n// C++ ABI Level 1 ABI documented at:\n//   https://github.com/ARM-software/abi-aa/blob/main/ehabi32/ehabi32.rst\n//\n//===----------------------------------------------------------------------===//\n"
+      ]
+    },
+    {
+      "git_blob": "860ad36cdf14e2e06cd6fe2f77b9070434240434",
+      "path": "libunwind/include/unwind_itanium.h",
+      "sha256": "43ad2c8ca672c8fb9a4eb80d7e05a687ae9134f4899641357c86cecde4efbd1f",
+      "source": "https://raw.githubusercontent.com/llvm/llvm-project/7a941dfb2877a0b8cf30323fefa85ad019e0b0f5/libunwind/include/unwind_itanium.h",
+      "source_notices": [
+        "//===----------------------------------------------------------------------===//\n//\n// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.\n// See https://llvm.org/LICENSE.txt for license information.\n// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception\n//\n//\n// C++ ABI Level 1 ABI documented at:\n//   https://itanium-cxx-abi.github.io/cxx-abi/abi-eh.html\n//\n//===----------------------------------------------------------------------===//\n"
+      ]
+    },
+    {
+      "git_blob": "ff3b5fc6fea77fba0f4ebc4d74e72bac984935fa",
+      "path": "libunwind/src/Unwind-EHABI.h",
+      "sha256": "c04fdebcd31e26de7615b82751373cc64ef83d02b24dbaaf0e112d0a559acc6b",
+      "source": "https://raw.githubusercontent.com/llvm/llvm-project/7a941dfb2877a0b8cf30323fefa85ad019e0b0f5/libunwind/src/Unwind-EHABI.h",
+      "source_notices": [
+        "//===----------------------------------------------------------------------===//\n//\n// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.\n// See https://llvm.org/LICENSE.txt for license information.\n// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception\n//\n//\n//===----------------------------------------------------------------------===//\n"
+      ]
+    },
+    {
+      "git_blob": "0b1930b44d1c648b89099b6f2f796b4233f1c877",
+      "path": "libunwind/src/Unwind-seh.cpp",
+      "sha256": "058ae089c7d42ade35b730f87443b34018b21bea75a4ea2226e9fffdf7500160",
+      "source": "https://raw.githubusercontent.com/llvm/llvm-project/7a941dfb2877a0b8cf30323fefa85ad019e0b0f5/libunwind/src/Unwind-seh.cpp",
+      "source_notices": [
+        "//===----------------------------------------------------------------------===//\n//\n// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.\n// See https://llvm.org/LICENSE.txt for license information.\n// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception\n//\n//===----------------------------------------------------------------------===//\n//\n//  Implements SEH-based Itanium C++ exceptions.\n//\n//===----------------------------------------------------------------------===//\n"
+      ]
+    },
+    {
+      "git_blob": "1764499b304f1ac4ed665829d7cc47793ebf9766",
+      "path": "libunwind/src/UnwindLevel1-gcc-ext.c",
+      "sha256": "93d2bb050caf6b4f80819b93340ae5aad91f44e633996cc7dd32dca90da05fe0",
+      "source": "https://raw.githubusercontent.com/llvm/llvm-project/7a941dfb2877a0b8cf30323fefa85ad019e0b0f5/libunwind/src/UnwindLevel1-gcc-ext.c",
+      "source_notices": [
+        "//===----------------------------------------------------------------------===//\n//\n// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.\n// See https://llvm.org/LICENSE.txt for license information.\n// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception\n//\n//\n//  Implements gcc extensions to the C++ ABI Exception Handling Level 1.\n//\n//===----------------------------------------------------------------------===//\n"
+      ]
+    },
+    {
+      "git_blob": "834fdae6a76d3e28bde5ece20c45f367a47b1f12",
+      "path": "libunwind/src/UnwindLevel1.c",
+      "sha256": "16e16fbc0c85873df1a445d7b204fb363e46c68d6a2815dc68257108b5c944c8",
+      "source": "https://raw.githubusercontent.com/llvm/llvm-project/7a941dfb2877a0b8cf30323fefa85ad019e0b0f5/libunwind/src/UnwindLevel1.c",
+      "source_notices": [
+        "//===----------------------------------------------------------------------===//\n//\n// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.\n// See https://llvm.org/LICENSE.txt for license information.\n// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception\n//\n//\n// Implements C++ ABI Exception Handling Level 1 as documented at:\n//      https://itanium-cxx-abi.github.io/cxx-abi/abi-eh.html\n// using libunwind\n//\n//===----------------------------------------------------------------------===//\n"
+      ]
+    },
+    {
+      "git_blob": "f44f6a1331968cf75de46a3cf64a0cc5c8f485b2",
+      "path": "libunwind/src/UnwindRegistersSave.S",
+      "sha256": "c5d0da824062363be10dc33bcd1156f16cd69811e71603c667f931a91fab5eb1",
+      "source": "https://raw.githubusercontent.com/llvm/llvm-project/7a941dfb2877a0b8cf30323fefa85ad019e0b0f5/libunwind/src/UnwindRegistersSave.S",
+      "source_notices": [
+        "//===----------------------------------------------------------------------===//\n//\n// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.\n// See https://llvm.org/LICENSE.txt for license information.\n// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception\n//\n//===----------------------------------------------------------------------===//\n"
+      ]
+    },
+    {
+      "git_blob": "84c9d526f1d7594e456b5a31c11adff57f79551a",
+      "path": "libunwind/src/assembly.h",
+      "sha256": "1b802ab55f7b949a9e8b1a1c7c82b6a84d068610aeb823993bdeee1964c98eb3",
+      "source": "https://raw.githubusercontent.com/llvm/llvm-project/7a941dfb2877a0b8cf30323fefa85ad019e0b0f5/libunwind/src/assembly.h",
+      "source_notices": [
+        "/* ===-- assembly.h - libUnwind assembler support macros -------------------===\n *\n * Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.\n * See https://llvm.org/LICENSE.txt for license information.\n * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception\n *\n * ===----------------------------------------------------------------------===\n *\n * This file defines macros for use in libUnwind assembler source.\n * This file is not part of the interface of this library.\n *\n * ===----------------------------------------------------------------------===\n */"
+      ]
+    },
+    {
+      "git_blob": "f017403fa2234f7234e784eefeafe8eae6b1a59b",
+      "path": "libunwind/src/config.h",
+      "sha256": "fd99264860ced6f5b5cd4d5e0ef6eb444a4ab511a47a8b0d91bfab254ab21a1e",
+      "source": "https://raw.githubusercontent.com/llvm/llvm-project/7a941dfb2877a0b8cf30323fefa85ad019e0b0f5/libunwind/src/config.h",
+      "source_notices": [
+        "//===----------------------------------------------------------------------===//\n//\n// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.\n// See https://llvm.org/LICENSE.txt for license information.\n// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception\n//\n//\n//  Defines macros used within libunwind project.\n//\n//===----------------------------------------------------------------------===//\n"
+      ]
+    },
+    {
+      "git_blob": "68ad882347203ca193d05bcb2e3f34d4500edca0",
+      "path": "libunwind/src/dwarf2.h",
+      "sha256": "e10d240e2f19de7121a8afaf3d4841a65936723e69d636f7e3241e14802d0bfc",
+      "source": "https://raw.githubusercontent.com/llvm/llvm-project/7a941dfb2877a0b8cf30323fefa85ad019e0b0f5/libunwind/src/dwarf2.h",
+      "source_notices": [
+        "//===----------------------------------------------------------------------===//\n//\n// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.\n// See https://llvm.org/LICENSE.txt for license information.\n// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception\n//\n//===----------------------------------------------------------------------===//\n",
+        "/*\n   These constants were taken from version 3 of the DWARF standard,\n   which is Copyright (c) 2005 Free Standards Group, and\n   Copyright (c) 1992, 1993 UNIX International, Inc.\n*/"
+      ]
+    },
+    {
+      "git_blob": "0b9d56ec805bca92f0ed4b93be549c8cf982e809",
+      "path": "libunwind/src/libunwind.cpp",
+      "sha256": "51ccb27829d15988ca5678541b1b32bb3c2bdea87e02be31bf4faca48a0ee2ad",
+      "source": "https://raw.githubusercontent.com/llvm/llvm-project/7a941dfb2877a0b8cf30323fefa85ad019e0b0f5/libunwind/src/libunwind.cpp",
+      "source_notices": [
+        "//===----------------------------------------------------------------------===//\n//\n// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.\n// See https://llvm.org/LICENSE.txt for license information.\n// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception\n//\n//\n//  Implements unw_* functions from <libunwind.h>\n//\n//===----------------------------------------------------------------------===//\n"
+      ]
+    },
+    {
+      "git_blob": "8acf2212d1eae32433764070421727d73b07e372",
+      "path": "libunwind/src/libunwind_ext.h",
+      "sha256": "2efb28c93eb3c32cf491733b8e9c7b5715cb15fa0d6afb7b23ee4ca6de40cc98",
+      "source": "https://raw.githubusercontent.com/llvm/llvm-project/7a941dfb2877a0b8cf30323fefa85ad019e0b0f5/libunwind/src/libunwind_ext.h",
+      "source_notices": [
+        "//===----------------------------------------------------------------------===//\n//\n// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.\n// See https://llvm.org/LICENSE.txt for license information.\n// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception\n//\n//\n//  Extensions to libunwind API.\n//\n//===----------------------------------------------------------------------===//\n"
+      ]
+    },
+    {
+      "git_blob": "b00ca2c9327c74cc40f678cb4db3b56ed18dc405",
+      "path": "libunwind/src/shadow_stack_unwind.h",
+      "sha256": "c18056e575fcf2deed7ccfe469c1c7e6c1f390f64b28cac5aa304de3bb7a50fa",
+      "source": "https://raw.githubusercontent.com/llvm/llvm-project/7a941dfb2877a0b8cf30323fefa85ad019e0b0f5/libunwind/src/shadow_stack_unwind.h",
+      "source_notices": [
+        "//===----------------------------------------------------------------------===//\n//\n// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.\n// See https://llvm.org/LICENSE.txt for license information.\n// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception\n//\n//\n//===----------------------------------------------------------------------===//\n"
+      ]
+    },
+    {
+      "git_blob": "26fc8ef70c024ab756b1fb1b03eed646a63a03ab",
+      "path": "mingw-w64-crt/cfguard/guard_dispatch.S",
+      "sha256": "a479e2319b9a2789afd6f91aedb3e6c640ed16b746df6babffbb17f810432811",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/cfguard/guard_dispatch.S",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "5c736e162339dc590723f402380c4264601aefe3",
+      "path": "mingw-w64-crt/cfguard/mingw_cfguard_support.c",
+      "sha256": "a05b0eb6e9d6553ae934f81324fced9c3a6dc89f71ad073dad8ef174d424d693",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/cfguard/mingw_cfguard_support.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "c8a8bfbeebcc7f325d7d1a729bc95bbf10b7d7d9",
+      "path": "mingw-w64-crt/crt/CRT_fp10.c",
+      "sha256": "fa9af6a9c58207fc596b3babe8f0b91ebbd75a9cf73e15aa849289e7eb300643",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/crt/CRT_fp10.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "2bb5d94a279942260b3091ae7278ac6e000351c5",
+      "path": "mingw-w64-crt/crt/_newmode.c",
+      "sha256": "d85bb76f70f90b246c780ffbfbe6540a4d787b7801e98c8ac8c3edd50dcee971",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/crt/_newmode.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "9e6931c4fc4b5dbd41d5338a9be793b170596802",
+      "path": "mingw-w64-crt/crt/cinitexe.c",
+      "sha256": "98c9238561c0ed1b3d7edfd1e32423dfda93c3ae285807873f637d03406bdcc9",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/crt/cinitexe.c",
+      "source_notices": []
+    },
+    {
+      "git_blob": "39c0d85610f70f746f91adc9af67ccf2480b937b",
+      "path": "mingw-w64-crt/crt/crtbegin.c",
+      "sha256": "692fdc825a472b8dfda48e65eace55caf5396c8536236b814b967007c978a8b0",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/crt/crtbegin.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "15ee52a7c3348bdd64b7c4ecb0cbe626e6f8d092",
+      "path": "mingw-w64-crt/crt/crtdll.c",
+      "sha256": "158dcc7681f335dc36c4bcf86e41444d6507679cab80a68433666df690217990",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/crt/crtdll.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "39c0d85610f70f746f91adc9af67ccf2480b937b",
+      "path": "mingw-w64-crt/crt/crtend.c",
+      "sha256": "692fdc825a472b8dfda48e65eace55caf5396c8536236b814b967007c978a8b0",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/crt/crtend.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "ca9b0069160c14aca643a860386c9d5180fcbd0c",
+      "path": "mingw-w64-crt/crt/crtexe.c",
+      "sha256": "0624cd5c19dfcd4f6f17a3608582db6d0d4f92a468c391890b8f9114784a4b82",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/crt/crtexe.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "d6be1bc7c2cf76471df995bdf7509590cd4d8f4d",
+      "path": "mingw-w64-crt/crt/dllargv.c",
+      "sha256": "98a1bf05b8a037d68ba1ea98ae40a2230a4e734196879fee4bd215c5c3283112",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/crt/dllargv.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "7edf8360c91c182f8ec6e5a695c262332ee6c3ba",
+      "path": "mingw-w64-crt/crt/gccmain.c",
+      "sha256": "07c83e890740008bb74b26ecf60d97048cfeb74d89d973b6e8db4f437bc66ac9",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/crt/gccmain.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "5aba73462de3018c7d35ec93d5afcc6eda8276ff",
+      "path": "mingw-w64-crt/crt/loadcfg.S",
+      "sha256": "ea3b2928757e53d5f68edbacfc271f4b6070f8a118bf44e50f6a4dd44baba545",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/crt/loadcfg.S",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "687aab4a90bc7dc14ff14f86ce95136d5c1a2422",
+      "path": "mingw-w64-crt/crt/merr.c",
+      "sha256": "37d23d36e2041d5ea6e04e6674d84c227937ec477d246742fa062b5e61e1f5ea",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/crt/merr.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "8143c6b72998473c4df1efa0654f36e59fbc2b53",
+      "path": "mingw-w64-crt/crt/mingw_dll_ctors_dtors.c",
+      "sha256": "682be7d58c77d70fdf116ad53168c893dbeaa0c85b8a9b86300493e66d3eeaae",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/crt/mingw_dll_ctors_dtors.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "84413cdb7c9fed8e923e3620334e0f29ccf145f2",
+      "path": "mingw-w64-crt/crt/mingw_helpers.c",
+      "sha256": "a5639b68c3176c4c6a358c48f869c2a081434c07d7a0e435013f44909a2003c5",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/crt/mingw_helpers.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "5008790e1eefed244e387f654bf4efbe5f3b2250",
+      "path": "mingw-w64-crt/crt/natstart.c",
+      "sha256": "c65fb9a3cb70536b8f757e07df8febb0b1a5fd72889bcff4fee924add1078d14",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/crt/natstart.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "5b903c21d211138864d6b484c5b5d8c0c5df6cf3",
+      "path": "mingw-w64-crt/crt/pseudo-reloc-list.c",
+      "sha256": "853116d1ba135ea499714152be5705c72678a86fbd9bd5b90469b0ad51ab8acc",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/crt/pseudo-reloc-list.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "dd2a28e8c2a82fbd0d00731c38e666c09738d1f3",
+      "path": "mingw-w64-crt/crt/pseudo-reloc.c",
+      "sha256": "24d57d7fec056a84268fcb3fa43dc7fc726c3c3f4c2ff4796652ca3dba33314a",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/crt/pseudo-reloc.c",
+      "source_notices": [
+        "/* pseudo-reloc.c\n\n   Contributed by Egor Duda  <deo@logos-m.ru>\n   Modified by addition of runtime_pseudo_reloc version 2\n   by Kai Tietz  <kai.tietz@onevision.com>\n\t\n   THIS SOFTWARE IS NOT COPYRIGHTED\n\n   This source code is offered for use in the public domain. You may\n   use, modify or distribute it freely.\n\n   This code is distributed in the hope that it will be useful but\n   WITHOUT ANY WARRANTY. ALL WARRANTIES, EXPRESS OR IMPLIED ARE HEREBY\n   DISCLAMED. This includes but is not limited to warranties of\n   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n*/"
+      ]
+    },
+    {
+      "git_blob": "6273a1c527116aa889d3958bf10de7306a20d2a2",
+      "path": "mingw-w64-crt/crt/tlssup.c",
+      "sha256": "3f330e9f97d39637245c74d8cd940b2e0238b50c56aee2ff579cff9314e48e9c",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/crt/tlssup.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n *\n * Written by Kai Tietz  <kai.tietz@onevision.com>\n */"
+      ]
+    },
+    {
+      "git_blob": "fce059e14e90c9ca16425e793e43dcc803130561",
+      "path": "mingw-w64-crt/crt/usermatherr.c",
+      "sha256": "9642a86e0f68b59b958866afaca5aa602ae632d361565128237b71cff4759e48",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/crt/usermatherr.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "b53cc18ec0c05a14962269e453b1d18b2ae1084d",
+      "path": "mingw-w64-crt/crt/wildcard.c",
+      "sha256": "a574c6324511ef40619b62a7bfdfcfd4a24a101b790074979a53fd54f9b6b363",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/crt/wildcard.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "b2ec312f09f4f03755c048a20b29ad7454b823a8",
+      "path": "mingw-w64-crt/crt/xncommod.c",
+      "sha256": "011050a8ff748ea000d630892a16dff86ab9ffc43503befe52c1c0b79cb25479",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/crt/xncommod.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "973ff45b16e494acf60cd8e26870460a754e9ac7",
+      "path": "mingw-w64-crt/crt/xthdloc.c",
+      "sha256": "3320df224c561ac5335121ad4e1f342b90bda7a291d0f14e89ce16c2cb17e54d",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/crt/xthdloc.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "dcbbe11846a5d0c9cea993f7adcc87bd6a5fe958",
+      "path": "mingw-w64-crt/crt/xtxtmode.c",
+      "sha256": "a1c826ee8a440cf86dbb1ae6db80e727af5f079b5797f93a3e3a616b3db2bdb9",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/crt/xtxtmode.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "c61e9fa8a52159f500db0e1497594b503dbcc5cd",
+      "path": "mingw-w64-crt/gdtoa/dmisc.c",
+      "sha256": "e73637f5fe5e171d13ab4ce51671f20af98c2707fe6c3ba4f25c7bcd108e0f85",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/gdtoa/dmisc.c",
+      "source_notices": [
+        "/****************************************************************\n\nThe author of this software is David M. Gay.\n\nCopyright (C) 1998 by Lucent Technologies\nAll Rights Reserved\n\nPermission to use, copy, modify, and distribute this software and\nits documentation for any purpose and without fee is hereby\ngranted, provided that the above copyright notice appear in all\ncopies and that both that the copyright notice and this\npermission notice and warranty disclaimer appear in supporting\ndocumentation, and that the name of Lucent or any of its entities\nnot be used in advertising or publicity pertaining to\ndistribution of the software without specific, written prior\npermission.\n\nLUCENT DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,\nINCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.\nIN NO EVENT SHALL LUCENT OR ANY OF ITS ENTITIES BE LIABLE FOR ANY\nSPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES\nWHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER\nIN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,\nARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.\n\n****************************************************************/"
+      ]
+    },
+    {
+      "git_blob": "1cfe1953e4c16b19dfd7a0446da5d20ec67f3de4",
+      "path": "mingw-w64-crt/gdtoa/gdtoa.c",
+      "sha256": "09ea9686def889450b16910562c5a884e87eee161c52e6c127d373688aac8559",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/gdtoa/gdtoa.c",
+      "source_notices": [
+        "/****************************************************************\n\nThe author of this software is David M. Gay.\n\nCopyright (C) 1998, 1999 by Lucent Technologies\nAll Rights Reserved\n\nPermission to use, copy, modify, and distribute this software and\nits documentation for any purpose and without fee is hereby\ngranted, provided that the above copyright notice appear in all\ncopies and that both that the copyright notice and this\npermission notice and warranty disclaimer appear in supporting\ndocumentation, and that the name of Lucent or any of its entities\nnot be used in advertising or publicity pertaining to\ndistribution of the software without specific, written prior\npermission.\n\nLUCENT DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,\nINCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.\nIN NO EVENT SHALL LUCENT OR ANY OF ITS ENTITIES BE LIABLE FOR ANY\nSPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES\nWHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER\nIN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,\nARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.\n\n****************************************************************/"
+      ]
+    },
+    {
+      "git_blob": "b2b4c54151a0da327338210940e5470cbca33f11",
+      "path": "mingw-w64-crt/gdtoa/gdtoa.h",
+      "sha256": "9ea503624739483d5a981d426a9b7a74fd2ee2e04599594e74b886d09beb0403",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/gdtoa/gdtoa.h",
+      "source_notices": [
+        "/****************************************************************\n\nThe author of this software is David M. Gay.\n\nCopyright (C) 1998 by Lucent Technologies\nAll Rights Reserved\n\nPermission to use, copy, modify, and distribute this software and\nits documentation for any purpose and without fee is hereby\ngranted, provided that the above copyright notice appear in all\ncopies and that both that the copyright notice and this\npermission notice and warranty disclaimer appear in supporting\ndocumentation, and that the name of Lucent or any of its entities\nnot be used in advertising or publicity pertaining to\ndistribution of the software without specific, written prior\npermission.\n\nLUCENT DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,\nINCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.\nIN NO EVENT SHALL LUCENT OR ANY OF ITS ENTITIES BE LIABLE FOR ANY\nSPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES\nWHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER\nIN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,\nARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.\n\n****************************************************************/"
+      ]
+    },
+    {
+      "git_blob": "cc2007cd5fa3f0654b14acee99db363d515c44ad",
+      "path": "mingw-w64-crt/gdtoa/gdtoaimp.h",
+      "sha256": "cd4e3796364b4eb9d9c5cf3ff00d3abc8e114102376454bc1d2413183ca3e44d",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/gdtoa/gdtoaimp.h",
+      "source_notices": [
+        "/****************************************************************\n\nThe author of this software is David M. Gay.\n\nCopyright (C) 1998-2000 by Lucent Technologies\nAll Rights Reserved\n\nPermission to use, copy, modify, and distribute this software and\nits documentation for any purpose and without fee is hereby\ngranted, provided that the above copyright notice appear in all\ncopies and that both that the copyright notice and this\npermission notice and warranty disclaimer appear in supporting\ndocumentation, and that the name of Lucent or any of its entities\nnot be used in advertising or publicity pertaining to\ndistribution of the software without specific, written prior\npermission.\n\nLUCENT DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,\nINCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.\nIN NO EVENT SHALL LUCENT OR ANY OF ITS ENTITIES BE LIABLE FOR ANY\nSPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES\nWHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER\nIN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,\nARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.\n\n****************************************************************/"
+      ]
+    },
+    {
+      "git_blob": "157e872319f033f3fcc838c26a93b7fc8b9c9826",
+      "path": "mingw-w64-crt/gdtoa/gmisc.c",
+      "sha256": "7b4327dfc978aacfb950bd4c6970696ccc76ddb7159800a244ef2a0bb593dc5c",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/gdtoa/gmisc.c",
+      "source_notices": [
+        "/****************************************************************\n\nThe author of this software is David M. Gay.\n\nCopyright (C) 1998 by Lucent Technologies\nAll Rights Reserved\n\nPermission to use, copy, modify, and distribute this software and\nits documentation for any purpose and without fee is hereby\ngranted, provided that the above copyright notice appear in all\ncopies and that both that the copyright notice and this\npermission notice and warranty disclaimer appear in supporting\ndocumentation, and that the name of Lucent or any of its entities\nnot be used in advertising or publicity pertaining to\ndistribution of the software without specific, written prior\npermission.\n\nLUCENT DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,\nINCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.\nIN NO EVENT SHALL LUCENT OR ANY OF ITS ENTITIES BE LIABLE FOR ANY\nSPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES\nWHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER\nIN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,\nARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.\n\n****************************************************************/"
+      ]
+    },
+    {
+      "git_blob": "960543a606eeda45b24a4886e6149963fe6bae79",
+      "path": "mingw-w64-crt/gdtoa/misc.c",
+      "sha256": "02486c21b11fe4538bde37d4c740b486a5eef76c8fdeec8e74a9c409c8acb6dc",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/gdtoa/misc.c",
+      "source_notices": [
+        "/****************************************************************\n\nThe author of this software is David M. Gay.\n\nCopyright (C) 1998, 1999 by Lucent Technologies\nAll Rights Reserved\n\nPermission to use, copy, modify, and distribute this software and\nits documentation for any purpose and without fee is hereby\ngranted, provided that the above copyright notice appear in all\ncopies and that both that the copyright notice and this\npermission notice and warranty disclaimer appear in supporting\ndocumentation, and that the name of Lucent or any of its entities\nnot be used in advertising or publicity pertaining to\ndistribution of the software without specific, written prior\npermission.\n\nLUCENT DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,\nINCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.\nIN NO EVENT SHALL LUCENT OR ANY OF ITS ENTITIES BE LIABLE FOR ANY\nSPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES\nWHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER\nIN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,\nARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\nTHIS SOFTWARE.\n\n****************************************************************/"
+      ]
+    },
+    {
+      "git_blob": "30b11f284226c16e8e5320e4b3d164cc4a3c425d",
+      "path": "mingw-w64-crt/misc/__initenv.c",
+      "sha256": "7ca289f2891fef05351cc52879413c219b30de0258b950dbc7d4e10d05a01f97",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/misc/__initenv.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "e3f880b38408689890dff6091f2fe1ef831f8c46",
+      "path": "mingw-w64-crt/misc/__p___initenv.c",
+      "sha256": "034d66df82c6da68cc4bc59ff829ff3f18edd431cbe2f6376d51667f9b90f509",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/misc/__p___initenv.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "3f5b5261bffae5b63826829a9103d290d7bf5708",
+      "path": "mingw-w64-crt/misc/dllmain.c",
+      "sha256": "ad3eb745bc2e614de38f43700c274cae2b7edec7ee40950cc918d8b98d3d9505",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/misc/dllmain.c",
+      "source_notices": []
+    },
+    {
+      "git_blob": "21529682983729e6197d22fe532d974ca113fcf2",
+      "path": "mingw-w64-crt/misc/mingw_matherr.c",
+      "sha256": "47ccdea07abacdd4629596084796291ecf35f4ccf951fa6b5038b6db2eb4c336",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/misc/mingw_matherr.c",
+      "source_notices": []
+    },
+    {
+      "git_blob": "72fef92cc36e674db13500d74dee10a27a060631",
+      "path": "mingw-w64-crt/misc/ucrt__getmainargs.c",
+      "sha256": "7d9139300468218e77c1f4b1bc52ba2802b9273ad1f1b1c3e50be624039d2f5e",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/misc/ucrt__getmainargs.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "0aad4f6c368a7f284568ffb1e96c8e48f011e56a",
+      "path": "mingw-w64-crt/misc/ucrt_amsg_exit.c",
+      "sha256": "ad8dd7eb0b4e2fef5b5c16f4934b7f5bca265246e18440ecb380ab8ffe1a8c6d",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/misc/ucrt_amsg_exit.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "438941f7e3f473462007cffc12d967c88bf315e9",
+      "path": "mingw-w64-crt/stdio/mingw_fprintf.c",
+      "sha256": "c19ffaac9e0ee6056bf4cd0316d021596b37ac800d04dd187b01db01533d839e",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/stdio/mingw_fprintf.c",
+      "source_notices": [
+        "/* fprintf.c\n *\n * $Id: fprintf.c,v 1.1 2008/08/11 22:41:55 keithmarshall Exp $\n *\n * Provides an implementation of the \"fprintf\" function, conforming\n * generally to C99 and SUSv3/POSIX specifications, with extensions\n * to support Microsoft's non-standard format specifications.  This\n * is included in libmingwex.a, whence it may replace the Microsoft\n * function of the same name.\n *\n * Written by Keith Marshall <keithmarshall@users.sourceforge.net>\n *\n * This implementation of \"fprintf\" will normally be invoked by calling\n * \"__mingw_fprintf()\" in preference to a direct reference to \"fprintf()\"\n * itself; this leaves the MSVCRT implementation as the default, which\n * will be deployed when user code invokes \"fprint()\".  Users who then\n * wish to use this implementation may either call \"__mingw_fprintf()\"\n * directly, or may use conditional preprocessor defines, to redirect\n * references to \"fprintf()\" to \"__mingw_fprintf()\".\n *\n * Compiling this module with \"-D INSTALL_AS_DEFAULT\" will change this\n * recommended convention, such that references to \"fprintf()\" in user\n * code will ALWAYS be redirected to \"__mingw_fprintf()\"; if this option\n * is adopted, then users wishing to use the MSVCRT implementation of\n * \"fprintf()\" will be forced to use a \"back-door\" mechanism to do so.\n * Such a \"back-door\" mechanism is provided with MinGW, allowing the\n * MSVCRT implementation to be called as \"__msvcrt_fprintf()\"; however,\n * since users may not expect this behaviour, a standard libmingwex.a\n * installation does not employ this option.\n *\n *\n * This is free software.  You may redistribute and/or modify it as you\n * see fit, without restriction of copyright.\n *\n * This software is provided \"as is\", in the hope that it may be useful,\n * but WITHOUT WARRANTY OF ANY KIND, not even any implied warranty of\n * MERCHANTABILITY, nor of FITNESS FOR ANY PARTICULAR PURPOSE.  At no\n * time will the author accept any form of liability for any damages,\n * however caused, resulting from the use of this software.\n *\n */"
+      ]
+    },
+    {
+      "git_blob": "2bbe5203b52fe37cd977c6c11bc11c7924dab2ae",
+      "path": "mingw-w64-crt/stdio/mingw_pformat.c",
+      "sha256": "8ad4e2a80cb56291deb8ab42238c5084fa256a65dbf08412109f08c3ced85225",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/stdio/mingw_pformat.c",
+      "source_notices": [
+        "/* pformat.c\n *\n * $Id: pformat.c,v 1.9 2011/01/07 22:57:00 keithmarshall Exp $\n *\n * Provides a core implementation of the formatting capabilities\n * common to the entire `printf()' family of functions; it conforms\n * generally to C99 and SUSv3/POSIX specifications, with extensions\n * to support Microsoft's non-standard format specifications.\n *\n * Written by Keith Marshall <keithmarshall@users.sourceforge.net>\n *\n * This is free software.  You may redistribute and/or modify it as you\n * see fit, without restriction of copyright.\n *\n * This software is provided \"as is\", in the hope that it may be useful,\n * but WITHOUT WARRANTY OF ANY KIND, not even any implied warranty of\n * MERCHANTABILITY, nor of FITNESS FOR ANY PARTICULAR PURPOSE.  At no\n * time will the author accept any form of liability for any damages,\n * however caused, resulting from the use of this software.\n *\n * The elements of this implementation which deal with the formatting\n * of floating point numbers, (i.e. the `%e', `%E', `%f', `%F', `%g'\n * and `%G' format specifiers, but excluding the hexadecimal floating\n * point `%a' and `%A' specifiers), make use of the `__gdtoa' function\n * written by David M. Gay, and are modelled on his sample code, which\n * has been deployed under its accompanying terms of use:--\n *\n ******************************************************************\n * Copyright (C) 1997, 1999, 2001 Lucent Technologies\n * All Rights Reserved\n *\n * Permission to use, copy, modify, and distribute this software and\n * its documentation for any purpose and without fee is hereby\n * granted, provided that the above copyright notice appear in all\n * copies and that both that the copyright notice and this\n * permission notice and warranty disclaimer appear in supporting\n * documentation, and that the name of Lucent or any of its entities\n * not be used in advertising or publicity pertaining to\n * distribution of the software without specific, written prior\n * permission.\n *\n * LUCENT DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,\n * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.\n * IN NO EVENT SHALL LUCENT OR ANY OF ITS ENTITIES BE LIABLE FOR ANY\n * SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES\n * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER\n * IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,\n * ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF\n * THIS SOFTWARE.\n ******************************************************************\n *\n */"
+      ]
+    },
+    {
+      "git_blob": "ee98ac1ac827877eaa8e5de8a675bdc9dcced18c",
+      "path": "mingw-w64-crt/stdio/ucrt___local_stdio_printf_options.c",
+      "sha256": "0c8ab6443db6f80930f95ee4f380faf7e0bd7a04ecafa0fcba8016bd77a0c98c",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/stdio/ucrt___local_stdio_printf_options.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "0b06b14e9653a4dca58436e30cc2ad2feb9a5f2b",
+      "path": "mingw-w64-crt/stdio/ucrt_fprintf.c",
+      "sha256": "080d99fcea70a61cde96b5347e8a381c28778928584227cb6b70a543c3b0933c",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/stdio/ucrt_fprintf.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    },
+    {
+      "git_blob": "6ac1bb8c115a5cbf82d3d1a364fc3460eeb47380",
+      "path": "mingw-w64-crt/stdio/ucrt_vfprintf.c",
+      "sha256": "682fc042d9007afcfa6c022373178d22591af8c9cb93de9ab5525b3d17cd5b75",
+      "source": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/0d6dfbc348dfad714761c0a7151615767f96bcb5/mingw-w64-crt/stdio/ucrt_vfprintf.c",
+      "source_notices": [
+        "/**\n * This file has no copyright assigned and is placed in the Public Domain.\n * This file is part of the mingw-w64 runtime package.\n * No warranty is given; refer to the file DISCLAIMER.PD within this package.\n */"
+      ]
+    }
+  ],
+  "targets": {
+    "aarch64-pc-windows-gnullvm": {
+      "retained_objects": [
+        "Unwind-seh.cpp.obj",
+        "UnwindLevel1-gcc-ext.c.obj",
+        "UnwindLevel1.c.obj",
+        "UnwindRegistersSave.S.obj",
+        "crtbegin.o",
+        "crtend.o",
+        "dllcrt2.o",
+        "libarm64_libmingw32_a-cinitexe.o",
+        "libarm64_libmingw32_a-mingw_dll_ctors_dtors.o",
+        "libarm64_libmingw32_a-mingw_helpers.o",
+        "libarm64_libmingw32_a-natstart.o",
+        "libarm64_libmingw32_a-pseudo-reloc-list.o",
+        "libarm64_libmingw32_a-pseudo-reloc.o",
+        "libarm64_libmingw32_a-tlssup.o",
+        "libarm64_libmingwex_a-dllmain.o",
+        "libarm64_libmingwex_a-loadcfg.o",
+        "libarm64_libmingwex_a-mingw_cfguard_support.o",
+        "libarm64_libucrt_extra_a-ucrt___local_stdio_printf_options.o",
+        "libarm64_libucrt_extra_a-ucrt_fprintf.o",
+        "libarm64_libucrt_extra_a-ucrt_vfprintf.o",
+        "libunwind.cpp.obj"
+      ],
+      "sdk_inputs": [
+        {
+          "path": "aarch64-w64-mingw32/lib/crtbegin.o",
+          "sha256": "4ba912486f310ab85d7d06a90d4c46c22485edce0255a03a1f74c0c8510eff9e",
+          "size": 1309
+        },
+        {
+          "path": "aarch64-w64-mingw32/lib/crtend.o",
+          "sha256": "eefb57102e2168200514c7565f27b14fe519bb5a853e7f00d3e4dd2a5c777470",
+          "size": 1309
+        },
+        {
+          "path": "aarch64-w64-mingw32/lib/dllcrt2.o",
+          "sha256": "bf86f93b1ce6b401fc837edbac68e8b9ae474a3af335c67ba1659febd25305a6",
+          "size": 42872
+        },
+        {
+          "path": "aarch64-w64-mingw32/lib/libdbghelp.a",
+          "sha256": "b5d39301a039d48a1513c6222e5254efd96eb641508fac9a4635cd5e5da27968",
+          "size": 103246
+        },
+        {
+          "path": "aarch64-w64-mingw32/lib/libkernel32.a",
+          "sha256": "f5197cec7cea31be9847bfb6c3912bea507319be63740a6887d02a0b6bbdd893",
+          "size": 1009086
+        },
+        {
+          "path": "aarch64-w64-mingw32/lib/libmingw32.a",
+          "sha256": "ff45b29605c4c9de82d6ad40fcc7fe4139b37467df10541b286336f7929257c3",
+          "size": 339550
+        },
+        {
+          "path": "aarch64-w64-mingw32/lib/libmingwex.a",
+          "sha256": "d1108040c5e08d84d58108f4dfe40cb3793a0eee61d0a1fa6919f8469be5ea73",
+          "size": 4168698
+        },
+        {
+          "path": "aarch64-w64-mingw32/lib/libmsvcrt.a",
+          "sha256": "062c0d06384cb8f8db2666eda5e50dab9a300e2e662f9dda2711bd48576ae34d",
+          "size": 1796926
+        },
+        {
+          "path": "aarch64-w64-mingw32/lib/libntdll.a",
+          "sha256": "3c91ccf64aa2c8d2fa47bedf45531ec2c972ff37200eb541afb16d7259cce96c",
+          "size": 1126014
+        },
+        {
+          "path": "aarch64-w64-mingw32/lib/libunwind.a",
+          "sha256": "1a983632d86eb33d808534b4853e5185f31419adc787048c9f5bc3e76a79d9b9",
+          "size": 231528
+        },
+        {
+          "path": "aarch64-w64-mingw32/lib/libuser32.a",
+          "sha256": "fd1f8ad6376a7d57a01c9d0361f89ca038c8c03dde43b8298f094e73f24c6bf9",
+          "size": 434306
+        },
+        {
+          "path": "aarch64-w64-mingw32/lib/libuserenv.a",
+          "sha256": "fbc1da1ed5165754594e48fa8e1199a0fbe395e6ab29531d33633c14725789c5",
+          "size": 40108
+        },
+        {
+          "path": "aarch64-w64-mingw32/lib/libws2_32.a",
+          "sha256": "04d7f776550e3732b37cef7b2759862e82b2485e99cc9baf354df573da489483",
+          "size": 411636
+        },
+        {
+          "path": "lib/clang/23/lib/windows/libclang_rt.builtins-aarch64.a",
+          "sha256": "0eadf5121c8d6c9169769130d8e83a549251b91bd2686150d75f3914eb8ac6df",
+          "size": 760636
+        }
+      ]
+    },
+    "x86_64-pc-windows-gnullvm": {
+      "retained_objects": [
+        "Unwind-seh.cpp.obj",
+        "UnwindLevel1-gcc-ext.c.obj",
+        "UnwindLevel1.c.obj",
+        "UnwindRegistersSave.S.obj",
+        "crtbegin.o",
+        "crtend.o",
+        "dllcrt2.o",
+        "lib64_libmingw32_a-cinitexe.o",
+        "lib64_libmingw32_a-mingw_dll_ctors_dtors.o",
+        "lib64_libmingw32_a-mingw_helpers.o",
+        "lib64_libmingw32_a-natstart.o",
+        "lib64_libmingw32_a-pseudo-reloc-list.o",
+        "lib64_libmingw32_a-pseudo-reloc.o",
+        "lib64_libmingw32_a-tlssup.o",
+        "lib64_libmingwex_a-dllmain.o",
+        "lib64_libmingwex_a-dmisc.o",
+        "lib64_libmingwex_a-gdtoa.o",
+        "lib64_libmingwex_a-gmisc.o",
+        "lib64_libmingwex_a-guard_dispatch.o",
+        "lib64_libmingwex_a-loadcfg.o",
+        "lib64_libmingwex_a-mingw_cfguard_support.o",
+        "lib64_libmingwex_a-mingw_fprintf.o",
+        "lib64_libmingwex_a-mingw_pformat.o",
+        "lib64_libmingwex_a-misc.o",
+        "lib64_libucrt_extra_a-ucrt___local_stdio_printf_options.o",
+        "lib64_libucrt_extra_a-ucrt_fprintf.o",
+        "lib64_libucrt_extra_a-ucrt_vfprintf.o",
+        "libunwind.cpp.obj"
+      ],
+      "sdk_inputs": [
+        {
+          "path": "lib/clang/23/lib/windows/libclang_rt.builtins-x86_64.a",
+          "sha256": "fa6a7a18518ff5372a5f32a386ab0d689099d8c258c18eaea2431f514154c55b",
+          "size": 256660
+        },
+        {
+          "path": "x86_64-w64-mingw32/lib/crtbegin.o",
+          "sha256": "5dc28a7b0ecf42c769578f63b8d169c89c958f95c2e67b3a0d8f94b8bd3c6c60",
+          "size": 628
+        },
+        {
+          "path": "x86_64-w64-mingw32/lib/crtend.o",
+          "sha256": "c6b583eaf68b432e35507013e3213557edd2656c33916a7878c8efda18b95c19",
+          "size": 628
+        },
+        {
+          "path": "x86_64-w64-mingw32/lib/dllcrt2.o",
+          "sha256": "a846dd86db648a38ad5ee3d382295b6fa084df639a8c26cd32646ff9f71bfc47",
+          "size": 17632
+        },
+        {
+          "path": "x86_64-w64-mingw32/lib/libdbghelp.a",
+          "sha256": "f407acff38e12cb5227a6bad5f023f31c3705aca0a5339fc9b25ec433342e3cc",
+          "size": 49766
+        },
+        {
+          "path": "x86_64-w64-mingw32/lib/libkernel32.a",
+          "sha256": "6ee0041fafa7ad06bd7dc8b6b387e4ca066e76ccfeca56ae84af5a2a6d42a345",
+          "size": 577358
+        },
+        {
+          "path": "x86_64-w64-mingw32/lib/libmingw32.a",
+          "sha256": "a0aad43b481208ad1ff583102c00bd2a1e56e855b2045e282ed03845a44feef7",
+          "size": 139220
+        },
+        {
+          "path": "x86_64-w64-mingw32/lib/libmingwex.a",
+          "sha256": "df21bc3944a8766542f1b4c1ffc864e2b5dd997f2d14604eec12d3ba9258bfea",
+          "size": 1881848
+        },
+        {
+          "path": "x86_64-w64-mingw32/lib/libmsvcrt.a",
+          "sha256": "e4e38200c764bbfd217f3290f64b9bd3cc963dd782b34f3d747df27780360f62",
+          "size": 848642
+        },
+        {
+          "path": "x86_64-w64-mingw32/lib/libntdll.a",
+          "sha256": "a9e9a4eacaff6d5c186c514a8f27840df9de44c86de4dfbfe38dab0cae907cea",
+          "size": 545270
+        },
+        {
+          "path": "x86_64-w64-mingw32/lib/libunwind.a",
+          "sha256": "b37299ed084757834d7cee8d723aff6b349890d61505478602e9e981dcca839c",
+          "size": 91768
+        },
+        {
+          "path": "x86_64-w64-mingw32/lib/libuser32.a",
+          "sha256": "6b2bea0a02e6a95bcbb684ff4ede16a4a51c8bd0a55e7e15b81255c4467190bb",
+          "size": 207984
+        },
+        {
+          "path": "x86_64-w64-mingw32/lib/libuserenv.a",
+          "sha256": "c9d73aedfcbde527e9a41e9c1bb72924bd6fac5e8a4d0cae13483e8b72e2f94b",
+          "size": 19538
+        },
+        {
+          "path": "x86_64-w64-mingw32/lib/libws2_32.a",
+          "sha256": "fbb7fff6f90697b20285a1e4dfdeffb8cc5fdf7c8932ea39bc66bd722e3e33ad",
+          "size": 171084
+        }
+      ]
+    }
+  }
+}

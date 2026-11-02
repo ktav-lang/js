@@ -1,0 +1,27 @@
+name: Native npm payload and assembly guards
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  payload-contract:
+    name: Complete native npm role contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require the reviewed version for tag-triggered builds
+        shell: python
+        run: |
+          import os
+          ref = os.environ['GITHUB_REF']
+          if ref.startswith('refs/tags/') and ref != 'refs/tags/v0.8.1':
+              raise SystemExit('this source-bound release path requires separate review for a different version')
+      - name: Reject missing legal/source roles and altered native identities
+        run: python -I -m unittest discover -s ci -p test_native_npm_payload.py -v

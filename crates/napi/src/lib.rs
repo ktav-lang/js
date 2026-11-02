@@ -18,6 +18,9 @@ use napi::{sys, ValueType};
 use napi_derive::napi;
 use rustc_hash::FxBuildHasher;
 
+static KTAV_NOTICES: &[u8] =
+    include_bytes!(concat!(env!("OUT_DIR"), "/ktav-napi-notices.resource"));
+
 fn envelope_json(err: &ktav::Error, source: &str) -> String {
     let mut env = ktav::ErrorEnvelope::from_error(err, source);
     // Spec § 6: every source-content parse error carries a 1-based line.
@@ -152,6 +155,7 @@ fn line_of_offset(bytes: &[u8], pos: usize) -> u32 {
 /// Parse a Ktav document and return the equivalent JavaScript value.
 #[napi]
 pub fn loads<'env>(env: &'env Env, s: String) -> Result<Unknown<'env>> {
+    std::hint::black_box(KTAV_NOTICES);
     let value = ktav::parse(&s).map_err(|e| Error::from_reason(envelope_json(&e, &s)))?;
     value_to_js(env, &value)
 }

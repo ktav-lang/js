@@ -3,7 +3,8 @@ docs_local/
 
 # Rust build artifacts
 target/
-Cargo.lock
+**/Cargo.lock
+!/Cargo.lock
 
 # Node / JS
 node_modules/

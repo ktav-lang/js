@@ -1,0 +1,39 @@
+name: License checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  cargo-licenses:
+    name: Cargo dependency licenses
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@b66acf5e9fe20f8aba065be86778a8a4c846f902
+        with:
+          command: check licenses
+
+  npm-licenses:
+    name: npm dependency licenses
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node --test tests/npm-license-policy.test.mjs
+      - name: Check committed npm lockfile
+        run: node scripts/check-npm-licenses.mjs
+      - name: Resolve npm graph without lifecycle scripts
+        run: npm install --ignore-scripts
+      - name: Check resolved npm graph
+        run: node scripts/check-npm-licenses.mjs
+      - name: Resolve Vite example dependencies without lifecycle scripts
+        run: npm --prefix examples/bundler-vite install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Check Vite example licenses
+        run: node scripts/check-npm-licenses.mjs examples/bundler-vite

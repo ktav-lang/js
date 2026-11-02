@@ -25,3 +25,5 @@
 //! The pinned ABI also exports insert/remove/rename operations, each with
 //! textual-path and literal-segments variants.
 ktav::declare_cabi!();
+
+include!(concat!(env!("OUT_DIR"), "/native_notices.rs"));
